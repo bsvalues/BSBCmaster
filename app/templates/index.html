@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+    <header class="bg-dark py-3">
+        <div class="container">
+            <div class="d-flex align-items-center">
+                <h1 class="text-light mb-0">{{ title }}</h1>
+                <span class="badge bg-info ms-2">v{{ version }}</span>
+            </div>
+            <p class="text-light-emphasis mb-0 mt-2">{{ description }}</p>
+        </div>
+    </header>
+
+    <main class="container my-4">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h2 class="h5 mb-0">API Status</h2>
+                        <div class="d-flex align-items-center">
+                            <div class="status-indicator me-2">
+                                <span id="api-status" class="badge bg-secondary">Unknown</span>
+                            </div>
+                            <button id="refresh-status" class="btn btn-sm btn-outline-secondary">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
+                                    <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/>
+                                    <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-light-emphasis">PostgreSQL</span>
+                                    <span id="postgres-status" class="badge bg-secondary">Unknown</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-light-emphasis">MS SQL Server</span>
+                                    <span id="mssql-status" class="badge bg-secondary">Unknown</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h2 class="h5 mb-0">API Endpoints</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="accordion" id="endpoints-accordion">
+                            <!-- Health Check -->
+                            <div class="accordion-item">
+                                <h3 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-health" aria-expanded="false" aria-controls="collapse-health">
+                                        <span class="badge bg-success me-2">GET</span> /api/health
+                                    </button>
+                                </h3>
+                                <div id="collapse-health" class="accordion-collapse collapse" data-bs-parent="#endpoints-accordion">
+                                    <div class="accordion-body">
+                                        <p>Checks the health of the API and its database connections.</p>
+                                        <p><strong>Authentication:</strong> None required</p>
+                                        <p><strong>Response:</strong> Status of API and database connections</p>
+                                        <a href="{{ base_url }}/api/health" target="_blank" class="btn btn-sm btn-primary">Try it</a>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Run SQL Query -->
+                            <div class="accordion-item">
+                                <h3 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-run-query" aria-expanded="false" aria-controls="collapse-run-query">
+                                        <span class="badge bg-warning me-2">POST</span> /api/run-query
+                                    </button>
+                                </h3>
+                                <div id="collapse-run-query" class="accordion-collapse collapse" data-bs-parent="#endpoints-accordion">
+                                    <div class="accordion-body">
+                                        <p>Execute a SQL query against the specified database.</p>
+                                        <p><strong>Authentication:</strong> API Key required (X-API-Key header)</p>
+                                        <p><strong>Request Body:</strong></p>
+                                        <pre><code>{
+  "db": "postgres",
+  "query": "SELECT id, name FROM parcels LIMIT 10"
+}</code></pre>
+                                        <p><strong>Response:</strong> Query results with pagination</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- NL to SQL -->
+                            <div class="accordion-item">
+                                <h3 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-nl-to-sql" aria-expanded="false" aria-controls="collapse-nl-to-sql">
+                                        <span class="badge bg-warning me-2">POST</span> /api/nl-to-sql
+                                    </button>
+                                </h3>
+                                <div id="collapse-nl-to-sql" class="accordion-collapse collapse" data-bs-parent="#endpoints-accordion">
+                                    <div class="accordion-body">
+                                        <p>Convert natural language prompt to SQL query.</p>
+                                        <p><strong>Authentication:</strong> API Key required (X-API-Key header)</p>
+                                        <p><strong>Request Body:</strong></p>
+                                        <pre><code>{
+  "db": "postgres",
+  "prompt": "Find all parcels with a total value over $500,000"
+}</code></pre>
+                                        <p><strong>Response:</strong> Translated SQL query</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Discover Schema -->
+                            <div class="accordion-item">
+                                <h3 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-discover-schema" aria-expanded="false" aria-controls="collapse-discover-schema">
+                                        <span class="badge bg-success me-2">GET</span> /api/discover-schema
+                                    </button>
+                                </h3>
+                                <div id="collapse-discover-schema" class="accordion-collapse collapse" data-bs-parent="#endpoints-accordion">
+                                    <div class="accordion-body">
+                                        <p>Discover and return the database schema.</p>
+                                        <p><strong>Authentication:</strong> API Key required (X-API-Key header)</p>
+                                        <p><strong>Parameters:</strong></p>
+                                        <ul>
+                                            <li><code>db</code> - Database to query (mssql or postgres)</li>
+                                        </ul>
+                                        <p><strong>Response:</strong> Database schema details</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Schema Summary -->
+                            <div class="accordion-item">
+                                <h3 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-schema-summary" aria-expanded="false" aria-controls="collapse-schema-summary">
+                                        <span class="badge bg-success me-2">GET</span> /api/schema-summary
+                                    </button>
+                                </h3>
+                                <div id="collapse-schema-summary" class="accordion-collapse collapse" data-bs-parent="#endpoints-accordion">
+                                    <div class="accordion-body">
+                                        <p>Get a summarized view of the database schema.</p>
+                                        <p><strong>Authentication:</strong> API Key required (X-API-Key header)</p>
+                                        <p><strong>Parameters:</strong></p>
+                                        <ul>
+                                            <li><code>db</code> - Database to query (mssql or postgres)</li>
+                                            <li><code>prefix</code> - Optional table name prefix filter</li>
+                                        </ul>
+                                        <p><strong>Response:</strong> Summarized schema information</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-lg-4">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h2 class="h5 mb-0">API Authentication</h2>
+                    </div>
+                    <div class="card-body">
+                        <p>Most endpoints require API key authentication.</p>
+                        <p>Include your API key in the <code>X-API-Key</code> header with all authenticated requests.</p>
+                        <div class="alert alert-info">
+                            <h3 class="h6">Example</h3>
+                            <pre><code>X-API-Key: your-api-key-here</code></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="h5 mb-0">Resources</h2>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item bg-transparent">
+                                <a href="https://fastapi.tiangolo.com/" target="_blank" class="d-flex align-items-center text-decoration-none">
+                                    <span class="me-2">FastAPI Documentation</span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-up-right" viewBox="0 0 16 16">
+                                        <path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/>
+                                        <path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/>
+                                    </svg>
+                                </a>
+                            </li>
+                            <li class="list-group-item bg-transparent">
+                                <a href="https://www.postgresql.org/docs/" target="_blank" class="d-flex align-items-center text-decoration-none">
+                                    <span class="me-2">PostgreSQL Documentation</span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-up-right" viewBox="0 0 16 16">
+                                        <path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/>
+                                        <path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/>
+                                    </svg>
+                                </a>
+                            </li>
+                            <li class="list-group-item bg-transparent">
+                                <a href="https://learn.microsoft.com/en-us/sql/t-sql/language-reference" target="_blank" class="d-flex align-items-center text-decoration-none">
+                                    <span class="me-2">MS SQL Documentation</span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box-arrow-up-right" viewBox="0 0 16 16">
+                                        <path fill-rule="evenodd" d="M8.636 3.5a.5.5 0 0 0-.5-.5H1.5A1.5 1.5 0 0 0 0 4.5v10A1.5 1.5 0 0 0 1.5 16h10a1.5 1.5 0 0 0 1.5-1.5V7.864a.5.5 0 0 0-1 0V14.5a.5.5 0 0 1-.5.5h-10a.5.5 0 0 1-.5-.5v-10a.5.5 0 0 1 .5-.5h6.636a.5.5 0 0 0 .5-.5z"/>
+                                        <path fill-rule="evenodd" d="M16 .5a.5.5 0 0 0-.5-.5h-5a.5.5 0 0 0 0 1h3.793L6.146 9.146a.5.5 0 1 0 .708.708L15 1.707V5.5a.5.5 0 0 0 1 0v-5z"/>
+                                    </svg>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-dark py-3 mt-auto">
+        <div class="container">
+            <p class="text-light-emphasis mb-0 text-center">© {{ current_year }} MCP Assessor Agent API. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Update API and database status
+        function updateStatus() {
+            fetch('{{ base_url }}/api/health')
+                .then(response => response.json())
+                .then(data => {
+                    // Update API status
+                    const apiStatusEl = document.getElementById('api-status');
+                    apiStatusEl.textContent = data.status;
+                    apiStatusEl.className = data.status === 'ok' ? 'badge bg-success' : 'badge bg-danger';
+                    
+                    // Update database statuses
+                    const postgresStatusEl = document.getElementById('postgres-status');
+                    postgresStatusEl.textContent = data.db_connections.postgres ? 'Connected' : 'Disconnected';
+                    postgresStatusEl.className = data.db_connections.postgres ? 'badge bg-success' : 'badge bg-danger';
+                    
+                    const mssqlStatusEl = document.getElementById('mssql-status');
+                    mssqlStatusEl.textContent = data.db_connections.mssql ? 'Connected' : 'Disconnected';
+                    mssqlStatusEl.className = data.db_connections.mssql ? 'badge bg-success' : 'badge bg-danger';
+                })
+                .catch(error => {
+                    console.error('Error fetching API status:', error);
+                    document.getElementById('api-status').textContent = 'Error';
+                    document.getElementById('api-status').className = 'badge bg-danger';
+                });
+        }
+        
+        // Initial status update
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStatus();
+            
+            // Set up refresh button
+            document.getElementById('refresh-status').addEventListener('click', updateStatus);
+        });
+    </script>
+</body>
+</html>

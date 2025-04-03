@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - {{ version }}</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <div class="container py-4">
+        <header class="pb-3 mb-4 border-bottom">
+            <div class="d-flex align-items-center">
+                <h1 class="me-3">{{ title }}</h1>
+                <span class="badge bg-secondary">v{{ version }}</span>
+            </div>
+            <p class="lead text-muted">{{ description }}</p>
+        </header>
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">API Status</h4>
+                        <span id="status-badge" class="badge bg-warning">Checking...</span>
+                    </div>
+                    <div class="card-body">
+                        <h5>Database Connections</h5>
+                        <ul id="db-status" class="list-group">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                PostgreSQL
+                                <span id="postgres-status" class="badge bg-warning">Checking...</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                MS SQL Server
+                                <span id="mssql-status" class="badge bg-warning">Checking...</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h4 class="mb-0">API Key</h4>
+                    </div>
+                    <div class="card-body">
+                        <p>All API requests require authentication using an API key via the <code>X-API-Key</code> header.</p>
+                        <div class="alert alert-info">
+                            <p class="mb-0">To make requests using curl:</p>
+                            <pre><code>curl -X POST "{{ base_url }}/api/run-query" \
+     -H "X-API-Key: your_api_key" \
+     -H "Content-Type: application/json" \
+     -d '{"db": "postgres", "query": "SELECT * FROM parcels LIMIT 5"}'</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h4 class="mb-0">Available Endpoints</h4>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Endpoint</th>
+                                    <th>Method</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>/docs</code></td>
+                                    <td>GET</td>
+                                    <td>Interactive API documentation (Swagger UI)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>/api/health</code></td>
+                                    <td>GET</td>
+                                    <td>Health check endpoint for monitoring API status</td>
+                                </tr>
+                                <tr>
+                                    <td><code>/api/run-query</code></td>
+                                    <td>POST</td>
+                                    <td>Execute a SQL query against a specified database</td>
+                                </tr>
+                                <tr>
+                                    <td><code>/api/nl-to-sql</code></td>
+                                    <td>POST</td>
+                                    <td>Convert natural language to SQL query</td>
+                                </tr>
+                                <tr>
+                                    <td><code>/api/discover-schema</code></td>
+                                    <td>GET</td>
+                                    <td>Get detailed database schema information</td>
+                                </tr>
+                                <tr>
+                                    <td><code>/api/schema-summary</code></td>
+                                    <td>GET</td>
+                                    <td>Get a summary of the database schema</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="container mt-5 py-3 text-center border-top">
+        <p class="text-muted">© {{ current_year }} MCP Assessor API</p>
+    </footer>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

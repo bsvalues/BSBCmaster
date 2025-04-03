@@ -1,0 +1,23 @@
+/* Custom CSS for MCP Assessor Agent API */
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+footer {
+    margin-top: auto;
+}
+
+pre {
+    background-color: var(--bs-dark);
+    padding: 1rem;
+    border-radius: 0.25rem;
+    overflow-x: auto;
+}
+
+.status-indicator {
+    min-width: 80px;
+    text-align: center;
+}

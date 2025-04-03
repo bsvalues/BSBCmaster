@@ -1,0 +1,69 @@
+/* Custom styles for the MCP Assessor Agent API */
+
+/* Body styles */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Push footer to bottom */
+footer {
+    margin-top: auto;
+}
+
+/* Code block styles */
+pre {
+    background-color: var(--bs-dark-bg-subtle);
+    padding: 1rem;
+    border-radius: 0.25rem;
+    overflow-x: auto;
+}
+
+code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.875em;
+}
+
+/* Card hover effect */
+.list-group-item-action:hover {
+    transform: translateY(-2px);
+    transition: transform 0.2s ease;
+}
+
+/* Header styles */
+.display-4 {
+    font-weight: 600;
+}
+
+/* Status indicators */
+.db-status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.status-up {
+    background-color: var(--bs-success);
+}
+
+.status-down {
+    background-color: var(--bs-danger);
+}
+
+/* Card and list group custom styles */
+.card {
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.03);
+}
+
+.list-group-item {
+    background-color: var(--bs-tertiary-bg);
+    border-color: var(--bs-border-color);
+}
