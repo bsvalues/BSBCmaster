@@ -1,0 +1,429 @@
+from fastapi import FastAPI, Request, HTTPException, Depends, Query
+from fastapi.security.api_key import APIKeyHeader
+from pydantic import BaseModel, Field, constr
+from typing import List, Dict, Any, Optional
+import os
+import secrets
+import logging
+from contextlib import contextmanager
+import pyodbc
+import psycopg2
+from psycopg2.pool import ThreadedConnectionPool
+from pyodbc import OperationalError as PyodbcError
+from psycopg2 import OperationalError as PostgresError
+from starlette.middleware.cors import CORSMiddleware
+from starlette.status import (
+    HTTP_401_UNAUTHORIZED,
+    HTTP_400_BAD_REQUEST,
+    HTTP_403_FORBIDDEN,
+    HTTP_500_INTERNAL_SERVER_ERROR
+)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger("mcp_assessor_api")
+
+# Application configuration
+class Settings:
+    API_KEY: str = os.getenv("MCP_API_KEY")
+    MSSQL_CONN_STR: str = os.getenv("MSSQL_CONN_STR")
+    POSTGRES_CONN_STR: str = os.getenv("POSTGRES_CONN_STR")
+    ALLOWED_ORIGINS: List[str] = os.getenv("ALLOWED_ORIGINS", "").split(",")
+    MAX_RESULTS: int = int(os.getenv("MAX_RESULTS", "50"))
+    
+    # Security validation
+    def __init__(self):
+        if not self.API_KEY or len(self.API_KEY) < 32:
+            # Generate a secure API key if none provided or too weak
+            if not self.API_KEY:
+                logger.warning("No API key defined. Generating a secure random key.")
+            else:
+                logger.warning("API key too short. Generating a secure random key.")
+            self.API_KEY = secrets.token_urlsafe(48)
+            
+        if not self.ALLOWED_ORIGINS or self.ALLOWED_ORIGINS == [""]:
+            logger.warning("No CORS origins specified. Setting to localhost only.")
+            self.ALLOWED_ORIGINS = ["http://localhost:3000"]
+            
+        # Validate database connections
+        if not self.MSSQL_CONN_STR:
+            logger.warning("MS SQL connection string not provided")
+            
+        if not self.POSTGRES_CONN_STR:
+            logger.warning("PostgreSQL connection string not provided")
+
+settings = Settings()
+
+# Create FastAPI app
+app = FastAPI(
+    title="MCP Assessor Agent API",
+    description="API for accessing and querying assessment data",
+    version="1.0.0",
+)
+
+# API key security
+API_KEY_HEADER = APIKeyHeader(name="x-api-key", auto_error=False)
+
+async def get_api_key(api_key_header: str = Depends(API_KEY_HEADER)):
+    if not api_key_header:
+        logger.warning("API request missing key header")
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="API key is missing",
+        )
+    
+    if api_key_header != settings.API_KEY:
+        logger.warning("Invalid API key attempt")
+        raise HTTPException(
+            status_code=HTTP_403_FORBIDDEN,
+            detail="Invalid API key",
+        )
+    
+    return api_key_header
+
+# Database connection pools
+postgres_pool = None
+if settings.POSTGRES_CONN_STR:
+    try:
+        postgres_pool = ThreadedConnectionPool(1, 10, settings.POSTGRES_CONN_STR)
+        logger.info("PostgreSQL connection pool initialized")
+    except PostgresError as e:
+        logger.error(f"Failed to initialize PostgreSQL pool: {e}")
+
+# Context managers for database connections
+@contextmanager
+def get_mssql_connection():
+    """Get a connection from the MS SQL Server connection pool."""
+    conn = None
+    try:
+        conn = pyodbc.connect(settings.MSSQL_CONN_STR)
+        yield conn
+    except PyodbcError as e:
+        logger.error(f"MS SQL Server connection error: {e}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database connection error"
+        )
+    finally:
+        if conn:
+            conn.close()
+
+@contextmanager
+def get_postgres_connection():
+    """Get a connection from the PostgreSQL connection pool."""
+    conn = None
+    try:
+        conn = postgres_pool.getconn()
+        yield conn
+        postgres_pool.putconn(conn)
+    except (PostgresError, AttributeError) as e:
+        logger.error(f"PostgreSQL connection error: {e}")
+        if conn and postgres_pool:
+            postgres_pool.putconn(conn)
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database connection error"
+        )
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+# Request models with validation
+class SQLQuery(BaseModel):
+    db: constr(regex='^(mssql|postgres)$') = Field(..., description="Database type (mssql or postgres)")
+    query: constr(min_length=1, max_length=5000) = Field(..., description="SQL query to execute")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "db": "postgres",
+                "query": "SELECT id, name FROM parcels LIMIT 10"
+            }
+        }
+
+class NLPrompt(BaseModel):
+    db: constr(regex='^(mssql|postgres)$') = Field(..., description="Database type (mssql or postgres)")
+    prompt: constr(min_length=1, max_length=1000) = Field(..., description="Natural language query")
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "db": "postgres",
+                "prompt": "Find all parcels with a total value over $500,000"
+            }
+        }
+
+# Response models
+class QueryResult(BaseModel):
+    status: str
+    data: List[Dict[str, Any]]
+    count: int
+    truncated: bool
+    
+class SQLTranslation(BaseModel):
+    status: str
+    sql: str
+    
+class SchemaResponse(BaseModel):
+    status: str
+    schema: List[Dict[str, Any]]
+    
+class SchemaSummary(BaseModel):
+    status: str
+    summary: List[str]
+    
+class HealthResponse(BaseModel):
+    status: str
+    db_connections: Dict[str, bool]
+
+# SQL query sanitization and validation
+def is_safe_query(query: str) -> bool:
+    """Basic SQL injection prevention"""
+    unsafe_patterns = [
+        "DROP ", "DELETE ", "UPDATE ", "INSERT ", "ALTER ", "TRUNCATE ",
+        "CREATE ", "GRANT ", "EXEC ", "EXECUTE "
+    ]
+    
+    query_upper = query.upper()
+    return not any(pattern in query_upper for pattern in unsafe_patterns)
+
+# API endpoints
+@app.post(
+    "/tools/run_sql_query", 
+    response_model=QueryResult,
+    dependencies=[Depends(get_api_key)]
+)
+async def run_sql_query(payload: SQLQuery):
+    """Execute a SQL query against the specified database."""
+    logger.info(f"Running SQL query on {payload.db}")
+    
+    # Validate query for safety
+    if not is_safe_query(payload.query):
+        logger.warning(f"Unsafe SQL query attempted: {payload.query}")
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="Operation not permitted in this query"
+        )
+        
+    try:
+        results = []
+        if payload.db == "mssql":
+            with get_mssql_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(payload.query)
+                rows = cursor.fetchall()
+                columns = [column[0] for column in cursor.description]
+                results = [dict(zip(columns, row)) for row in rows]
+                
+        elif payload.db == "postgres":
+            with get_postgres_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(payload.query)
+                    rows = cursor.fetchall()
+                    columns = [desc[0] for desc in cursor.description]
+                    results = [dict(zip(columns, row)) for row in rows]
+                    
+        # Apply result limitation
+        total_count = len(results)
+        truncated = total_count > settings.MAX_RESULTS
+        limited_results = results[:settings.MAX_RESULTS]
+        
+        return {
+            "status": "success", 
+            "data": limited_results,
+            "count": total_count,
+            "truncated": truncated
+        }
+        
+    except (PyodbcError, PostgresError) as e:
+        logger.error(f"Database error: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database error: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred"
+        )
+
+@app.post(
+    "/tools/nl_to_sql", 
+    response_model=SQLTranslation,
+    dependencies=[Depends(get_api_key)]
+)
+async def nl_to_sql(prompt: NLPrompt):
+    """Convert natural language prompt to SQL query."""
+    logger.info(f"Processing NL->SQL request: {prompt.prompt}")
+    
+    try:
+        # This would normally call an LLM service
+        # Simulated response for demonstration
+        simulated_sql = f"SELECT * FROM parcels WHERE total_value > 500000 LIMIT 100"
+        
+        return {
+            "status": "success", 
+            "sql": simulated_sql
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in NL->SQL processing: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error processing natural language query"
+        )
+
+@app.get(
+    "/tools/discover_schema", 
+    response_model=SchemaResponse,
+    dependencies=[Depends(get_api_key)]
+)
+async def discover_schema(db: str = Query(..., regex="^(mssql|postgres)$")):
+    """Discover and return the database schema."""
+    logger.info(f"Discovering schema for {db}")
+    
+    try:
+        if db == "mssql":
+            with get_mssql_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT 
+                        TABLE_NAME, 
+                        COLUMN_NAME, 
+                        DATA_TYPE 
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                """)
+                rows = cursor.fetchall()
+                columns = [column[0] for column in cursor.description]
+                results = [dict(zip(columns, row)) for row in rows]
+                
+        elif db == "postgres":
+            with get_postgres_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT 
+                            table_name, 
+                            column_name, 
+                            data_type 
+                        FROM information_schema.columns 
+                        WHERE table_schema = 'public'
+                    """)
+                    rows = cursor.fetchall()
+                    columns = [desc[0] for desc in cursor.description]
+                    results = [dict(zip(columns, row)) for row in rows]
+        
+        return {"status": "success", "schema": results}
+        
+    except Exception as e:
+        logger.error(f"Error discovering schema: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving database schema"
+        )
+
+@app.get(
+    "/tools/get_schema_summary", 
+    response_model=SchemaSummary,
+    dependencies=[Depends(get_api_key)]
+)
+async def get_schema_summary(
+    db: str = Query(..., regex="^(mssql|postgres)$"),
+    prefix: str = Query("", max_length=50)
+):
+    """Get a summarized view of the database schema."""
+    logger.info(f"Getting schema summary for {db} with prefix '{prefix}'")
+    
+    try:
+        schema = []
+        if db == "mssql":
+            with get_mssql_connection() as conn:
+                cursor = conn.cursor()
+                query = """
+                    SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME LIKE ?
+                """
+                cursor.execute(query, (f"{prefix}%",))
+                schema = cursor.fetchall()
+                
+        elif db == "postgres":
+            with get_postgres_connection() as conn:
+                with conn.cursor() as cursor:
+                    query = """
+                        SELECT table_name, column_name, data_type
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name LIKE %s
+                    """
+                    cursor.execute(query, (f"{prefix}%",))
+                    schema = cursor.fetchall()
+
+        # Generate formatted summaries
+        table_dict = {}
+        for table, column, dtype in schema:
+            if table not in table_dict:
+                table_dict[table] = []
+            table_dict[table].append(f"{column} ({dtype})")
+
+        summaries = [
+            f"Table `{table}` with columns: {', '.join(cols)}" 
+            for table, cols in table_dict.items()
+        ]
+
+        return {"status": "success", "summary": summaries}
+        
+    except Exception as e:
+        logger.error(f"Error getting schema summary: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error retrieving schema summary"
+        )
+
+@app.get("/health", response_model=HealthResponse)
+async def health():
+    """Check the health status of the API and database connections."""
+    db_status = {
+        "mssql": False,
+        "postgres": False
+    }
+    
+    # Check MSSQL connection
+    if settings.MSSQL_CONN_STR:
+        try:
+            with get_mssql_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT 1")
+                db_status["mssql"] = True
+        except Exception:
+            pass
+    
+    # Check PostgreSQL connection
+    if postgres_pool:
+        try:
+            with get_postgres_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT 1")
+                    db_status["postgres"] = True
+        except Exception:
+            pass
+    
+    return {
+        "status": "ok",
+        "db_connections": db_status
+    }
+
+# Cleanup connection pools on shutdown
+@app.on_event("shutdown")
+def shutdown_event():
+    if postgres_pool:
+        postgres_pool.closeall()
+        logger.info("PostgreSQL connection pool closed")

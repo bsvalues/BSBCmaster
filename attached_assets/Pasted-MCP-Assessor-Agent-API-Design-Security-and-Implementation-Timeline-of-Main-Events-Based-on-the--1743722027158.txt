@@ -1,0 +1,114 @@
+MCP Assessor Agent API: Design, Security, and Implementation
+Timeline of Main Events
+Based on the provided sources, the timeline focuses on the development and operational aspects of the "MCP Assessor Agent API":
+•
+Initialization of Settings: The API starts by loading configuration settings from environment variables, including API keys, database connection strings (for MS SQL and PostgreSQL), allowed CORS origins, and maximum result limits.
+•
+API Key Generation (if necessary): If an API key is not provided via the MCP_API_KEY environment variable or if it's shorter than 32 characters, the API generates a secure random API key. Warnings are logged in these scenarios.
+•
+CORS Origin Configuration: If no allowed CORS origins are specified or if the provided value is empty, the API defaults to allowing requests only from http://localhost:3000 and logs a warning.
+•
+Database Connection String Validation: The API checks for the presence of MS SQL and PostgreSQL connection strings in the environment variables. Warnings are logged if either is missing.
+•
+FastAPI Application Creation: An instance of the FastAPI application is created with a title, description, and version.
+•
+API Key Security Setup: An APIKeyHeader is defined for authenticating requests using the x-api-key header. A dependency function get_api_key is created to validate the provided API key against the configured settings.API_KEY. Unauthorized or invalid key attempts result in HTTP exceptions (401 or 403).
+•
+PostgreSQL Connection Pool Initialization (if configured): If a PostgreSQL connection string is provided, a ThreadedConnectionPool is initialized. The success or failure of this initialization is logged.
+•
+Definition of Database Connection Context Managers: @contextmanager decorators are used to create functions (get_mssql_connection and get_postgres_connection) that handle the acquisition and release of database connections, including error handling for connection failures.
+•
+CORS Middleware Integration: The CORSMiddleware is added to the FastAPI application to handle Cross-Origin Resource Sharing based on the configured ALLOWED_ORIGINS.
+•
+Definition of Request and Response Models: Pydantic BaseModel classes are defined to structure and validate the input and output data for various API endpoints (e.g., SQLQuery, NLPrompt, QueryResult, SQLTranslation, SchemaResponse, SchemaSummary, HealthResponse). These models also include example schemas for documentation.
+•
+Implementation of SQL Query Sanitization: The is_safe_query function is defined to perform basic checks for potentially malicious SQL keywords in user-provided queries.
+•
+Implementation of API Endpoints:
+◦
+/tools/run_sql_query (POST): Executes a validated SQL query against the specified database (MSSQL or PostgreSQL). It includes safety checks, database connection handling, query execution, result formatting, and result limitation based on settings.MAX_RESULTS.
+◦
+/tools/nl_to_sql (POST): Simulates the conversion of a natural language prompt to a SQL query (currently a placeholder with a simulated response).
+◦
+/tools/discover_schema (GET): Retrieves the schema (table name, column name, data type) for the specified database.
+◦
+/tools/get_schema_summary (GET): Provides a summarized view of the database schema, optionally filtered by a table name prefix.
+◦
+/health (GET): Checks the health status of the API and attempts to establish connections to the configured databases.
+•
+Logging Configuration: Basic logging is configured to output informational, warning, error, and critical messages to the console.
+•
+Shutdown Event Handling: An event handler is defined for the shutdown event to gracefully close the PostgreSQL connection pool if it was initialized.
+•
+Security Vulnerabilities Identified: An analysis of the code reveals several security concerns, including potential API key exposure, SQL injection risks, excessive data exposure through direct use of environment variables, and a broad CORS configuration.
+•
+Performance and Reliability Issues Identified: The analysis also points out potential performance and reliability issues such as inefficient connection management without pooling for MS SQL, generic error handling, and hard-coded result limitations without pagination.
+•
+Recommendations for Improvement: A refactored approach is recommended, focusing on security enhancements (secure API key generation, SQL injection prevention, restricted CORS, configuration separation), database optimization (connection pooling for PostgreSQL, context managers, standardized error handling), API design improvements (type validation, response models, input validation, documentation), operational excellence (structured logging, health check, graceful shutdown, pagination), and specific error handling.
+Cast of Characters
+•
+FastAPI: A modern, fast (high-performance), web framework for building APIs with Python based on standard Python type hints. It is the framework used to build the MCP Assessor Agent API.
+•
+Request: Represents an incoming HTTP request to the API, used by FastAPI to access request details.
+•
+HTTPException: A specific exception type in FastAPI used to raise HTTP error responses with a given status code and detail message.
+•
+Depends: A function used in FastAPI for dependency injection, allowing the execution of code before an endpoint function, such as for authentication (e.g., get_api_key).
+•
+Query: Used in FastAPI to define and validate query parameters in GET requests.
+•
+APIKeyHeader: A security scheme from fastapi.security used to expect an API key in a custom HTTP header (in this case, x-api-key).
+•
+BaseModel (from Pydantic): The base class for creating data models with type hints and automatic data validation and serialization. Used extensively for request and response payloads in the API.
+•
+Field (from Pydantic): Used within Pydantic models to define attributes, their types, and additional metadata like descriptions and constraints.
+•
+constr (from Pydantic): A constrained string type in Pydantic, used here to define strings with specific regex patterns, minimum lengths, and maximum lengths.
+•
+List, Dict, Any, Optional (from typing): Standard Python type hints used to define the structure of data.
+•
+os: The Python module for interacting with the operating system, used here to access environment variables.
+•
+secrets: The Python module for generating cryptographically strong random numbers, used for generating secure API keys if needed.
+•
+logging: The Python module for emitting log messages, used for monitoring the API's behavior and potential issues.
+•
+contextmanager (from contextlib): A decorator used to define context managers, which help manage resources (like database connections) by ensuring they are properly set up and torn down.
+•
+pyodbc: A Python library for connecting to ODBC databases, used here for interacting with MS SQL Server.
+•
+psycopg2: A popular Python library for interacting with PostgreSQL databases.
+•
+ThreadedConnectionPool (from psycopg2.pool): A class from psycopg2 that implements a pool of database connections to improve performance by reusing connections.
+•
+OperationalError (from pyodbc and psycopg2): Specific exception types raised by the database drivers for operational errors, such as connection problems.
+•
+CORSMiddleware (from starlette.middleware.cors): A middleware used to enable Cross-Origin Resource Sharing (CORS) for the API.
+•
+Settings: A custom class used to load and manage the API's configuration settings from environment variables.
+•
+logger: A logging object configured for the "mcp_assessor_api" application.
+•
+API_KEY_HEADER: An instance of APIKeyHeader defining the expected API key header.
+•
+postgres_pool: An instance of ThreadedConnectionPool for PostgreSQL connections (if configured).
+•
+get_mssql_connection: A context manager function for obtaining and releasing MS SQL Server connections.
+•
+get_postgres_connection: A context manager function for obtaining and releasing PostgreSQL connections from the pool.
+•
+SQLQuery: A Pydantic model for requests to the /tools/run_sql_query endpoint, containing the database type and the SQL query.
+•
+NLPrompt: A Pydantic model for requests to the /tools/nl_to_sql endpoint, containing the database type and the natural language prompt.
+•
+QueryResult: A Pydantic model for the response from the /tools/run_sql_query endpoint, containing the status, data, count, and truncation status.
+•
+SQLTranslation: A Pydantic model for the response from the /tools/nl_to_sql endpoint, containing the status and the translated SQL query.
+•
+SchemaResponse: A Pydantic model for the response from the /tools/discover_schema endpoint, containing the status and the database schema.
+•
+SchemaSummary: A Pydantic model for the response from the /tools/get_schema_summary endpoint, containing the status and a summary of the database schema.
+•
+HealthResponse: A Pydantic model for the response from the /health endpoint, containing the status and the connection status of the databases.
+•
+is_safe_query: A function that performs a basic check to prevent potential SQL injection attacks.

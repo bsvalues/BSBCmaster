@@ -1,0 +1,116 @@
+MCP Assessor Agent API Study Guide
+MCP Assessor Agent API Study Guide
+Quiz
+1.
+What are the two primary database systems that this FastAPI application is designed to interact with? Briefly describe how the application manages connections to each.
+2.
+Explain the purpose of the APIKeyHeader and the get_api_key dependency function in this application. What security concern does this mechanism address?
+3.
+Describe the functionality of the /tools/run_sql_query endpoint. What measures are in place to prevent potentially harmful SQL queries?
+4.
+What is the role of Pydantic BaseModel in this API? Provide an example of how it is used for request validation.
+5.
+Explain the purpose of the /tools/discover_schema endpoint and what information it returns about the database.
+6.
+Describe the function of the CORS middleware configured in this application. Why is it important for web applications?
+7.
+What is the purpose of the context managers get_mssql_connection and get_postgres_connection? How do they contribute to resource management?
+8.
+Explain the functionality of the /tools/nl_to_sql endpoint as described in the code. What is its intended use case?
+9.
+What information does the /health endpoint provide? Why is such an endpoint useful for a deployed API?
+10.
+Describe the purpose of the Settings class in this application. How are configuration values typically provided to this class?
+Quiz Answer Key
+1.
+The application interacts with MS SQL Server and PostgreSQL. It uses connection strings defined in environment variables to establish connections. For PostgreSQL, it initializes a ThreadedConnectionPool for managing connections, while for MS SQL Server, it establishes a new connection for each request within a context manager.
+2.
+APIKeyHeader defines the expected HTTP header (x-api-key) for API key authentication. The get_api_key dependency function verifies the presence and validity of this key against the settings.API_KEY, raising an HTTPException for missing or invalid keys. This addresses unauthorized access to the API endpoints.
+3.
+The /tools/run_sql_query endpoint allows clients to execute SQL queries against a specified database (mssql or postgres). Before execution, the is_safe_query function performs a basic check for potentially harmful SQL keywords (e.g., DROP, DELETE) to prevent SQL injection.
+4.
+Pydantic BaseModel is used to define the structure and validation rules for request and response bodies. For example, the SQLQuery model defines the expected fields (db and query) and their types and constraints (e.g., using constr for string constraints and regex).
+5.
+The /tools/discover_schema endpoint retrieves and returns the schema information for a specified database (mssql or postgres). It fetches the table names, column names, and data types from the database's information schema and returns them in a structured JSON format.
+6.
+The CORS (Cross-Origin Resource Sharing) middleware configures which origins (domains) are allowed to make HTTP requests to the API. It is important for security, preventing unauthorized websites from making requests to the API from a different domain than the one that served the web page.
+7.
+The context managers get_mssql_connection and get_postgres_connection are used to safely acquire and release database connections. They ensure that a connection is established, yielded for use within the with block, and then properly closed (for MSSQL) or returned to the pool (for PostgreSQL), even if errors occur.
+8.
+The /tools/nl_to_sql endpoint is intended to convert natural language prompts into SQL queries. The provided code includes a placeholder that simulates this functionality by returning a hardcoded SQL query based on the prompt. In a real implementation, this would likely involve integration with a natural language processing model.
+9.
+The /health endpoint checks the operational status of the API and its database connections. It returns a JSON response indicating whether the API is "ok" and the connection status (True or False) for both MS SQL Server and PostgreSQL. This is useful for monitoring and ensuring the API's dependencies are functioning correctly.
+10.
+The Settings class is used to manage the application's configuration, such as API keys, database connection strings, allowed CORS origins, and maximum result limits. These values are typically loaded from environment variables using os.getenv(), allowing for configuration without modifying the code directly.
+Essay Format Questions
+1.
+Discuss the security measures implemented in the MCP Assessor Agent API, as evidenced by the provided code. Analyze their effectiveness and suggest potential additional security enhancements.
+2.
+Compare and contrast the approaches used for managing database connections to MS SQL Server and PostgreSQL in this application. Evaluate the advantages and disadvantages of each approach in terms of performance and reliability.
+3.
+Analyze the design of the API endpoints provided in the code. Discuss their functionality, input/output models, and how they contribute to the overall purpose of the MCP Assessor Agent API.
+4.
+Evaluate the error handling strategies implemented in the API, considering both database-related errors and other potential exceptions. Discuss the information provided to the client in case of an error and suggest improvements for debugging and user experience.
+5.
+Discuss the role of configuration management in this FastAPI application. Explain how environment variables are used and why this is a common practice for deploying applications. Suggest alternative or complementary configuration strategies.
+Glossary of Key Terms
+•
+FastAPI: A modern, high-performance, web framework for building APIs with Python based on standard Python type hints.
+•
+API Key: A code used to identify and authenticate an application or user making requests to an API.
+•
+HTTPException: A specific exception in FastAPI used to return HTTP error responses with a given status code and detail.
+•
+Depends: A function in FastAPI used for dependency injection, allowing for the reuse of logic and automatic validation.
+•
+APIKeyHeader: A specific dependency in FastAPI Security used to expect and validate an API key provided in a request header.
+•
+Pydantic: A data validation and settings management library using Python type hints.
+•
+BaseModel: The base class in Pydantic for creating data models with type validation and serialization.
+•
+constr: A Pydantic type that allows defining string constraints, such as minimum and maximum length, and regular expression patterns.
+•
+List: A built-in Python type representing an ordered collection of items.
+•
+Dict: A built-in Python type representing a collection of key-value pairs.
+•
+Any: A type hint indicating that a variable can hold any type of value.
+•
+Optional: A type hint indicating that a variable can either hold a specific type or be None.
+•
+os: A built-in Python module providing a way of using operating system dependent functionality, such as accessing environment variables.
+•
+secrets: A built-in Python module for generating cryptographically strong random numbers suitable for managing secrets like API keys.
+•
+logging: A built-in Python module that provides a flexible event logging system for applications.
+•
+contextmanager: A decorator in the contextlib module that allows defining functions to be used with the with statement for managing resources.
+•
+pyodbc: A Python library that provides access to ODBC databases, such as MS SQL Server.
+•
+psycopg2: A popular PostgreSQL adapter for Python.
+•
+ThreadedConnectionPool: A class in psycopg2.pool that manages a pool of database connections to improve performance by reusing connections.
+•
+OperationalError: An exception raised by database connectors (like pyodbc and psycopg2) for errors related to the database operation.
+•
+CORSMiddleware: Middleware in Starlette (the ASGI framework underlying FastAPI) used to configure Cross-Origin Resource Sharing.
+•
+HTTP Status Codes: Standardized codes indicating the outcome of an HTTP request (e.g., 401 Unauthorized, 400 Bad Request, 500 Internal Server Error).
+•
+Environment Variables: Dynamic named values that can affect the way running processes will behave on a computer. They are often used to configure applications.
+•
+SQL Injection: A code injection technique, used to attack data-driven applications, in which malicious SQL statements are inserted into an entry field for execution.
+•
+Schema: The structure of a database, including tables, columns, data types, and relationships.
+•
+Sanitization: The process of removing or escaping potentially harmful characters or code from input data.
+•
+Validation: The process of ensuring that input data conforms to expected formats, types, and constraints.
+•
+Middleware: Software that acts as a bridge between an operating system or database and applications, especially on a network. In FastAPI, it's used to process requests and responses.
+•
+Dependency Injection: A design pattern in which an object receives other objects that it depends on. In FastAPI, it's implemented using the Depends function.
+•
+ASGI (Asynchronous Server Gateway Interface): A specification for a standard interface between asynchronous Python web servers, frameworks, and applications. FastAPI is built on top of Starlette, which is an ASGI framework.
