@@ -4,6 +4,7 @@ This file provides a Flask application for documentation of the MCP Assessor Age
 
 import os
 import logging
+import asyncio
 from flask import Flask, render_template, request, jsonify
 from datetime import datetime
 
@@ -13,6 +14,14 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
+# Import the database initialization function
+from app.db import initialize_db
+
+# Initialize the database connection pool
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+loop.run_until_complete(initialize_db())
+
 # Create the Flask app
 app = Flask(__name__, 
             template_folder='app/templates',
@@ -21,12 +30,8 @@ app = Flask(__name__,
 # Database connection status
 def test_db_connections():
     """Test connections to configured databases."""
-    # For now, just return static values
-    # In a real implementation, this would test actual connections
-    return {
-        "postgres": os.environ.get("PGHOST") is not None,
-        "mssql": False  # MS SQL not configured
-    }
+    from app.db import test_db_connections as db_test
+    return db_test()
 
 @app.route('/')
 def index():
