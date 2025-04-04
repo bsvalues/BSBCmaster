@@ -1,0 +1,714 @@
+<div id="visualization-container" class="mt-4">
+    <div class="card bg-dark">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Visualize Results</span>
+            <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="toggle-viz-btn">
+                    <i class="bi bi-bar-chart"></i> Toggle Visualization
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-info ms-2" id="advanced-viz-btn" style="display: none;">
+                    <i class="bi bi-graph-up"></i> Advanced Options
+                </button>
+            </div>
+        </div>
+        <div class="card-body" id="chart-container" style="display: none;">
+            <ul class="nav nav-tabs mb-3" id="vizTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic-viz" type="button" role="tab" aria-controls="basic-viz" aria-selected="true">Basic</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced-viz" type="button" role="tab" aria-controls="advanced-viz" aria-selected="false">Advanced</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="property-tab" data-bs-toggle="tab" data-bs-target="#property-viz" type="button" role="tab" aria-controls="property-viz" aria-selected="false">Property Data</button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="vizTabContent">
+                <!-- Basic Visualization Tab -->
+                <div class="tab-pane fade show active" id="basic-viz" role="tabpanel" aria-labelledby="basic-tab">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="chartType" class="form-label">Chart Type:</label>
+                            <select id="chartType" class="form-select">
+                                <option value="bar">Bar Chart</option>
+                                <option value="line">Line Chart</option>
+                                <option value="pie">Pie Chart</option>
+                                <option value="scatter">Scatter Plot</option>
+                                <option value="doughnut">Doughnut Chart</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="xAxis" class="form-label">X Axis:</label>
+                            <select id="xAxis" class="form-select"></select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="yAxis" class="form-label">Y Axis:</label>
+                            <select id="yAxis" class="form-select"></select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Advanced Visualization Tab -->
+                <div class="tab-pane fade" id="advanced-viz" role="tabpanel" aria-labelledby="advanced-tab">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="advancedChartType" class="form-label">Visualization Type:</label>
+                            <select id="advancedChartType" class="form-select">
+                                <option value="stacked">Stacked Bar Chart</option>
+                                <option value="timeseries">Time Series</option>
+                                <option value="scatter">Scatter Plot with Groups</option>
+                                <option value="heatmap">Heat Map</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="primaryField" class="form-label">Primary Field:</label>
+                            <select id="primaryField" class="form-select"></select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="secondaryField" class="form-label">Secondary Field:</label>
+                            <select id="secondaryField" class="form-select"></select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="groupByField" class="form-label">Group By Field:</label>
+                            <select id="groupByField" class="form-select"></select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="aggregationType" class="form-label">Aggregation:</label>
+                            <select id="aggregationType" class="form-select">
+                                <option value="sum">Sum</option>
+                                <option value="avg">Average</option>
+                                <option value="count">Count</option>
+                                <option value="min">Minimum</option>
+                                <option value="max">Maximum</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="sortOrder" class="form-label">Sort Order:</label>
+                            <select id="sortOrder" class="form-select">
+                                <option value="asc">Ascending</option>
+                                <option value="desc">Descending</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Property Data Tab -->
+                <div class="tab-pane fade" id="property-viz" role="tabpanel" aria-labelledby="property-tab">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="propertyVizType" class="form-label">Property Visualization:</label>
+                            <select id="propertyVizType" class="form-select">
+                                <option value="valueDistribution">Value Distribution</option>
+                                <option value="propertyType">Property by Type</option>
+                                <option value="saleHistory">Sales History</option>
+                                <option value="valueTrends">Value Trends</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label for="dataSummary" class="form-label">Data Summary:</label>
+                            <div id="dataSummary" class="p-2 bg-dark border border-secondary rounded">
+                                <small class="text-light" id="summaryText">Select visualization type to see data summary</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="height: 400px;" class="mt-3">
+                <canvas id="resultChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Add visualization functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle visualization display
+    const toggleVizBtn = document.getElementById('toggle-viz-btn');
+    const advancedVizBtn = document.getElementById('advanced-viz-btn');
+    const chartContainer = document.getElementById('chart-container');
+    
+    if (toggleVizBtn) {
+        toggleVizBtn.addEventListener('click', function() {
+            const isHidden = chartContainer.style.display === 'none';
+            chartContainer.style.display = isHidden ? 'block' : 'none';
+            advancedVizBtn.style.display = isHidden ? 'inline-block' : 'none';
+            
+            if (isHidden && window.lastResults && window.lastResults.data) {
+                updateChartSelectors();
+                updateAdvancedSelectors();
+                updatePropertyDataSelectors();
+                updateChart();
+            }
+        });
+    }
+    
+    // Tab selectors
+    const basicTab = document.getElementById('basic-tab');
+    const advancedTab = document.getElementById('advanced-tab');
+    const propertyTab = document.getElementById('property-tab');
+    
+    // Chart selectors for basic charts
+    const chartTypeSelect = document.getElementById('chartType');
+    const xAxisSelect = document.getElementById('xAxis');
+    const yAxisSelect = document.getElementById('yAxis');
+    
+    // Advanced chart selectors
+    const advancedChartTypeSelect = document.getElementById('advancedChartType');
+    const primaryFieldSelect = document.getElementById('primaryField');
+    const secondaryFieldSelect = document.getElementById('secondaryField');
+    const groupByFieldSelect = document.getElementById('groupByField');
+    const aggregationTypeSelect = document.getElementById('aggregationType');
+    const sortOrderSelect = document.getElementById('sortOrder');
+    
+    // Property data selectors
+    const propertyVizTypeSelect = document.getElementById('propertyVizType');
+    const summaryText = document.getElementById('summaryText');
+    
+    // Add event listeners
+    if (chartTypeSelect && xAxisSelect && yAxisSelect) {
+        chartTypeSelect.addEventListener('change', updateChart);
+        xAxisSelect.addEventListener('change', updateChart);
+        yAxisSelect.addEventListener('change', updateChart);
+    }
+    
+    if (advancedChartTypeSelect) {
+        advancedChartTypeSelect.addEventListener('change', updateAdvancedChart);
+        primaryFieldSelect.addEventListener('change', updateAdvancedChart);
+        secondaryFieldSelect.addEventListener('change', updateAdvancedChart);
+        groupByFieldSelect.addEventListener('change', updateAdvancedChart);
+        aggregationTypeSelect.addEventListener('change', updateAdvancedChart);
+        sortOrderSelect.addEventListener('change', updateAdvancedChart);
+    }
+    
+    if (propertyVizTypeSelect) {
+        propertyVizTypeSelect.addEventListener('change', updatePropertyChart);
+    }
+    
+    // Tab change events
+    if (basicTab && advancedTab && propertyTab) {
+        basicTab.addEventListener('click', function() {
+            setTimeout(updateChart, 100);
+        });
+        
+        advancedTab.addEventListener('click', function() {
+            setTimeout(updateAdvancedChart, 100);
+        });
+        
+        propertyTab.addEventListener('click', function() {
+            setTimeout(updatePropertyChart, 100);
+        });
+    }
+    
+    // Update chart selectors
+    function updateChartSelectors() {
+        if (!window.lastResults || !window.lastResults.data || window.lastResults.data.length === 0) {
+            return;
+        }
+        
+        // Clear existing options
+        xAxisSelect.innerHTML = '';
+        yAxisSelect.innerHTML = '';
+        
+        // Get data columns
+        const data = window.lastResults.data;
+        const columns = Object.keys(data[0]);
+        
+        // Get column types
+        const numericColumns = getNumericColumns(data);
+        const dateColumns = getDateColumns(data);
+        const textColumns = getTextColumns(data);
+        
+        // Add options for X-axis (prefer text/date columns first)
+        [...textColumns, ...dateColumns, ...numericColumns, ...columns.filter(c => 
+            !textColumns.includes(c) && !dateColumns.includes(c) && !numericColumns.includes(c)
+        )].forEach(column => {
+            const option = document.createElement('option');
+            option.value = column;
+            option.textContent = column;
+            xAxisSelect.appendChild(option);
+        });
+        
+        // Add options for Y-axis (prefer numeric columns first)
+        [...numericColumns, ...columns.filter(c => !numericColumns.includes(c))].forEach(column => {
+            const option = document.createElement('option');
+            option.value = column;
+            option.textContent = column;
+            yAxisSelect.appendChild(option);
+        });
+        
+        // Set default selections if possible
+        if (textColumns.length > 0 && numericColumns.length > 0) {
+            xAxisSelect.value = textColumns[0];
+            yAxisSelect.value = numericColumns[0];
+        } else if (dateColumns.length > 0 && numericColumns.length > 0) {
+            xAxisSelect.value = dateColumns[0];
+            yAxisSelect.value = numericColumns[0];
+        } else if (columns.length >= 2) {
+            xAxisSelect.value = columns[0];
+            yAxisSelect.value = columns[1];
+        }
+    }
+    
+    // Update advanced selectors
+    function updateAdvancedSelectors() {
+        if (!window.lastResults || !window.lastResults.data || window.lastResults.data.length === 0) {
+            return;
+        }
+        
+        // Clear existing options
+        primaryFieldSelect.innerHTML = '';
+        secondaryFieldSelect.innerHTML = '';
+        groupByFieldSelect.innerHTML = '';
+        
+        // Get data columns
+        const data = window.lastResults.data;
+        const columns = Object.keys(data[0]);
+        
+        // Get column types
+        const numericColumns = getNumericColumns(data);
+        const dateColumns = getDateColumns(data);
+        const textColumns = getTextColumns(data);
+        
+        // Add a blank option for group by
+        const blankOption = document.createElement('option');
+        blankOption.value = '';
+        blankOption.textContent = '-- None --';
+        groupByFieldSelect.appendChild(blankOption);
+        
+        // Add all columns to primary field
+        columns.forEach(column => {
+            const option = document.createElement('option');
+            option.value = column;
+            option.textContent = column;
+            primaryFieldSelect.appendChild(option.cloneNode(true));
+        });
+        
+        // Add numeric columns to secondary field
+        numericColumns.forEach(column => {
+            const option = document.createElement('option');
+            option.value = column;
+            option.textContent = column;
+            secondaryFieldSelect.appendChild(option.cloneNode(true));
+        });
+        
+        // Add category columns to group by
+        [...textColumns, ...dateColumns].forEach(column => {
+            const option = document.createElement('option');
+            option.value = column;
+            option.textContent = column;
+            groupByFieldSelect.appendChild(option.cloneNode(true));
+        });
+        
+        // Set defaults based on chart type
+        const chartType = advancedChartTypeSelect.value;
+        if (chartType === 'timeseries' && dateColumns.length > 0 && numericColumns.length > 0) {
+            primaryFieldSelect.value = dateColumns[0];
+            secondaryFieldSelect.value = numericColumns[0];
+            if (textColumns.length > 0) {
+                groupByFieldSelect.value = textColumns[0];
+            }
+        } else if (chartType === 'scatter' && numericColumns.length >= 2) {
+            primaryFieldSelect.value = numericColumns[0];
+            secondaryFieldSelect.value = numericColumns[1];
+            if (textColumns.length > 0) {
+                groupByFieldSelect.value = textColumns[0];
+            }
+        } else if (textColumns.length > 0 && numericColumns.length > 0) {
+            primaryFieldSelect.value = textColumns[0];
+            secondaryFieldSelect.value = numericColumns[0];
+        }
+    }
+    
+    // Update property data selectors
+    function updatePropertyDataSelectors() {
+        if (!window.lastResults || !window.lastResults.data || window.lastResults.data.length === 0) {
+            return;
+        }
+        
+        // Generate data summary
+        const data = window.lastResults.data;
+        const numRows = data.length;
+        const numericColumns = getNumericColumns(data);
+        
+        // Find property-related fields
+        const hasParcelData = data.some(row => 'parcel_id' in row || 'address' in row);
+        const hasPropertyData = data.some(row => 'property_type' in row || 'year_built' in row);
+        const hasSaleData = data.some(row => 'sale_price' in row || 'sale_date' in row);
+        
+        // Update summary text
+        let summary = `Data contains ${numRows} rows.<br>`;
+        
+        if (hasParcelData) {
+            summary += '• Contains parcel information<br>';
+        }
+        
+        if (hasPropertyData) {
+            summary += '• Contains property characteristics<br>';
+        }
+        
+        if (hasSaleData) {
+            summary += '• Contains sales data<br>';
+        }
+        
+        if (numericColumns.length > 0) {
+            summary += `• ${numericColumns.length} numeric fields available for analysis<br>`;
+        }
+        
+        summaryText.innerHTML = summary;
+    }
+    
+    // Get numeric columns from data
+    function getNumericColumns(data) {
+        const numericColumns = [];
+        if (!data || data.length === 0) return numericColumns;
+        
+        const firstRow = data[0];
+        for (const column in firstRow) {
+            // Check if all values in this column are numeric
+            const isNumeric = data.every(row => {
+                const val = row[column];
+                return val === null || val === undefined || !isNaN(Number(val));
+            });
+            
+            if (isNumeric) numericColumns.push(column);
+        }
+        
+        return numericColumns;
+    }
+    
+    // Get date columns from data
+    function getDateColumns(data) {
+        const dateColumns = [];
+        if (!data || data.length === 0) return dateColumns;
+        
+        const firstRow = data[0];
+        for (const column in firstRow) {
+            // Check if column name suggests a date
+            if (column.toLowerCase().includes('date') || 
+                column.toLowerCase().includes('time') ||
+                column.toLowerCase().includes('created') ||
+                column.toLowerCase().includes('updated')) {
+                dateColumns.push(column);
+            }
+        }
+        
+        return dateColumns;
+    }
+    
+    // Get text columns from data
+    function getTextColumns(data) {
+        const textColumns = [];
+        if (!data || data.length === 0) return textColumns;
+        
+        const firstRow = data[0];
+        for (const column in firstRow) {
+            // Check if column contains text values
+            const isText = data.some(row => {
+                const val = row[column];
+                return val !== null && typeof val === 'string' && isNaN(Number(val));
+            });
+            
+            if (isText) textColumns.push(column);
+        }
+        
+        return textColumns;
+    }
+    
+    // Chart instance
+    let chartInstance = null;
+    
+    // Update basic chart
+    function updateChart() {
+        if (!window.lastResults || !window.lastResults.data || window.lastResults.data.length === 0) {
+            return;
+        }
+        
+        // If we're not on the basic tab, don't update
+        if (!document.getElementById('basic-viz').classList.contains('active')) {
+            return;
+        }
+        
+        // Get chart parameters
+        const chartType = chartTypeSelect.value;
+        const xColumn = xAxisSelect.value;
+        const yColumn = yAxisSelect.value;
+        
+        // Destroy previous chart if exists
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+        
+        const data = window.lastResults.data;
+        
+        // For different chart types, use our enhanced library
+        if (chartType === 'bar') {
+            chartInstance = window.enhancedViz.createPropertyValueBarChart(
+                '#resultChart', 
+                data, 
+                xColumn, 
+                yColumn
+            );
+        } else if (chartType === 'pie') {
+            chartInstance = window.enhancedViz.createPropertyDistributionPieChart(
+                '#resultChart', 
+                data, 
+                xColumn, 
+                yColumn
+            );
+        } else if (chartType === 'doughnut') {
+            chartInstance = window.enhancedViz.createDoughnutChart(
+                '#resultChart', 
+                data, 
+                xColumn, 
+                yColumn
+            );
+        } else if (chartType === 'scatter') {
+            chartInstance = window.enhancedViz.createScatterPlot(
+                '#resultChart', 
+                data, 
+                xColumn, 
+                yColumn
+            );
+        } else {
+            // Default to basic chart creation
+            // Get canvas context
+            const ctx = document.getElementById('resultChart').getContext('2d');
+            
+            // Extract data for chart
+            const labels = data.map(row => row[xColumn]);
+            const values = data.map(row => row[yColumn]);
+            
+            // Check if values are numeric
+            const areValuesNumeric = values.every(val => !isNaN(Number(val)));
+            
+            // Process data based on type
+            let processedLabels, processedData;
+            
+            if (!areValuesNumeric && (chartType === 'bar' || chartType === 'pie')) {
+                // Count occurrences for non-numeric values
+                const countMap = {};
+                values.forEach(val => {
+                    countMap[val] = (countMap[val] || 0) + 1;
+                });
+                
+                processedLabels = Object.keys(countMap);
+                processedData = Object.values(countMap);
+            } else {
+                processedLabels = labels;
+                processedData = values.map(val => isNaN(Number(val)) ? 0 : Number(val));
+            }
+            
+            // Create chart config
+            const chartConfig = {
+                type: chartType,
+                data: {
+                    labels: processedLabels,
+                    datasets: [{
+                        label: yColumn,
+                        data: processedData,
+                        backgroundColor: chartType === 'pie' ? 
+                            backgroundColors.slice(0, processedData.length) : 
+                            backgroundColors[0],
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            };
+            
+            // Remove scales for pie chart
+            if (chartType === 'pie') {
+                delete chartConfig.options.scales;
+            }
+            
+            // Create new chart
+            chartInstance = new Chart(ctx, chartConfig);
+        }
+    }
+    
+    // Update advanced chart
+    function updateAdvancedChart() {
+        if (!window.lastResults || !window.lastResults.data || window.lastResults.data.length === 0) {
+            return;
+        }
+        
+        // If we're not on the advanced tab, don't update
+        if (!document.getElementById('advanced-viz').classList.contains('active')) {
+            return;
+        }
+        
+        // Get chart parameters
+        const chartType = advancedChartTypeSelect.value;
+        const primaryField = primaryFieldSelect.value;
+        const secondaryField = secondaryFieldSelect.value;
+        const groupByField = groupByFieldSelect.value;
+        const aggregationType = aggregationTypeSelect.value;
+        
+        // Destroy previous chart if exists
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+        
+        const data = window.lastResults.data;
+        
+        // For different advanced chart types
+        if (chartType === 'stacked') {
+            // Identify value fields (numeric columns)
+            const numericColumns = getNumericColumns(data);
+            const valueFields = numericColumns.slice(0, 3); // Limit to first 3 numeric fields
+            
+            chartInstance = window.enhancedViz.createStackedBarChart(
+                '#resultChart', 
+                data, 
+                primaryField, 
+                valueFields, 
+                valueFields // Use same names for labels
+            );
+        } else if (chartType === 'timeseries') {
+            chartInstance = window.enhancedViz.createTimeSeriesChart(
+                '#resultChart', 
+                data, 
+                primaryField, 
+                secondaryField, 
+                groupByField
+            );
+        } else if (chartType === 'scatter') {
+            chartInstance = window.enhancedViz.createScatterPlot(
+                '#resultChart', 
+                data, 
+                primaryField, 
+                secondaryField, 
+                groupByField
+            );
+        } else {
+            // Fall back to basic chart
+            updateChart();
+        }
+    }
+    
+    // Update property chart
+    function updatePropertyChart() {
+        if (!window.lastResults || !window.lastResults.data || window.lastResults.data.length === 0) {
+            return;
+        }
+        
+        // If we're not on the property tab, don't update
+        if (!document.getElementById('property-viz').classList.contains('active')) {
+            return;
+        }
+        
+        // Get chart parameters
+        const vizType = propertyVizTypeSelect.value;
+        
+        // Destroy previous chart if exists
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+        
+        const data = window.lastResults.data;
+        
+        // Handle property-specific visualizations
+        if (vizType === 'valueDistribution') {
+            // Find appropriate fields
+            const valueField = findField(data, ['total_value', 'value', 'price']);
+            const categoryField = findField(data, ['property_type', 'type', 'category']);
+            
+            if (valueField) {
+                chartInstance = window.enhancedViz.createPropertyValueBarChart(
+                    '#resultChart', 
+                    data, 
+                    categoryField || 'id', 
+                    valueField
+                );
+            }
+        } else if (vizType === 'propertyType') {
+            // Find appropriate fields
+            const typeField = findField(data, ['property_type', 'type', 'category']);
+            const valueField = findField(data, ['total_value', 'value', 'price']);
+            
+            if (typeField) {
+                chartInstance = window.enhancedViz.createPropertyDistributionPieChart(
+                    '#resultChart', 
+                    data, 
+                    typeField, 
+                    valueField
+                );
+            }
+        } else if (vizType === 'saleHistory') {
+            // Find appropriate fields
+            const dateField = findField(data, ['sale_date', 'date', 'created_at']);
+            const priceField = findField(data, ['sale_price', 'price', 'amount']);
+            const categoryField = findField(data, ['property_type', 'type', 'sale_type']);
+            
+            if (dateField && priceField) {
+                chartInstance = window.enhancedViz.createTimeSeriesChart(
+                    '#resultChart', 
+                    data, 
+                    dateField, 
+                    priceField, 
+                    categoryField
+                );
+            }
+        } else if (vizType === 'valueTrends') {
+            // Find appropriate fields
+            const yearField = findField(data, ['assessment_year', 'year', 'year_built']);
+            const valueField = findField(data, ['total_value', 'value', 'price']);
+            const typeField = findField(data, ['property_type', 'type', 'category']);
+            
+            if (yearField && valueField) {
+                chartInstance = window.enhancedViz.createStackedBarChart(
+                    '#resultChart', 
+                    data, 
+                    yearField, 
+                    [valueField], 
+                    [valueField]
+                );
+            }
+        }
+    }
+    
+    // Helper to find a field by possible names
+    function findField(data, possibleNames) {
+        if (!data || data.length === 0) return null;
+        
+        const columns = Object.keys(data[0]);
+        
+        for (const name of possibleNames) {
+            const match = columns.find(col => 
+                col.toLowerCase().includes(name.toLowerCase())
+            );
+            
+            if (match) return match;
+        }
+        
+        return null;
+    }
+    
+    // Colors for charts
+    const backgroundColors = [
+        'rgba(54, 162, 235, 0.5)',
+        'rgba(255, 99, 132, 0.5)',
+        'rgba(255, 206, 86, 0.5)',
+        'rgba(75, 192, 192, 0.5)',
+        'rgba(153, 102, 255, 0.5)',
+        'rgba(255, 159, 64, 0.5)',
+        'rgba(199, 199, 199, 0.5)',
+        'rgba(83, 102, 255, 0.5)',
+        'rgba(40, 159, 64, 0.5)',
+        'rgba(210, 199, 199, 0.5)',
+    ];
+});
+</script>
