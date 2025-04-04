@@ -5,7 +5,7 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["gunicorn", "--bind", "0.0.0.0:5000", "server:application"]
+run = ["python", "workflow.py"]
 
 [workflows]
 runButton = "Start application"
@@ -22,7 +22,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python server.py"
+args = "python workflow.py"
 waitForPort = 5000
 
 [[ports]]

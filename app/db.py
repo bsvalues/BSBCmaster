@@ -44,29 +44,20 @@ async def initialize_db():
         flask_db = get_flask_db()
         
         # Initialize PostgreSQL connection pool for raw queries
-        if settings.DB_POSTGRES_URL:
+        db_url = os.environ.get("DATABASE_URL")
+        if not db_url:
+            logger.warning("No DATABASE_URL environment variable found")
+            db_url = os.environ.get("DB_POSTGRES_URL")
+        
+        if db_url:
+            logger.info("Using database URL for PostgreSQL connection")
             import psycopg2.pool
             pg_pool = psycopg2.pool.SimpleConnectionPool(
-                1, 10, settings.DB_POSTGRES_URL
+                1, 10, db_url
             )
-            logger.info("PostgreSQL connection pool initialized")
+            logger.info("PostgreSQL connection pool initialized successfully")
         else:
-            logger.warning("PostgreSQL connection URL not provided")
-            # Log the environment variable
-            db_url = os.environ.get("DATABASE_URL")
-            if db_url:
-                logger.info("Found DATABASE_URL environment variable, using it for PostgreSQL connection")
-                import psycopg2.pool
-                pg_pool = psycopg2.pool.SimpleConnectionPool(
-                    1, 10, db_url
-                )
-                logger.info("PostgreSQL connection pool initialized with DATABASE_URL")
-                
-                # Set the DB_POSTGRES_URL in settings as well for consistency
-                from app.settings import settings
-                settings.DB_POSTGRES_URL = db_url
-            else:
-                logger.warning("No PostgreSQL connection URL available")
+            logger.warning("No PostgreSQL connection URL available")
     except Exception as e:
         logger.error(f"Error initializing database connections: {str(e)}")
         # Don't raise the exception, just log it
@@ -165,15 +156,24 @@ def execute_parameterized_query(
     Raises:
         HTTPException: If a database error occurs
     """
-    # Set default page size from settings if not provided
+    # Get MAX_RESULTS from settings or use default
+    max_results = 100  # Default value
+    try:
+        from app.settings import settings
+        if hasattr(settings, 'MAX_RESULTS'):
+            max_results = settings.MAX_RESULTS
+    except (ImportError, AttributeError):
+        logger.warning("Could not get MAX_RESULTS from settings, using default of 100")
+    
+    # Set default page size if not provided
     if page_size is None:
-        page_size = settings.MAX_RESULTS
+        page_size = max_results
     
     # Validate inputs
     if page < 1:
         page = 1
-    if page_size < 1 or page_size > settings.MAX_RESULTS:
-        page_size = settings.MAX_RESULTS
+    if page_size < 1 or page_size > max_results:
+        page_size = max_results
     
     # Safety check
     if not is_safe_query(query):
@@ -222,8 +222,16 @@ def execute_postgres_query(
         
         # Create cursor with dictionary results
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-            # Set query timeout
-            cursor.execute(f"SET statement_timeout TO {settings.TIMEOUT_SECONDS * 1000}")
+            # Set query timeout (default to 30 seconds if not in settings)
+            timeout_seconds = 30  # Default timeout
+            try:
+                from app.settings import settings
+                if hasattr(settings, 'TIMEOUT_SECONDS'):
+                    timeout_seconds = settings.TIMEOUT_SECONDS
+            except (ImportError, AttributeError):
+                logger.warning("Could not get TIMEOUT_SECONDS from settings, using default of 30 seconds")
+                
+            cursor.execute(f"SET statement_timeout TO {timeout_seconds * 1000}")
             
             # Execute count query first (for pagination metadata)
             count_query = f"SELECT COUNT(*) AS total FROM ({query}) AS subquery"

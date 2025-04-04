@@ -10,6 +10,11 @@ import signal
 import time
 import threading
 import logging
+import requests
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -25,6 +30,11 @@ logger = logging.getLogger(__name__)
 # Global variables to store processes
 fastapi_process = None
 flask_process = None
+
+# Set FastAPI URL
+FASTAPI_URL = os.environ.get("FASTAPI_URL", "http://localhost:8000")
+os.environ["FASTAPI_URL"] = FASTAPI_URL
+logger.info(f"FastAPI URL set to: {FASTAPI_URL}")
 
 def log_output(process, service_name):
     """Monitor and log process output."""
@@ -53,15 +63,21 @@ def start_fastapi():
             pass
         
         # Start FastAPI service using uvicorn with specific parameters
+        # Change to use app package which has already defined the FastAPI app
         cmd = ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
         logger.info(f"Starting FastAPI service: {' '.join(cmd)}")
+        
+        # Set environment variables
+        env = os.environ.copy()
+        env["FASTAPI_URL"] = "http://localhost:8000"
         
         fastapi_process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             bufsize=1,
-            universal_newlines=False
+            universal_newlines=False,
+            env=env
         )
         
         # Start a thread to monitor and log FastAPI output
@@ -71,9 +87,27 @@ def start_fastapi():
             daemon=True
         ).start()
         
-        # Wait for FastAPI to initialize (this will be cut short when gunicorn starts)
-        logger.info("FastAPI service starting. Continuing with Flask startup...")
-        return True
+        # Wait for FastAPI to initialize
+        logger.info("FastAPI service starting. Waiting for initialization...")
+        
+        # Wait up to 30 seconds for FastAPI to start up
+        for _ in range(30):
+            try:
+                response = requests.get(f"{FASTAPI_URL}/health", timeout=1)
+                if response.status_code == 200:
+                    logger.info(f"FastAPI is running and healthy: {response.text}")
+                    return True
+            except requests.exceptions.RequestException:
+                pass
+            time.sleep(1)
+            
+        # Check if the process is still running
+        if fastapi_process and fastapi_process.poll() is None:
+            logger.warning("FastAPI process is running but health check failed. Continuing anyway...")
+            return True
+        else:
+            logger.error("FastAPI process has exited unexpectedly")
+            return False
     
     except Exception as e:
         logger.error(f"Error starting FastAPI service: {e}")
@@ -100,12 +134,17 @@ def start_flask():
         cmd = ["gunicorn", "--bind", "0.0.0.0:5000", "--reuse-port", "--reload", "main:app"]
         logger.info(f"Starting Flask service: {' '.join(cmd)}")
         
+        # Set environment variables
+        env = os.environ.copy()
+        env["FASTAPI_URL"] = "http://localhost:8000"
+        
         flask_process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             bufsize=1,
-            universal_newlines=False
+            universal_newlines=False,
+            env=env
         )
         
         # Start a thread to monitor and log Flask output
@@ -115,8 +154,26 @@ def start_flask():
             daemon=True
         ).start()
         
-        logger.info("Flask service starting.")
-        return True
+        logger.info("Flask service starting. Waiting for initialization...")
+        
+        # Wait up to 30 seconds for Flask to start up
+        for _ in range(30):
+            try:
+                response = requests.get("http://localhost:5000/", timeout=1)
+                if response.status_code == 200:
+                    logger.info("Flask is running and healthy")
+                    return True
+            except requests.exceptions.RequestException:
+                pass
+            time.sleep(1)
+            
+        # Check if the process is still running
+        if flask_process and flask_process.poll() is None:
+            logger.warning("Flask process is running but health check failed. Continuing anyway...")
+            return True
+        else:
+            logger.error("Flask process has exited unexpectedly")
+            return False
     
     except Exception as e:
         logger.error(f"Error starting Flask service: {e}")

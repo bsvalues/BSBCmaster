@@ -202,8 +202,12 @@ if __name__ == "__main__":
         logger.info("FastAPI started successfully")
     else:
         logger.error("Failed to start FastAPI")
+        # Still continue to start Flask even if FastAPI fails
+        # Since we're using Gunicorn for Flask in the workflow
     
-    # Start Flask 
-    flask_port = int(os.environ.get("FLASK_PORT", 5000))
-    logger.info(f"Starting Flask documentation interface on port {flask_port}")
-    app.run(host="0.0.0.0", port=flask_port, debug=True, use_reloader=False)
+    # If running directly (not via Gunicorn), start Flask
+    # For workflow, Flask is started by Gunicorn
+    if "gunicorn" not in os.environ.get("SERVER_SOFTWARE", ""):
+        flask_port = int(os.environ.get("FLASK_PORT", 5000))
+        logger.info(f"Starting Flask documentation interface on port {flask_port}")
+        app.run(host="0.0.0.0", port=flask_port, debug=True, use_reloader=False)
