@@ -17,12 +17,15 @@ logger = logging.getLogger(__name__)
 # Define a constant for the FastAPI URL if it's not in the environment
 FASTAPI_URL = os.environ.get("FASTAPI_URL", "http://localhost:8000")
 
-# Import FastAPI settings for API_PREFIX
+# Import or define API settings with fallbacks
 try:
     from app.settings import settings as fastapi_settings
     API_PREFIX = fastapi_settings.API_PREFIX
-except ImportError:
+    API_KEY = fastapi_settings.API_KEY
+except (ImportError, AttributeError):
+    logger.warning("Could not import FastAPI settings, using defaults")
     API_PREFIX = "/api"
+    API_KEY = os.environ.get("API_KEY", "b6212a0ff43102f608553e842293eba0ec013ff6926459f96fba31d0fabacd2e")
 
 # Get db instance from app_setup
 from app_setup import db, app
@@ -332,16 +335,41 @@ def proxy_run_query():
         # Forward the request to FastAPI
         headers = {
             'Content-Type': 'application/json',
-            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+            'X-API-Key': request.headers.get('X-API-Key', API_KEY)
         }
-        response = requests.post(
-            f"{FASTAPI_URL}{API_PREFIX}/run-query",
-            json=request.json,
-            headers=headers
-        )
         
-        # Return the response from FastAPI
-        return jsonify(response.json()), response.status_code
+        # Make sure we have valid JSON data
+        data = request.json if request.is_json else {}
+        
+        # Log the request
+        logger.info(f"Proxying request to FastAPI run-query: {FASTAPI_URL}{API_PREFIX}/run-query")
+        
+        # Try to connect to FastAPI service
+        try:
+            response = requests.post(
+                f"{FASTAPI_URL}{API_PREFIX}/run-query",
+                json=data,
+                headers=headers,
+                timeout=30  # Add timeout to prevent hanging
+            )
+            
+            # Return the response from FastAPI
+            return jsonify(response.json()), response.status_code
+            
+        except requests.exceptions.ConnectionError:
+            logger.error(f"Connection error to FastAPI service at {FASTAPI_URL}")
+            return jsonify({
+                "status": "error",
+                "message": "Could not connect to the FastAPI service. Please check if it's running."
+            }), 503  # Service Unavailable
+            
+        except requests.exceptions.Timeout:
+            logger.error("Timeout connecting to FastAPI service")
+            return jsonify({
+                "status": "error",
+                "message": "Request to FastAPI service timed out"
+            }), 504  # Gateway Timeout
+            
     except Exception as e:
         logger.error(f"Error proxying run-query: {str(e)}")
         return jsonify({
@@ -356,16 +384,41 @@ def proxy_nl_to_sql():
         # Forward the request to FastAPI
         headers = {
             'Content-Type': 'application/json',
-            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+            'X-API-Key': request.headers.get('X-API-Key', API_KEY)
         }
-        response = requests.post(
-            f"{FASTAPI_URL}{API_PREFIX}/nl-to-sql",
-            json=request.json,
-            headers=headers
-        )
         
-        # Return the response from FastAPI
-        return jsonify(response.json()), response.status_code
+        # Make sure we have valid JSON data
+        data = request.json if request.is_json else {}
+        
+        # Log the request
+        logger.info(f"Proxying request to FastAPI nl-to-sql: {FASTAPI_URL}{API_PREFIX}/nl-to-sql")
+        
+        # Try to connect to FastAPI service
+        try:
+            response = requests.post(
+                f"{FASTAPI_URL}{API_PREFIX}/nl-to-sql",
+                json=data,
+                headers=headers,
+                timeout=60  # Longer timeout because language model processing takes time
+            )
+            
+            # Return the response from FastAPI
+            return jsonify(response.json()), response.status_code
+            
+        except requests.exceptions.ConnectionError:
+            logger.error(f"Connection error to FastAPI service at {FASTAPI_URL}")
+            return jsonify({
+                "status": "error",
+                "message": "Could not connect to the FastAPI service. Please check if it's running."
+            }), 503  # Service Unavailable
+            
+        except requests.exceptions.Timeout:
+            logger.error("Timeout connecting to FastAPI service")
+            return jsonify({
+                "status": "error",
+                "message": "Request to FastAPI service timed out. NL to SQL conversion may take longer than expected."
+            }), 504  # Gateway Timeout
+            
     except Exception as e:
         logger.error(f"Error proxying nl-to-sql: {str(e)}")
         return jsonify({
@@ -379,16 +432,38 @@ def proxy_discover_schema():
     try:
         # Forward the request to FastAPI
         headers = {
-            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+            'X-API-Key': request.headers.get('X-API-Key', API_KEY)
         }
-        response = requests.get(
-            f"{FASTAPI_URL}{API_PREFIX}/discover-schema",
-            params=request.args,
-            headers=headers
-        )
         
-        # Return the response from FastAPI
-        return jsonify(response.json()), response.status_code
+        # Log the request
+        logger.info(f"Proxying request to FastAPI discover-schema: {FASTAPI_URL}{API_PREFIX}/discover-schema")
+        
+        # Try to connect to FastAPI service
+        try:
+            response = requests.get(
+                f"{FASTAPI_URL}{API_PREFIX}/discover-schema",
+                params=request.args,
+                headers=headers,
+                timeout=30
+            )
+            
+            # Return the response from FastAPI
+            return jsonify(response.json()), response.status_code
+            
+        except requests.exceptions.ConnectionError:
+            logger.error(f"Connection error to FastAPI service at {FASTAPI_URL}")
+            return jsonify({
+                "status": "error",
+                "message": "Could not connect to the FastAPI service. Please check if it's running."
+            }), 503  # Service Unavailable
+            
+        except requests.exceptions.Timeout:
+            logger.error("Timeout connecting to FastAPI service")
+            return jsonify({
+                "status": "error",
+                "message": "Request to FastAPI service timed out"
+            }), 504  # Gateway Timeout
+            
     except Exception as e:
         logger.error(f"Error proxying discover-schema: {str(e)}")
         return jsonify({
@@ -402,16 +477,38 @@ def proxy_schema_summary():
     try:
         # Forward the request to FastAPI
         headers = {
-            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+            'X-API-Key': request.headers.get('X-API-Key', API_KEY)
         }
-        response = requests.get(
-            f"{FASTAPI_URL}{API_PREFIX}/schema-summary",
-            params=request.args,
-            headers=headers
-        )
         
-        # Return the response from FastAPI
-        return jsonify(response.json()), response.status_code
+        # Log the request
+        logger.info(f"Proxying request to FastAPI schema-summary: {FASTAPI_URL}{API_PREFIX}/schema-summary")
+        
+        # Try to connect to FastAPI service
+        try:
+            response = requests.get(
+                f"{FASTAPI_URL}{API_PREFIX}/schema-summary",
+                params=request.args,
+                headers=headers,
+                timeout=30
+            )
+            
+            # Return the response from FastAPI
+            return jsonify(response.json()), response.status_code
+            
+        except requests.exceptions.ConnectionError:
+            logger.error(f"Connection error to FastAPI service at {FASTAPI_URL}")
+            return jsonify({
+                "status": "error", 
+                "message": "Could not connect to the FastAPI service. Please check if it's running."
+            }), 503  # Service Unavailable
+            
+        except requests.exceptions.Timeout:
+            logger.error("Timeout connecting to FastAPI service")
+            return jsonify({
+                "status": "error",
+                "message": "Request to FastAPI service timed out"
+            }), 504  # Gateway Timeout
+            
     except Exception as e:
         logger.error(f"Error proxying schema-summary: {str(e)}")
         return jsonify({
@@ -426,16 +523,41 @@ def proxy_parameterized_query():
         # Forward the request to FastAPI
         headers = {
             'Content-Type': 'application/json',
-            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+            'X-API-Key': request.headers.get('X-API-Key', API_KEY)
         }
-        response = requests.post(
-            f"{FASTAPI_URL}{API_PREFIX}/parameterized-query",
-            json=request.json,
-            headers=headers
-        )
         
-        # Return the response from FastAPI
-        return jsonify(response.json()), response.status_code
+        # Make sure we have valid JSON data
+        data = request.json if request.is_json else {}
+        
+        # Log the request
+        logger.info(f"Proxying request to FastAPI parameterized-query: {FASTAPI_URL}{API_PREFIX}/parameterized-query")
+        
+        # Try to connect to FastAPI service
+        try:
+            response = requests.post(
+                f"{FASTAPI_URL}{API_PREFIX}/parameterized-query",
+                json=data,
+                headers=headers,
+                timeout=30
+            )
+            
+            # Return the response from FastAPI
+            return jsonify(response.json()), response.status_code
+            
+        except requests.exceptions.ConnectionError:
+            logger.error(f"Connection error to FastAPI service at {FASTAPI_URL}")
+            return jsonify({
+                "status": "error",
+                "message": "Could not connect to the FastAPI service. Please check if it's running."
+            }), 503  # Service Unavailable
+            
+        except requests.exceptions.Timeout:
+            logger.error("Timeout connecting to FastAPI service")
+            return jsonify({
+                "status": "error",
+                "message": "Request to FastAPI service timed out"
+            }), 504  # Gateway Timeout
+            
     except Exception as e:
         logger.error(f"Error proxying parameterized-query: {str(e)}")
         return jsonify({

@@ -62,13 +62,29 @@ def start_fastapi():
         except Exception:
             pass
         
-        # Start FastAPI service using uvicorn
-        cmd = ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-        logger.info(f"Starting FastAPI service: {' '.join(cmd)}")
+        # Start FastAPI service using our dedicated script
+        cmd = ["python", "run_fastapi_service.py"]
+        logger.info(f"Starting FastAPI service using dedicated script: {' '.join(cmd)}")
         
         # Set environment variables
         env = os.environ.copy()
         env["FASTAPI_URL"] = "http://localhost:8000"
+        
+        # Ensure DATABASE_URL is set
+        if "DATABASE_URL" in env:
+            logger.info("Using existing DATABASE_URL from environment")
+        elif all(k in env for k in ["PGHOST", "PGUSER", "PGDATABASE"]):
+            pg_user = env.get("PGUSER")
+            pg_pass = env.get("PGPASSWORD", "")
+            pg_host = env.get("PGHOST")
+            pg_port = env.get("PGPORT", "5432")
+            pg_db = env.get("PGDATABASE")
+            
+            db_url = f"postgresql://{pg_user}:{pg_pass}@{pg_host}:{pg_port}/{pg_db}"
+            env["DATABASE_URL"] = db_url
+            logger.info(f"Constructed DATABASE_URL from PostgreSQL environment variables: {pg_host}:{pg_port}/{pg_db}")
+        else:
+            logger.warning("Neither DATABASE_URL nor PostgreSQL environment variables found")
         
         fastapi_process = subprocess.Popen(
             cmd,
@@ -89,15 +105,16 @@ def start_fastapi():
         # Wait for FastAPI to initialize
         logger.info("FastAPI service starting. Waiting for initialization...")
         
-        # Wait up to 30 seconds for FastAPI to start up
-        for _ in range(30):
+        # Wait up to 60 seconds for FastAPI to start up - increased timeout for more reliability
+        for attempt in range(60):
             try:
                 response = requests.get(f"{FASTAPI_URL}/health", timeout=1)
                 if response.status_code == 200:
-                    logger.info(f"FastAPI is running and healthy: {response.text}")
+                    logger.info(f"FastAPI is running and healthy after {attempt+1} attempts: {response.text}")
                     return True
             except requests.exceptions.RequestException:
-                pass
+                if attempt % 10 == 0:  # Log only occasionally to avoid cluttering logs
+                    logger.info(f"Waiting for FastAPI (attempt {attempt+1}/60)...")
             time.sleep(1)
             
         # Check if the process is still running

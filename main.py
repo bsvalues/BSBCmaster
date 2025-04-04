@@ -106,8 +106,8 @@ def start_fastapi():
                     stderr=subprocess.PIPE,
                     check=False
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to kill existing process on port 8000: {e}")
             
             # Set up environment variables for consistent database access
             env = os.environ.copy()
@@ -118,8 +118,9 @@ def start_fastapi():
             env["FLASK_SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "mcp_assessor_api_secure_key")
             env["FASTAPI_URL"] = FASTAPI_URL
             
-            # Start FastAPI with uvicorn
-            cmd = ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+            # Start FastAPI with uvicorn directly from the asgi.py file
+            # This ensures it uses the app defined in app/__init__.py
+            cmd = ["python", "-m", "uvicorn", "asgi:app", "--host", "0.0.0.0", "--port", "8000"]
             logger.info(f"Starting FastAPI service with command: {' '.join(cmd)}")
             
             fastapi_process = subprocess.Popen(
@@ -148,15 +149,19 @@ def start_fastapi():
     fastapi_thread.start()
     logger.info("FastAPI thread started")
     
-    # Wait for FastAPI to start (up to 30 seconds)
-    for _ in range(30):
+    # Wait for FastAPI to start (up to 60 seconds with more verbose logging)
+    logger.info("Waiting for FastAPI to become available...")
+    for attempt in range(60):
         try:
             response = requests.get(f"{FASTAPI_URL}/health", timeout=1)
             if response.status_code == 200:
-                logger.info("FastAPI is running and healthy")
+                logger.info(f"FastAPI is running and healthy after {attempt+1} attempts")
                 return True
-        except requests.exceptions.RequestException:
-            pass
+            else:
+                logger.warning(f"FastAPI health check returned status code {response.status_code}")
+        except requests.exceptions.RequestException as e:
+            if attempt % 10 == 0:  # Log only every 10 attempts to avoid log flooding
+                logger.info(f"Waiting for FastAPI to start (attempt {attempt+1}/60): {str(e)}")
         time.sleep(1)
     
     logger.warning("Timed out waiting for FastAPI to start")
@@ -195,17 +200,15 @@ with app.app_context():
     except Exception as e:
         logger.error(f"Failed to seed database at startup: {e}")
 
+# Always start FastAPI as soon as this module is imported
+logger.info("Starting MCP Assessor Agent API server...")
+if start_fastapi():
+    logger.info("FastAPI started successfully")
+else:
+    logger.error("Failed to start FastAPI")
+
 if __name__ == "__main__":
-    # Start FastAPI first
-    logger.info("Starting MCP Assessor Agent API server...")
-    if start_fastapi():
-        logger.info("FastAPI started successfully")
-    else:
-        logger.error("Failed to start FastAPI")
-        # Still continue to start Flask even if FastAPI fails
-        # Since we're using Gunicorn for Flask in the workflow
-    
-    # If running directly (not via Gunicorn), start Flask
+    # If running directly (not via Gunicorn), also start Flask
     # For workflow, Flask is started by Gunicorn
     if "gunicorn" not in os.environ.get("SERVER_SOFTWARE", ""):
         flask_port = int(os.environ.get("FLASK_PORT", 5000))
