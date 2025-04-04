@@ -1,18 +1,17 @@
 #!/bin/bash
-# Combined service script for Replit workflow
 
-# Source environment variables
-source .env 2>/dev/null || true
+# Set environment variable for Flask-FastAPI communication
+export FASTAPI_URL="http://127.0.0.1:8000"
 
-# Start FastAPI in the background
-echo "Starting FastAPI service on port 8000..."
-python -m uvicorn app:app --host 0.0.0.0 --port 8000 &
+# Start FastAPI service in background
+echo "Starting FastAPI service..."
+python -m uvicorn asgi:app --host 0.0.0.0 --port 8000 --log-level info > fastapi.log 2>&1 &
 FASTAPI_PID=$!
 
-# Wait for FastAPI to initialize
-sleep 3
-echo "FastAPI service started"
+# Give FastAPI time to initialize
+sleep 5
+echo "FastAPI started on port 8000"
 
-# Start Flask in the foreground (this is what the workflow will see)
-echo "Starting Flask documentation on port 5000..."
+# Start Flask service in foreground
+echo "Starting Flask application on port 5000..."
 exec gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app

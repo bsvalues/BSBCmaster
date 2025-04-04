@@ -77,11 +77,11 @@ class Settings(BaseSettings):
     OPENAI: OpenAISettings = OpenAISettings(API_KEY=os.environ.get("OPENAI_API_KEY", None))
     
     # These fields are used by the Flask app but needed for env parsing
-    flask_app: Optional[str] = None
-    flask_port: Optional[str] = None
-    fastapi_port: Optional[str] = None
-    fastapi_url: Optional[str] = None
-    debug: Optional[str] = None
+    flask_app: Optional[str] = Field(default=None, description="Flask application path")
+    flask_port: Optional[str] = Field(default=None, description="Flask port")
+    fastapi_port: Optional[str] = Field(default=None, description="FastAPI port")
+    fastapi_url: Optional[str] = Field(default=None, description="FastAPI URL")
+    debug: Optional[bool] = Field(default=None, description="Debug mode")
     
     model_config = {
         "env_file": ".env",
