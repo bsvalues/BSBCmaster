@@ -1,6 +1,6 @@
 # MCP Assessor Agent API
 
-A secure FastAPI intermediary service designed for efficient and safe database querying across MS SQL Server and PostgreSQL databases. This API service allows for secure execution of SQL queries, database schema discovery, and natural language to SQL translation.
+A secure FastAPI intermediary service designed for efficient and safe database querying across MS SQL Server and PostgreSQL databases. This API service allows for secure execution of SQL queries, database schema discovery, natural language to SQL translation, and interactive data visualization.
 
 ## Key Features
 
@@ -11,6 +11,8 @@ A secure FastAPI intermediary service designed for efficient and safe database q
 - **Schema Summarization**: Get a summarized view of database structure
 - **Health Check**: Monitor the API and database connection status
 - **Natural Language to SQL**: (Simulated) Translate natural language to SQL queries
+- **Interactive Data Visualization**: Create charts and visualizations from query results
+- **Visual Query Builder**: Build SQL queries through an intuitive visual interface
 
 ## Enhanced SQL Injection Protection
 
@@ -69,3 +71,15 @@ Error messages are sanitized before being returned to the client to prevent info
 - psycopg2 (PostgreSQL)
 - Pydantic
 - Gunicorn (WSGI/ASGI server)
+- Bootstrap (UI framework)
+- Chart.js (Data visualization)
+
+## Data Visualization
+
+The API documentation includes a robust data visualization module that allows users to:
+
+- Execute SQL queries and visualize the results
+- Create various chart types (bar, line, pie, scatter)
+- Customize chart appearance and data mapping
+- Export visualization code for integration into applications
+- Interactively explore data relationships
