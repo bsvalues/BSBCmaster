@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     
     # Security settings
     API_KEY_HEADER_NAME: str = "X-API-Key"
-    API_KEY_MIN_LENGTH: int = 16
-    API_KEY: str = os.environ.get("API_KEY", "mcp_assessor_api_default_key_2024")
+    API_KEY_MIN_LENGTH: int = 32  # Increased for better security
+    API_KEY: str = os.environ.get("API_KEY", "mcp_assessor_api_default_key_2024_secure_random_token_987654321")
     
     # Database settings
     DB_POSTGRES_URL: str = os.environ.get("DATABASE_URL", "")

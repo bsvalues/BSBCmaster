@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# Export environment variables
-export $(cat .env 2>/dev/null | grep -v '^#' | xargs)
-
-# Run FastAPI service
-python run_api.py
+# Start the FastAPI service
+echo "Starting FastAPI service..."
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
