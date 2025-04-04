@@ -33,13 +33,19 @@ async def health_check():
     Returns:
         HealthResponse: The health status of the API and its database connections
     """
+    import time
+    from app import start_time
+    
     # Test database connections
     db_connections = test_db_connections()
     
     return {
         "status": "success" if any(db_connections.values()) else "error",
         "message": "API is operational",
-        "database_status": db_connections
+        "database_status": db_connections,
+        "databases": [],  # Detailed database info would be added here in a full implementation
+        "api_version": "1.0.0",  # Set API version
+        "uptime": time.time() - start_time  # Calculate uptime in seconds
     }
 
 @router.post("/run-query", response_model=QueryResult)

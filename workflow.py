@@ -39,7 +39,7 @@ def start_fastapi():
     logger.info(f"Starting FastAPI service on port {FASTAPI_PORT}...")
     
     # Start the FastAPI process
-    fastapi_cmd = ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", str(FASTAPI_PORT)]
+    fastapi_cmd = ["python", "-m", "uvicorn", "asgi:app", "--host", "0.0.0.0", "--port", str(FASTAPI_PORT)]
     fastapi_process = subprocess.Popen(
         fastapi_cmd,
         stdout=subprocess.PIPE,
@@ -82,18 +82,18 @@ def wait_for_fastapi():
     for attempt in range(1, max_attempts + 1):
         try:
             # Try to reach the FastAPI service - use /health endpoint
-            response = requests.get(f"{FASTAPI_URL}/health", timeout=1)
+            response = requests.get(f"{FASTAPI_URL}/api/health", timeout=1)
             if response.status_code == 200:
                 logger.info(f"FastAPI service is ready (attempt {attempt}/{max_attempts})")
                 return True
         except requests.exceptions.RequestException:
             pass
         
-        # Try with API prefix as an alternative
+        # Try with root health as an alternative
         try:
-            response = requests.get(f"{FASTAPI_URL}/api/health", timeout=1)
+            response = requests.get(f"{FASTAPI_URL}/health", timeout=1)
             if response.status_code == 200:
-                logger.info(f"FastAPI service is ready with API prefix (attempt {attempt}/{max_attempts})")
+                logger.info(f"FastAPI service is ready on root health endpoint (attempt {attempt}/{max_attempts})")
                 return True
         except requests.exceptions.RequestException:
             pass

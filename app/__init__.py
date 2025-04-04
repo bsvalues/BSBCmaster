@@ -15,6 +15,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
 
+# Record application start time for uptime calculation
+start_time = time.time()
+
 # Load environment variables from .env file
 load_dotenv()
 
