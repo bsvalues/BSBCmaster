@@ -38,12 +38,16 @@ async def initialize_db():
             # Log the environment variable
             db_url = os.environ.get("DATABASE_URL")
             if db_url:
-                logger.info("Found DATABASE_URL environment variable, using it instead")
+                logger.info("Found DATABASE_URL environment variable, using it for PostgreSQL connection")
                 import psycopg2.pool
                 pg_pool = psycopg2.pool.SimpleConnectionPool(
                     1, 10, db_url
                 )
                 logger.info("PostgreSQL connection pool initialized with DATABASE_URL")
+                
+                # Set the DB_POSTGRES_URL in settings as well for consistency
+                from app.settings import settings
+                settings.DB_POSTGRES_URL = db_url
             else:
                 logger.warning("No PostgreSQL connection URL available")
     except Exception as e:

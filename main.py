@@ -108,15 +108,21 @@ def start_fastapi():
                 pass
             
             # Start FastAPI with uvicorn
-            cmd = ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+            cmd = ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
             logger.info(f"Starting FastAPI service with command: {' '.join(cmd)}")
+            
+            # Set environment variables for the FastAPI process
+            env = os.environ.copy()
+            env["DATABASE_URL"] = os.environ.get("DATABASE_URL", "")
+            env["API_KEY"] = os.environ.get("API_KEY", "")
             
             fastapi_process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE, 
                 stderr=subprocess.STDOUT,
                 bufsize=1,
-                universal_newlines=True
+                universal_newlines=True,
+                env=env
             )
             
             # Log the output from the process
