@@ -54,7 +54,7 @@ def index():
     return render_template("index.html", 
                           title="MCP Assessor Agent API",
                           version="1.1.0",
-                          description="API service for accessing and querying assessment data",
+                          description="API service for accessing, querying, and visualizing assessment data",
                           base_url=base_url,
                           api_key_header=settings.API_KEY_HEADER_NAME,
                           current_year=datetime.now().year)
@@ -217,7 +217,7 @@ def api_docs():
     return jsonify({
         "title": "MCP Assessor Agent API",
         "version": "1.1.0",
-        "description": "API for executing SQL queries and exploring database schemas with robust security",
+        "description": "API for executing SQL queries, exploring database schemas, and visualizing data with robust security",
         "authentication": {
             "type": "API Key",
             "header": settings.API_KEY_HEADER_NAME,
