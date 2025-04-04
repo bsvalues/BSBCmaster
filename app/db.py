@@ -3,6 +3,7 @@ This module handles database connections and SQL query execution.
 """
 
 import logging
+import os
 import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -34,9 +35,21 @@ async def initialize_db():
             logger.info("PostgreSQL connection pool initialized")
         else:
             logger.warning("PostgreSQL connection URL not provided")
+            # Log the environment variable
+            db_url = os.environ.get("DATABASE_URL")
+            if db_url:
+                logger.info("Found DATABASE_URL environment variable, using it instead")
+                import psycopg2.pool
+                pg_pool = psycopg2.pool.SimpleConnectionPool(
+                    1, 10, db_url
+                )
+                logger.info("PostgreSQL connection pool initialized with DATABASE_URL")
+            else:
+                logger.warning("No PostgreSQL connection URL available")
     except Exception as e:
         logger.error(f"Error initializing database connections: {str(e)}")
-        raise
+        # Don't raise the exception, just log it
+        logger.error("Continuing without database connection")
 
 async def close_db_connections():
     """Close database connections on application shutdown."""
@@ -234,7 +247,7 @@ def execute_postgres_query(
             }
     finally:
         # Return connection to pool
-        if conn:
+        if conn and pg_pool:
             pg_pool.putconn(conn)
 
 def parse_for_parameters(query: str) -> Tuple[str, List[Any]]:
@@ -288,16 +301,19 @@ def test_db_connections() -> Dict[str, bool]:
     }
     
     # Test PostgreSQL connection
-    if settings.DB_POSTGRES_URL:
+    if pg_pool:
         try:
             conn = get_postgres_connection()
             with conn.cursor() as cursor:
                 cursor.execute("SELECT 1")
                 cursor.fetchone()
-            pg_pool.putconn(conn)
+            if pg_pool:
+                pg_pool.putconn(conn)
             results["postgres"] = True
         except Exception as e:
             logger.error(f"PostgreSQL connection test failed: {str(e)}")
+    else:
+        logger.warning("PostgreSQL connection pool not initialized")
     
     # MSSQL connection would be tested here if implemented
     
