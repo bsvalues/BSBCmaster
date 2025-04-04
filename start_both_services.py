@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-This script runs both Flask and FastAPI services in parallel.
+This script runs both Flask and FastAPI services in parallel,
+ensuring environment variables are properly loaded from .env first.
 """
 
 import os
@@ -10,9 +11,6 @@ import subprocess
 import signal
 import threading
 from dotenv import load_dotenv
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Global variables
 processes = []
@@ -42,6 +40,18 @@ def signal_handler(sig, frame):
 
 def main():
     """Main function."""
+    # Load environment variables from .env
+    print("Loading environment variables from .env file...")
+    load_dotenv()
+    
+    # Print loaded API key (masked for security)
+    api_key = os.environ.get("API_KEY", "")
+    if api_key:
+        masked_key = api_key[:4] + "*" * (len(api_key) - 8) + api_key[-4:]
+        print(f"API_KEY is loaded: {masked_key}")
+    else:
+        print("WARNING: API_KEY is not set in environment variables")
+    
     # Register signal handler
     signal.signal(signal.SIGINT, signal_handler)
     

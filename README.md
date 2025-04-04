@@ -2,6 +2,31 @@
 
 A secure FastAPI intermediary service designed for efficient and safe database querying across MS SQL Server and PostgreSQL databases. This API service allows for secure execution of SQL queries, database schema discovery, natural language to SQL translation, and interactive data visualization.
 
+## Quick Start
+
+1. Clone the repository
+2. Create a `.env` file with the following variables:
+   ```
+   DATABASE_URL=your_postgresql_connection_string
+   PGPORT=your_pg_port
+   PGUSER=your_pg_user
+   PGPASSWORD=your_pg_password
+   PGDATABASE=your_pg_database
+   PGHOST=your_pg_host
+   API_KEY=your_api_key
+   OPENAI_API_KEY=your_openai_api_key
+   ```
+3. Run the services using one of the following methods:
+   - Start both Flask and FastAPI services: `./start_both.sh`
+   - Start FastAPI service only: `./start_fastapi_service.sh`
+
+## Accessing the Services
+
+- **Flask Documentation UI**: http://localhost:5000
+- **FastAPI Endpoints**: http://localhost:8000
+- **API Documentation**: http://localhost:8000/api/docs
+- **API Redoc**: http://localhost:8000/api/redoc
+
 ## Key Features
 
 - **Multi-Database Support**: Connect to both MS SQL Server and PostgreSQL databases
@@ -83,3 +108,40 @@ The API documentation includes a robust data visualization module that allows us
 - Customize chart appearance and data mapping
 - Export visualization code for integration into applications
 - Interactively explore data relationships
+
+## Development and Maintenance
+
+### Environment Setup
+
+1. Check environment variables are properly set:
+   ```
+   python check_env.py
+   ```
+
+2. Install required dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
+
+### Running Services
+
+The application is composed of two services:
+
+1. **Flask Documentation UI** on port 5000
+   - Provides the main documentation and user interface
+   - Serves as a proxy for API requests to the FastAPI service
+
+2. **FastAPI Backend** on port 8000
+   - Handles all API requests
+   - Provides database connectivity
+   - Implements security features
+   - Processes natural language to SQL conversion
+
+### Available Scripts
+
+- `./start_both.sh`: Start both Flask and FastAPI services together
+- `./start_fastapi_service.sh`: Start only the FastAPI backend
+- `python run_api.py`: Run the FastAPI backend with direct console output
+- `python run_services.py`: Run both services in parallel
+- `python seed_database.py`: Seed the database with sample data
+- `python check_env.py`: Verify environment variables are properly set

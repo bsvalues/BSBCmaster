@@ -2,11 +2,16 @@
 This module initializes the FastAPI application.
 """
 
+import os
 import logging
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.cors import CORSMiddleware
+
+# Load environment variables from .env file
+load_dotenv()
 
 from app.api import router as api_router
 from app.db import initialize_db, close_db_connections

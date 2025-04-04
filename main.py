@@ -7,6 +7,10 @@ import os
 import logging
 from flask_cors import CORS
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Import the application and database
 from database import app, db

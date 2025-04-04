@@ -5,6 +5,10 @@ It allows running the FastAPI application with uvicorn.
 
 import os
 import uvicorn
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Define port for the FastAPI application
 API_PORT = int(os.environ.get("API_PORT", 8000))
