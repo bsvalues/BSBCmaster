@@ -22,7 +22,7 @@ start_time = time.time()
 load_dotenv()
 
 from app.api import router as api_router
-from app.db import initialize_db, close_db_connections
+from app.db import initialize_db, close_db_connections, get_flask_db
 from app.settings import settings
 from app.logger import APILoggingMiddleware
 from app.cache import get_cache_stats, invalidate_cache

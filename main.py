@@ -109,14 +109,18 @@ def start_fastapi():
             except Exception:
                 pass
             
+            # Set up environment variables for consistent database access
+            env = os.environ.copy()
+            
+            # Important: Pass all necessary environment variables
+            env["DATABASE_URL"] = os.environ.get("DATABASE_URL", "")
+            env["API_KEY"] = os.environ.get("API_KEY", "")
+            env["FLASK_SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "mcp_assessor_api_secure_key")
+            env["FASTAPI_URL"] = FASTAPI_URL
+            
             # Start FastAPI with uvicorn
             cmd = ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
             logger.info(f"Starting FastAPI service with command: {' '.join(cmd)}")
-            
-            # Set environment variables for the FastAPI process
-            env = os.environ.copy()
-            env["DATABASE_URL"] = os.environ.get("DATABASE_URL", "")
-            env["API_KEY"] = os.environ.get("API_KEY", "")
             
             fastapi_process = subprocess.Popen(
                 cmd,

@@ -244,18 +244,7 @@ def fastapi_test():
         return None
 
 if __name__ == "__main__":
-    # Start FastAPI first
-    logger.info("Starting MCP Assessor Agent API server...")
-    if start_fastapi():
-        logger.info("FastAPI started successfully")
-    else:
-        logger.error("Failed to start FastAPI")
-        sys.exit(1)
-    
-    # Seed the database if needed
-    seed_database_if_needed()
-    
-    # Start Flask 
-    flask_port = int(os.environ.get("FLASK_PORT", 5000))
-    logger.info(f"Starting Flask documentation interface on port {flask_port}")
-    app.run(host="0.0.0.0", port=flask_port, debug=True, use_reloader=False)
+    # Instead of running separately, use main.py for better integration
+    logger.info("Starting MCP Assessor Agent API server using main.py...")
+    import main
+    main.app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)

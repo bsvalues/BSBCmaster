@@ -21,12 +21,29 @@ logger = logging.getLogger(__name__)
 
 # Global connection pools
 pg_pool = None
+flask_db = None
+
+def get_flask_db():
+    """Get the Flask SQLAlchemy instance to ensure consistency."""
+    global flask_db
+    if flask_db is None:
+        try:
+            # Import the db from app_setup to ensure we use the same instance
+            from app_setup import db as app_setup_db
+            flask_db = app_setup_db
+            logger.info("Using Flask SQLAlchemy instance from app_setup")
+        except ImportError:
+            logger.warning("Could not import db from app_setup, will use direct database connection")
+    return flask_db
 
 async def initialize_db():
     """Initialize database connection pools on application startup."""
     global pg_pool
     try:
-        # Initialize PostgreSQL connection pool
+        # First, try to get the Flask DB instance for model operations
+        flask_db = get_flask_db()
+        
+        # Initialize PostgreSQL connection pool for raw queries
         if settings.DB_POSTGRES_URL:
             import psycopg2.pool
             pg_pool = psycopg2.pool.SimpleConnectionPool(
