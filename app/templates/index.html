@@ -91,9 +91,23 @@
                                         <p><strong>Request Body:</strong></p>
                                         <pre><code>{
   "db": "postgres",
-  "query": "SELECT id, name FROM parcels LIMIT 10"
+  "query": "SELECT id, name FROM parcels",
+  "page": 1,
+  "page_size": 25
 }</code></pre>
-                                        <p><strong>Response:</strong> Query results with pagination</p>
+                                        <p><strong>Pagination:</strong> Use <code>page</code> and <code>page_size</code> parameters to control result pagination</p>
+                                        <p><strong>Response:</strong> Query results with pagination metadata</p>
+                                        <p><strong>Pagination Metadata:</strong></p>
+                                        <pre><code>{
+  "page": 1,              // Current page number
+  "page_size": 25,        // Number of records per page
+  "total_records": 100,   // Total number of records matching the query
+  "total_pages": 4,       // Total number of pages
+  "has_next": true,       // Whether there is a next page
+  "has_prev": false,      // Whether there is a previous page
+  "next_page": 2,         // Next page number, if available
+  "prev_page": null       // Previous page number, if available
+}</code></pre>
                                     </div>
                                 </div>
                             </div>
@@ -133,8 +147,11 @@
                                         <p><strong>Parameters:</strong></p>
                                         <ul>
                                             <li><code>db</code> - Database to query (mssql or postgres)</li>
+                                            <li><code>page</code> - Page number for paginated results (default: 1)</li>
+                                            <li><code>page_size</code> - Number of records per page (default: from settings)</li>
                                         </ul>
-                                        <p><strong>Response:</strong> Database schema details</p>
+                                        <p><strong>Response:</strong> Database schema details with pagination metadata</p>
+                                        <p>The response includes the same pagination metadata format as the query endpoint.</p>
                                     </div>
                                 </div>
                             </div>
@@ -154,8 +171,11 @@
                                         <ul>
                                             <li><code>db</code> - Database to query (mssql or postgres)</li>
                                             <li><code>prefix</code> - Optional table name prefix filter</li>
+                                            <li><code>page</code> - Page number for paginated results (default: 1)</li>
+                                            <li><code>page_size</code> - Number of records per page (default: from settings)</li>
                                         </ul>
-                                        <p><strong>Response:</strong> Summarized schema information</p>
+                                        <p><strong>Response:</strong> Summarized schema information with pagination metadata</p>
+                                        <p>The response includes the same pagination metadata format as the query endpoint.</p>
                                     </div>
                                 </div>
                             </div>
