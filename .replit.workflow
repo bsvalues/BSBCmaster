@@ -22,11 +22,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python -m uvicorn app:app --host 0.0.0.0 --port 8000 &"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app"
+args = "python combined_workflow.py"
 waitForPort = 5000
 
 [[ports]]

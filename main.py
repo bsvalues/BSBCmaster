@@ -74,20 +74,30 @@ from database import *
 # Function to seed the database if needed
 def seed_database_if_needed():
     try:
-        # Check if we need to seed the database
+        # We need to ensure this runs in the Flask app context
         with app.app_context():
-            parcel_count = Parcel.query.count()
-            if parcel_count == 0:
-                logger.info("No parcels found in database. Running seed script...")
-                subprocess.run(["python", "seed_database.py"], check=True)
-                logger.info("Database seeded successfully")
-            else:
-                logger.info(f"Database already has {parcel_count} parcels. No seeding needed.")
+            try:
+                # Check if we need to seed the database
+                parcel_count = Parcel.query.count()
+                if parcel_count == 0:
+                    logger.info("No parcels found in database. Running seed script...")
+                    # Run in a separate process but with proper env variables
+                    subprocess.run(["python", "seed_database.py"], check=True)
+                    logger.info("Database seeded successfully")
+                else:
+                    logger.info(f"Database already has {parcel_count} parcels. No seeding needed.")
+            except Exception as inner_e:
+                logger.error(f"Inner error checking/seeding database: {inner_e}")
     except Exception as e:
-        logger.error(f"Error seeding database: {e}")
+        logger.error(f"Error in seed_database_if_needed: {e}")
 
-# Run seeding on application startup
-seed_database_if_needed()
+# In newer Flask versions, we use this pattern instead of before_first_request
+with app.app_context():
+    try:
+        # Try to seed database at startup
+        seed_database_if_needed()
+    except Exception as e:
+        logger.error(f"Failed to seed database at startup: {e}")
 
 if __name__ == "__main__":
     port = int(os.environ.get("FLASK_PORT", 5000))

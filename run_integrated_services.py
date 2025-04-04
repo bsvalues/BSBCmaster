@@ -7,293 +7,293 @@ with proper coordination, error handling, and environment setup.
 
 import os
 import sys
-import signal
 import subprocess
-import threading
 import time
+import signal
+import threading
 import logging
-import socket
-from dotenv import load_dotenv
+import requests
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("integrated_services.log"),
+        logging.FileHandler('integrated_services.log')
     ]
 )
 logger = logging.getLogger(__name__)
 
-# Global processes list for cleanup
-processes = []
-MAX_RETRY_ATTEMPTS = 3
+# Global variables to store process handles
+fastapi_process = None
+flask_process = None
 
 def check_port_available(port):
     """Check if a port is available."""
+    import socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    available = True
     try:
         sock.bind(('0.0.0.0', port))
-        result = True
-    except:
-        result = False
+    except socket.error:
+        available = False
     finally:
         sock.close()
-    return result
+    return available
 
 def wait_for_port(port, timeout=30):
     """Wait for a port to become available."""
+    logger.info(f"Waiting for port {port} to become available...")
     start_time = time.time()
     while time.time() - start_time < timeout:
-        try:
-            socket.create_connection(('127.0.0.1', port), timeout=1)
+        if check_port_available(port):
+            logger.info(f"Port {port} is now available")
             return True
-        except:
-            time.sleep(1)
+        time.sleep(1)
+    logger.warning(f"Timed out waiting for port {port} to become available")
     return False
 
 def log_output(process, service_name):
     """Monitor and log process output."""
-    while True:
-        line = process.stdout.readline()
-        if not line and process.poll() is not None:
-            break
-        if line:
-            line = line.decode('utf-8').rstrip()
-            logger.info(f"[{service_name}] {line}")
-    
-    # Check if process exited with an error
-    if process.returncode != 0:
-        logger.error(f"{service_name} exited with code {process.returncode}")
+    for line in iter(process.stdout.readline, b''):
+        try:
+            decoded_line = line.decode('utf-8').rstrip()
+            logger.info(f"[{service_name}] {decoded_line}")
+        except Exception as e:
+            logger.error(f"Error logging output from {service_name}: {str(e)}")
 
 def start_fastapi():
     """Start the FastAPI application."""
-    logger.info("Starting FastAPI service on port 8000...")
+    global fastapi_process
     
-    # Check if port is already in use
-    if not check_port_available(8000):
-        logger.warning("Port 8000 is already in use. Attempting to free it...")
-        try:
-            subprocess.run(["pkill", "-f", "uvicorn.*:8000"], check=False)
-            time.sleep(2)
-            if not check_port_available(8000):
-                logger.error("Could not free port 8000. Cannot start FastAPI service.")
+    try:
+        # First make sure port 8000 is available
+        if not check_port_available(8000):
+            # Try to kill any process using port 8000
+            try:
+                subprocess.run(
+                    ["fuser", "-k", "8000/tcp"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False
+                )
+                logger.info("Killed existing process on port 8000")
+                # Wait for port to become available
+                if not wait_for_port(8000, timeout=10):
+                    logger.error("Failed to free up port 8000")
+                    return False
+            except Exception as e:
+                logger.error(f"Error stopping service on port 8000: {str(e)}")
                 return False
-        except Exception as e:
-            logger.error(f"Error freeing port 8000: {str(e)}")
-            return False
+        
+        # Start FastAPI service
+        cmd = ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+        logger.info(f"Starting FastAPI service: {' '.join(cmd)}")
+        
+        fastapi_process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=1,
+            universal_newlines=False
+        )
+        
+        # Start a thread to log output
+        threading.Thread(
+            target=log_output,
+            args=(fastapi_process, "FastAPI"),
+            daemon=True
+        ).start()
+        
+        # Wait for FastAPI to start
+        logger.info("Waiting for FastAPI service to initialize...")
+        time.sleep(5)
+        
+        # Check if service started successfully
+        for _ in range(30):
+            try:
+                response = requests.get("http://localhost:8000/health", timeout=2)
+                if response.status_code == 200:
+                    logger.info("FastAPI service is healthy")
+                    return True
+            except requests.RequestException:
+                pass
+            time.sleep(1)
+            
+        logger.warning("FastAPI service did not respond to health check")
+        return fastapi_process.poll() is None  # Return True if process is still running
     
-    # Set up environment
-    env = os.environ.copy()
-    
-    # Run FastAPI using uvicorn with additional error capture
-    fastapi_cmd = [
-        "python", "-m", "uvicorn", "app:app", 
-        "--host", "0.0.0.0", "--port", "8000", "--reload"
-    ]
-    
-    retry_count = 0
-    while retry_count < MAX_RETRY_ATTEMPTS:
-        try:
-            process = subprocess.Popen(
-                fastapi_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                bufsize=1,
-                universal_newlines=False,
-                env=env
-            )
-            processes.append(process)
-            
-            # Record PID to file for potential external management
-            with open("fastapi.pid", "w") as f:
-                f.write(str(process.pid))
-            
-            # Start a thread to monitor and log output
-            threading.Thread(
-                target=log_output,
-                args=(process, "FastAPI"),
-                daemon=True
-            ).start()
-            
-            # Wait for service to start
-            logger.info("Waiting for FastAPI to initialize...")
-            if not wait_for_port(8000, timeout=15):
-                logger.error("Timed out waiting for FastAPI to start")
-                process.terminate()
-                retry_count += 1
-                continue
-            
-            # Check if process is still running
-            if process.poll() is not None:
-                logger.error(f"FastAPI failed to start (exit code {process.returncode})")
-                retry_count += 1
-                continue
-            
-            logger.info("FastAPI service started successfully")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error starting FastAPI (attempt {retry_count+1}): {str(e)}")
-            retry_count += 1
-            time.sleep(2)
-    
-    logger.error(f"Failed to start FastAPI after {MAX_RETRY_ATTEMPTS} attempts")
-    return False
+    except Exception as e:
+        logger.error(f"Error starting FastAPI service: {str(e)}")
+        return False
 
 def start_flask():
     """Start the Flask documentation application."""
-    logger.info("Starting Flask documentation on port 5000...")
+    global flask_process
     
-    # Check if port is already in use
-    if not check_port_available(5000):
-        logger.warning("Port 5000 is already in use. Attempting to free it...")
-        try:
-            subprocess.run(["pkill", "-f", "gunicorn.*:5000"], check=False)
-            time.sleep(2)
-            if not check_port_available(5000):
-                logger.error("Could not free port 5000. Cannot start Flask service.")
+    try:
+        # First make sure port 5000 is available
+        if not check_port_available(5000):
+            # Try to kill any process using port 5000
+            try:
+                subprocess.run(
+                    ["fuser", "-k", "5000/tcp"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False
+                )
+                logger.info("Killed existing process on port 5000")
+                # Wait for port to become available
+                if not wait_for_port(5000, timeout=10):
+                    logger.error("Failed to free up port 5000")
+                    return False
+            except Exception as e:
+                logger.error(f"Error stopping service on port 5000: {str(e)}")
                 return False
-        except Exception as e:
-            logger.error(f"Error freeing port 5000: {str(e)}")
-            return False
+        
+        # Start Flask service
+        cmd = ["gunicorn", "--bind", "0.0.0.0:5000", "--reuse-port", "--reload", "main:app"]
+        logger.info(f"Starting Flask service: {' '.join(cmd)}")
+        
+        flask_process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=1,
+            universal_newlines=False
+        )
+        
+        # Start a thread to log output
+        threading.Thread(
+            target=log_output,
+            args=(flask_process, "Flask"),
+            daemon=True
+        ).start()
+        
+        # Wait for Flask to start
+        logger.info("Waiting for Flask service to initialize...")
+        time.sleep(5)
+        
+        # Check if service started successfully
+        for _ in range(30):
+            try:
+                response = requests.get("http://localhost:5000/health", timeout=2)
+                if response.status_code == 200:
+                    logger.info("Flask service is healthy")
+                    return True
+            except requests.RequestException:
+                pass
+            time.sleep(1)
+            
+        logger.warning("Flask service did not respond to health check")
+        return flask_process.poll() is None  # Return True if process is still running
     
-    # Run Flask using gunicorn
-    flask_cmd = [
-        "gunicorn", "--bind", "0.0.0.0:5000", 
-        "--access-logfile", "-", "--error-logfile", "-",
-        "--reload", "main:app"
-    ]
-    
-    retry_count = 0
-    while retry_count < MAX_RETRY_ATTEMPTS:
-        try:
-            process = subprocess.Popen(
-                flask_cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                bufsize=1,
-                universal_newlines=False
-            )
-            processes.append(process)
-            
-            # Start a thread to monitor and log output
-            threading.Thread(
-                target=log_output,
-                args=(process, "Flask"),
-                daemon=True
-            ).start()
-            
-            # Wait for service to start
-            logger.info("Waiting for Flask to initialize...")
-            if not wait_for_port(5000, timeout=15):
-                logger.error("Timed out waiting for Flask to start")
-                process.terminate()
-                retry_count += 1
-                continue
-            
-            # Check if process is still running
-            if process.poll() is not None:
-                logger.error(f"Flask failed to start (exit code {process.returncode})")
-                retry_count += 1
-                continue
-            
-            logger.info("Flask documentation started successfully")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error starting Flask (attempt {retry_count+1}): {str(e)}")
-            retry_count += 1
-            time.sleep(2)
-    
-    logger.error(f"Failed to start Flask after {MAX_RETRY_ATTEMPTS} attempts")
-    return False
+    except Exception as e:
+        logger.error(f"Error starting Flask service: {str(e)}")
+        return False
 
 def cleanup(signum=None, frame=None):
     """Clean up processes on exit."""
-    logger.info("Cleaning up services...")
-    for process in processes:
-        try:
-            if process and process.poll() is None:
-                process.terminate()
-                process.wait(timeout=5)
-        except Exception as e:
-            logger.error(f"Error terminating process: {str(e)}")
+    logger.info("Cleaning up processes...")
     
-    logger.info("All services stopped")
+    try:
+        # Terminate FastAPI process
+        if fastapi_process and fastapi_process.poll() is None:
+            logger.info("Terminating FastAPI process")
+            fastapi_process.terminate()
+            try:
+                fastapi_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                logger.warning("FastAPI process did not terminate, killing it")
+                fastapi_process.kill()
+            logger.info("FastAPI process terminated")
+    except Exception as e:
+        logger.error(f"Error terminating FastAPI process: {str(e)}")
+    
+    try:
+        # Terminate Flask process
+        if flask_process and flask_process.poll() is None:
+            logger.info("Terminating Flask process")
+            flask_process.terminate()
+            try:
+                flask_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                logger.warning("Flask process did not terminate, killing it")
+                flask_process.kill()
+            logger.info("Flask process terminated")
+    except Exception as e:
+        logger.error(f"Error terminating Flask process: {str(e)}")
+    
+    # Exit gracefully
     if signum is not None:
         sys.exit(0)
 
 def main():
     """Main function to run both services."""
-    # Load environment variables
-    load_dotenv()
-    
-    # Make sure required environments are set
-    if not os.environ.get("API_KEY"):
-        logger.warning("API_KEY not set. Setting default value for development.")
-        os.environ["API_KEY"] = "b6212a0ff43102f608553e842293eba0ec013ff6926459f96fba31d0fabacd2e"
-    
-    # Register signal handlers for cleanup
+    # Register signal handlers
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGTERM, cleanup)
     
-    logger.info("=" * 60)
-    logger.info("Starting MCP Assessor Agent API integrated services...")
-    logger.info("=" * 60)
+    logger.info("=" * 80)
+    logger.info("Starting MCP Assessor Agent API services")
+    logger.info("=" * 80)
     
     # Start FastAPI service
     if not start_fastapi():
-        logger.error("Failed to start FastAPI service. Exiting...")
-        cleanup()
-        return
+        logger.error("Failed to start FastAPI service")
+        return 1
     
-    # Start Flask documentation
+    logger.info("FastAPI service started successfully")
+    
+    # Start Flask service
     if not start_flask():
-        logger.error("Failed to start Flask documentation. Exiting...")
+        logger.error("Failed to start Flask service")
         cleanup()
-        return
+        return 1
     
-    logger.info("=" * 60)
-    logger.info("All services started successfully")
-    logger.info("FastAPI running on port 8000")
-    logger.info("Flask documentation running on port 5000")
-    logger.info("=" * 60)
+    logger.info("Flask service started successfully")
+    logger.info("Both services are now running.")
+    logger.info("Flask Documentation: http://localhost:5000")
+    logger.info("FastAPI Service: http://localhost:8000")
     
+    # Monitor services
     try:
-        # Keep script running and monitor processes
         while True:
-            time.sleep(2)
+            # Check if processes are still running
+            fastapi_running = fastapi_process and fastapi_process.poll() is None
+            flask_running = flask_process and flask_process.poll() is None
             
-            # Check if any process has exited
-            for process in processes:
-                if process.poll() is not None:
-                    service_name = "FastAPI" if "uvicorn" in str(process.args) else "Flask"
-                    logger.error(f"{service_name} has exited unexpectedly with code {process.returncode}")
-                    
-                    # Attempt to restart the service
-                    logger.info(f"Attempting to restart {service_name}...")
-                    if service_name == "FastAPI":
-                        if not start_fastapi():
-                            logger.error("Failed to restart FastAPI service. Exiting...")
-                            cleanup()
-                            return
-                    else:
-                        if not start_flask():
-                            logger.error("Failed to restart Flask service. Exiting...")
-                            cleanup()
-                            return
-                    
-                    # Remove the old process from the list
-                    processes.remove(process)
+            if not fastapi_running:
+                if fastapi_process:
+                    logger.error(f"FastAPI process exited with code {fastapi_process.returncode}")
+                logger.info("Attempting to restart FastAPI service...")
+                if not start_fastapi():
+                    logger.error("Failed to restart FastAPI service")
+                    cleanup()
+                    return 1
+            
+            if not flask_running:
+                if flask_process:
+                    logger.error(f"Flask process exited with code {flask_process.returncode}")
+                logger.info("Attempting to restart Flask service...")
+                if not start_flask():
+                    logger.error("Failed to restart Flask service")
+                    cleanup()
+                    return 1
+            
+            # Sleep for a while before checking again
+            time.sleep(5)
     
     except KeyboardInterrupt:
-        logger.info("Received interrupt signal")
-        cleanup()
+        logger.info("Received keyboard interrupt")
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
+    finally:
         cleanup()
+    
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

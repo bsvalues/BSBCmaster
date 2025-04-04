@@ -43,10 +43,10 @@ def start_fastapi():
     logger.info("Starting FastAPI service on port 8000...")
     
     try:
-        # Run FastAPI using uvicorn
+        # Run FastAPI using uvicorn with reload for development
         fastapi_cmd = [
             "python", "-m", "uvicorn", "app:app", 
-            "--host", "0.0.0.0", "--port", "8000"
+            "--host", "0.0.0.0", "--port", "8000", "--reload"
         ]
         
         process = subprocess.Popen(
