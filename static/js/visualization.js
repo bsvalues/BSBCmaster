@@ -1,291 +1,52 @@
 /**
- * MCP Assessor Agent API - Data Visualization Module
+ * MCP Assessor Agent API - Data Visualization Library
  * 
- * This module provides visualization capabilities for real estate assessment data.
- * It includes functions for creating charts, maps, and other visualizations.
+ * This library provides visualization capabilities for the MCP Assessor Agent API,
+ * including data tables, charts, and interactive visualizations.
  */
 
-// Visualization namespace
-const MCPVisualization = (function() {
-    
-    // Configuration
-    const config = {
-        colors: {
-            primary: '#0d6efd',
-            secondary: '#6c757d',
-            success: '#198754',
-            danger: '#dc3545',
-            warning: '#ffc107',
-            info: '#0dcaf0',
-            light: '#f8f9fa',
-            dark: '#212529'
-        },
-        chart: {
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial',
-            fontSize: 12,
-            backgroundColor: '#212529',
-            textColor: '#f8f9fa'
-        }
-    };
-
+const MCPVisualization = {
     /**
-     * Create a bar chart using Chart.js
-     * 
-     * @param {string} elementId - The ID of the canvas element
-     * @param {Array} labels - The labels for the chart
-     * @param {Array} data - The data values for the chart
-     * @param {string} title - The title of the chart
-     * @param {Object} options - Additional options for the chart
-     * @returns {Object} The created chart instance
+     * Creates a paginated data table for query results
+     * @param {string} containerId - ID of the container element
+     * @param {object} data - Query result data (rows, columns, metadata)
+     * @param {object} options - Additional options like pagination handlers
      */
-    function createBarChart(elementId, labels, data, title, options = {}) {
-        const ctx = document.getElementById(elementId).getContext('2d');
-        
-        // Default options
-        const defaultOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        color: config.chart.textColor
-                    }
-                },
-                title: {
-                    display: true,
-                    text: title,
-                    color: config.chart.textColor,
-                    font: {
-                        size: 16
-                    }
-                },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    ticks: {
-                        color: config.chart.textColor
-                    }
-                },
-                x: {
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    ticks: {
-                        color: config.chart.textColor
-                    }
-                }
-            }
-        };
-        
-        // Merge options
-        const mergedOptions = { ...defaultOptions, ...options };
-        
-        // Create chart
-        return new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: title,
-                    data: data,
-                    backgroundColor: config.colors.primary,
-                    borderColor: config.colors.primary,
-                    borderWidth: 1
-                }]
-            },
-            options: mergedOptions
-        });
-    }
-    
-    /**
-     * Create a pie chart using Chart.js
-     * 
-     * @param {string} elementId - The ID of the canvas element
-     * @param {Array} labels - The labels for the chart
-     * @param {Array} data - The data values for the chart
-     * @param {string} title - The title of the chart
-     * @param {Object} options - Additional options for the chart
-     * @returns {Object} The created chart instance
-     */
-    function createPieChart(elementId, labels, data, title, options = {}) {
-        const ctx = document.getElementById(elementId).getContext('2d');
-        
-        // Generate colors based on the number of data points
-        const backgroundColors = generateColorPalette(data.length);
-        
-        // Default options
-        const defaultOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'right',
-                    labels: {
-                        color: config.chart.textColor
-                    }
-                },
-                title: {
-                    display: true,
-                    text: title,
-                    color: config.chart.textColor,
-                    font: {
-                        size: 16
-                    }
-                },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false
-                }
-            }
-        };
-        
-        // Merge options
-        const mergedOptions = { ...defaultOptions, ...options };
-        
-        // Create chart
-        return new Chart(ctx, {
-            type: 'pie',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: title,
-                    data: data,
-                    backgroundColor: backgroundColors,
-                    borderColor: backgroundColors.map(color => adjustColorBrightness(color, -20)),
-                    borderWidth: 1
-                }]
-            },
-            options: mergedOptions
-        });
-    }
-    
-    /**
-     * Create a line chart using Chart.js
-     * 
-     * @param {string} elementId - The ID of the canvas element
-     * @param {Array} labels - The labels for the chart
-     * @param {Array} data - The data values for the chart
-     * @param {string} title - The title of the chart
-     * @param {Object} options - Additional options for the chart
-     * @returns {Object} The created chart instance
-     */
-    function createLineChart(elementId, labels, data, title, options = {}) {
-        const ctx = document.getElementById(elementId).getContext('2d');
-        
-        // Default options
-        const defaultOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        color: config.chart.textColor
-                    }
-                },
-                title: {
-                    display: true,
-                    text: title,
-                    color: config.chart.textColor,
-                    font: {
-                        size: 16
-                    }
-                },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    ticks: {
-                        color: config.chart.textColor
-                    }
-                },
-                x: {
-                    grid: {
-                        color: 'rgba(255, 255, 255, 0.1)'
-                    },
-                    ticks: {
-                        color: config.chart.textColor
-                    }
-                }
-            }
-        };
-        
-        // Merge options
-        const mergedOptions = { ...defaultOptions, ...options };
-        
-        // Create chart
-        return new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: title,
-                    data: data,
-                    backgroundColor: 'rgba(13, 110, 253, 0.2)',
-                    borderColor: config.colors.primary,
-                    borderWidth: 2,
-                    tension: 0.1,
-                    fill: true
-                }]
-            },
-            options: mergedOptions
-        });
-    }
-    
-    /**
-     * Create a data table using the query results
-     * 
-     * @param {string} elementId - The ID of the element to append the table to
-     * @param {Object} queryResult - The query result object from the API
-     * @param {Object} options - Additional options for the table
-     */
-    function createDataTable(elementId, queryResult, options = {}) {
-        const element = document.getElementById(elementId);
-        
-        // Clear the element
-        element.innerHTML = '';
-        
-        // Check if there are rows to display
-        if (!queryResult.rows || queryResult.rows.length === 0) {
-            element.innerHTML = '<div class="alert alert-info">No data available</div>';
+    createDataTable: function(containerId, data, options = {}) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.error(`Container with ID ${containerId} not found`);
             return;
         }
         
-        // Get the column names from the first row
-        const columns = Object.keys(queryResult.rows[0]);
+        // Clear container
+        container.innerHTML = '';
         
-        // Create table container with responsive wrapper
-        const tableContainer = document.createElement('div');
-        tableContainer.className = 'table-responsive';
+        // Extract data
+        const { rows, columns, metadata } = data;
+        
+        if (!rows || !columns || rows.length === 0) {
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    No data available for this query.
+                </div>
+            `;
+            return;
+        }
         
         // Create table
         const table = document.createElement('table');
-        table.className = 'table table-dark table-striped table-hover';
+        table.className = 'table table-striped table-hover';
         
         // Create table header
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         
-        // Add header cells
         columns.forEach(column => {
             const th = document.createElement('th');
-            th.textContent = formatColumnName(column);
+            th.scope = 'col';
+            th.textContent = column;
             headerRow.appendChild(th);
         });
         
@@ -295,40 +56,12 @@ const MCPVisualization = (function() {
         // Create table body
         const tbody = document.createElement('tbody');
         
-        // Add rows
-        queryResult.rows.forEach(row => {
+        rows.forEach(row => {
             const tr = document.createElement('tr');
             
-            // Add cells
             columns.forEach(column => {
                 const td = document.createElement('td');
-                
-                // Format the value based on its type
-                let value = row[column];
-                
-                if (value === null) {
-                    td.innerHTML = '<span class="text-muted">NULL</span>';
-                } else if (typeof value === 'boolean') {
-                    td.innerHTML = value ? '<span class="badge bg-success">True</span>' : '<span class="badge bg-danger">False</span>';
-                } else if (typeof value === 'number') {
-                    // Format numbers with commas for thousands
-                    if (column.toLowerCase().includes('price') || column.toLowerCase().includes('value')) {
-                        td.textContent = '$' + value.toLocaleString();
-                    } else {
-                        td.textContent = value.toLocaleString();
-                    }
-                } else if (typeof value === 'string' && (column.toLowerCase().includes('date') || column.toLowerCase().includes('time'))) {
-                    // Format dates nicely
-                    try {
-                        const date = new Date(value);
-                        td.textContent = date.toLocaleDateString();
-                    } catch (e) {
-                        td.textContent = value;
-                    }
-                } else {
-                    td.textContent = value;
-                }
-                
+                td.textContent = row[column] !== null ? row[column] : 'NULL';
                 tr.appendChild(td);
             });
             
@@ -336,447 +69,359 @@ const MCPVisualization = (function() {
         });
         
         table.appendChild(tbody);
-        tableContainer.appendChild(table);
+        container.appendChild(table);
         
-        // Add pagination if there are multiple pages
-        if (queryResult.total_pages > 1) {
-            const pagination = createPagination(queryResult.page, queryResult.total_pages, options.onPageChange);
-            element.appendChild(pagination);
-        }
-        
-        // Append table to element
-        element.appendChild(tableContainer);
-        
-        // Add metadata about the query
-        const metadataDiv = document.createElement('div');
-        metadataDiv.className = 'mt-3 text-muted small';
-        metadataDiv.innerHTML = `
-            <strong>Total rows:</strong> ${queryResult.total_rows} | 
-            <strong>Execution time:</strong> ${queryResult.execution_time.toFixed(3)}s
-        `;
-        element.appendChild(metadataDiv);
-    }
-    
-    /**
-     * Create a pagination component
-     * 
-     * @param {number} currentPage - The current page number
-     * @param {number} totalPages - The total number of pages
-     * @param {Function} onPageChange - Callback function when page changes
-     * @returns {HTMLElement} The pagination element
-     */
-    function createPagination(currentPage, totalPages, onPageChange) {
-        const paginationContainer = document.createElement('nav');
-        paginationContainer.setAttribute('aria-label', 'Data pagination');
-        
-        const paginationList = document.createElement('ul');
-        paginationList.className = 'pagination justify-content-center';
-        
-        // Previous button
-        const prevItem = document.createElement('li');
-        prevItem.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
-        
-        const prevLink = document.createElement('a');
-        prevLink.className = 'page-link';
-        prevLink.href = '#';
-        prevLink.setAttribute('aria-label', 'Previous');
-        prevLink.innerHTML = '<span aria-hidden="true">&laquo;</span>';
-        
-        if (currentPage > 1) {
-            prevLink.addEventListener('click', e => {
-                e.preventDefault();
-                onPageChange(currentPage - 1);
-            });
-        }
-        
-        prevItem.appendChild(prevLink);
-        paginationList.appendChild(prevItem);
-        
-        // Page numbers
-        const maxPages = 5; // Maximum number of page links to show
-        let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
-        let endPage = Math.min(totalPages, startPage + maxPages - 1);
-        
-        // Adjust start page if end page is maxPages
-        if (endPage - startPage + 1 < maxPages && startPage > 1) {
-            startPage = Math.max(1, endPage - maxPages + 1);
-        }
-        
-        // First page
-        if (startPage > 1) {
-            const firstItem = document.createElement('li');
-            firstItem.className = 'page-item';
+        // Add pagination if metadata is available
+        if (metadata && metadata.total_pages > 1) {
+            const pagination = document.createElement('nav');
+            pagination.setAttribute('aria-label', 'Query results pagination');
             
-            const firstLink = document.createElement('a');
-            firstLink.className = 'page-link';
-            firstLink.href = '#';
-            firstLink.textContent = '1';
+            const ul = document.createElement('ul');
+            ul.className = 'pagination justify-content-center';
             
-            firstLink.addEventListener('click', e => {
-                e.preventDefault();
-                onPageChange(1);
-            });
+            // Previous button
+            const prevLi = document.createElement('li');
+            prevLi.className = `page-item ${metadata.current_page === 1 ? 'disabled' : ''}`;
             
-            firstItem.appendChild(firstLink);
-            paginationList.appendChild(firstItem);
+            const prevLink = document.createElement('a');
+            prevLink.className = 'page-link';
+            prevLink.href = '#';
+            prevLink.setAttribute('aria-label', 'Previous');
+            prevLink.innerHTML = '<span aria-hidden="true">&laquo;</span>';
             
-            // Ellipsis
-            if (startPage > 2) {
-                const ellipsisItem = document.createElement('li');
-                ellipsisItem.className = 'page-item disabled';
-                
-                const ellipsisLink = document.createElement('a');
-                ellipsisLink.className = 'page-link';
-                ellipsisLink.href = '#';
-                ellipsisLink.textContent = '...';
-                
-                ellipsisItem.appendChild(ellipsisLink);
-                paginationList.appendChild(ellipsisItem);
-            }
-        }
-        
-        // Page numbers
-        for (let i = startPage; i <= endPage; i++) {
-            const pageItem = document.createElement('li');
-            pageItem.className = `page-item ${i === currentPage ? 'active' : ''}`;
-            
-            const pageLink = document.createElement('a');
-            pageLink.className = 'page-link';
-            pageLink.href = '#';
-            pageLink.textContent = i;
-            
-            if (i !== currentPage) {
-                pageLink.addEventListener('click', e => {
+            if (metadata.current_page > 1 && options.onPageChange) {
+                prevLink.addEventListener('click', e => {
                     e.preventDefault();
-                    onPageChange(i);
+                    options.onPageChange(metadata.current_page - 1);
                 });
             }
             
-            pageItem.appendChild(pageLink);
-            paginationList.appendChild(pageItem);
-        }
-        
-        // Last page
-        if (endPage < totalPages) {
-            // Ellipsis
-            if (endPage < totalPages - 1) {
-                const ellipsisItem = document.createElement('li');
-                ellipsisItem.className = 'page-item disabled';
+            prevLi.appendChild(prevLink);
+            ul.appendChild(prevLi);
+            
+            // Page numbers
+            for (let i = 1; i <= metadata.total_pages; i++) {
+                const li = document.createElement('li');
+                li.className = `page-item ${i === metadata.current_page ? 'active' : ''}`;
                 
-                const ellipsisLink = document.createElement('a');
-                ellipsisLink.className = 'page-link';
-                ellipsisLink.href = '#';
-                ellipsisLink.textContent = '...';
+                const link = document.createElement('a');
+                link.className = 'page-link';
+                link.href = '#';
+                link.textContent = i;
                 
-                ellipsisItem.appendChild(ellipsisLink);
-                paginationList.appendChild(ellipsisItem);
+                if (i !== metadata.current_page && options.onPageChange) {
+                    link.addEventListener('click', e => {
+                        e.preventDefault();
+                        options.onPageChange(i);
+                    });
+                }
+                
+                li.appendChild(link);
+                ul.appendChild(li);
             }
             
-            const lastItem = document.createElement('li');
-            lastItem.className = 'page-item';
+            // Next button
+            const nextLi = document.createElement('li');
+            nextLi.className = `page-item ${metadata.current_page === metadata.total_pages ? 'disabled' : ''}`;
             
-            const lastLink = document.createElement('a');
-            lastLink.className = 'page-link';
-            lastLink.href = '#';
-            lastLink.textContent = totalPages;
+            const nextLink = document.createElement('a');
+            nextLink.className = 'page-link';
+            nextLink.href = '#';
+            nextLink.setAttribute('aria-label', 'Next');
+            nextLink.innerHTML = '<span aria-hidden="true">&raquo;</span>';
             
-            lastLink.addEventListener('click', e => {
-                e.preventDefault();
-                onPageChange(totalPages);
-            });
+            if (metadata.current_page < metadata.total_pages && options.onPageChange) {
+                nextLink.addEventListener('click', e => {
+                    e.preventDefault();
+                    options.onPageChange(metadata.current_page + 1);
+                });
+            }
             
-            lastItem.appendChild(lastLink);
-            paginationList.appendChild(lastItem);
+            nextLi.appendChild(nextLink);
+            ul.appendChild(nextLi);
+            
+            pagination.appendChild(ul);
+            container.appendChild(pagination);
         }
         
-        // Next button
-        const nextItem = document.createElement('li');
-        nextItem.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
-        
-        const nextLink = document.createElement('a');
-        nextLink.className = 'page-link';
-        nextLink.href = '#';
-        nextLink.setAttribute('aria-label', 'Next');
-        nextLink.innerHTML = '<span aria-hidden="true">&raquo;</span>';
-        
-        if (currentPage < totalPages) {
-            nextLink.addEventListener('click', e => {
-                e.preventDefault();
-                onPageChange(currentPage + 1);
-            });
+        // Add metadata info
+        if (metadata && metadata.execution_time) {
+            const metaInfo = document.createElement('div');
+            metaInfo.className = 'mt-2 small text-muted';
+            metaInfo.innerHTML = `
+                <strong>Execution time:</strong> ${metadata.execution_time.toFixed(3)}s 
+                | <strong>Rows:</strong> ${metadata.total_rows || rows.length}
+                ${metadata.database_type ? ` | <strong>Database:</strong> ${metadata.database_type}` : ''}
+            `;
+            container.appendChild(metaInfo);
         }
-        
-        nextItem.appendChild(nextLink);
-        paginationList.appendChild(nextItem);
-        
-        paginationContainer.appendChild(paginationList);
-        return paginationContainer;
-    }
+    },
     
     /**
-     * Format a column name for display
-     * 
-     * @param {string} columnName - The raw column name
-     * @returns {string} The formatted column name
+     * Visualize query results with appropriate charts based on data type
+     * @param {string} containerId - ID of the container element
+     * @param {object} data - Query result data (rows, columns, metadata)
      */
-    function formatColumnName(columnName) {
-        // Replace underscores with spaces
-        let formatted = columnName.replace(/_/g, ' ');
-        
-        // Capitalize each word
-        formatted = formatted.replace(/\b\w/g, char => char.toUpperCase());
-        
-        return formatted;
-    }
-    
-    /**
-     * Generate a color palette with the specified number of colors
-     * 
-     * @param {number} count - The number of colors to generate
-     * @returns {Array} An array of color strings
-     */
-    function generateColorPalette(count) {
-        const baseColors = [
-            config.colors.primary,
-            config.colors.success,
-            config.colors.danger,
-            config.colors.warning,
-            config.colors.info,
-            '#fd7e14', // orange
-            '#6f42c1', // purple
-            '#20c997', // teal
-            '#e83e8c', // pink
-            '#17a2b8'  // cyan
-        ];
-        
-        // If we need fewer colors than the base palette, return a subset
-        if (count <= baseColors.length) {
-            return baseColors.slice(0, count);
-        }
-        
-        // Otherwise, generate additional colors by adjusting the brightness of the base colors
-        const colors = [...baseColors];
-        
-        let currentIndex = 0;
-        while (colors.length < count) {
-            const baseColor = baseColors[currentIndex % baseColors.length];
-            const brightness = 20 * (Math.floor(currentIndex / baseColors.length) + 1);
-            colors.push(adjustColorBrightness(baseColor, brightness));
-            currentIndex++;
-        }
-        
-        return colors;
-    }
-    
-    /**
-     * Adjust the brightness of a color
-     * 
-     * @param {string} color - The color in hex format (#RRGGBB)
-     * @param {number} percent - The percentage to adjust the brightness (negative for darker, positive for lighter)
-     * @returns {string} The adjusted color in hex format
-     */
-    function adjustColorBrightness(color, percent) {
-        let R = parseInt(color.substring(1, 3), 16);
-        let G = parseInt(color.substring(3, 5), 16);
-        let B = parseInt(color.substring(5, 7), 16);
-        
-        R = parseInt(R * (100 + percent) / 100);
-        G = parseInt(G * (100 + percent) / 100);
-        B = parseInt(B * (100 + percent) / 100);
-        
-        R = (R < 255) ? R : 255;
-        G = (G < 255) ? G : 255;
-        B = (B < 255) ? B : 255;
-        
-        R = Math.max(0, R).toString(16).padStart(2, '0');
-        G = Math.max(0, G).toString(16).padStart(2, '0');
-        B = Math.max(0, B).toString(16).padStart(2, '0');
-        
-        return `#${R}${G}${B}`;
-    }
-    
-    /**
-     * Create visualizations based on the query results
-     * 
-     * @param {string} containerElementId - The ID of the container element
-     * @param {Object} queryResult - The query result object from the API
-     */
-    function visualizeQueryResults(containerElementId, queryResult) {
-        const container = document.getElementById(containerElementId);
-        
-        // Clear the container
-        container.innerHTML = '';
-        
-        // Check if there are rows to visualize
-        if (!queryResult.rows || queryResult.rows.length === 0) {
-            container.innerHTML = '<div class="alert alert-info">No data available for visualization</div>';
+    visualizeQueryResults: function(containerId, data) {
+        const container = document.getElementById(containerId);
+        if (!container) {
+            console.error(`Container with ID ${containerId} not found`);
             return;
         }
         
-        // Create visualization container
-        const visualizationContainer = document.createElement('div');
-        visualizationContainer.className = 'visualization-container mt-4';
+        // Clear container
+        container.innerHTML = '';
         
-        // Determine what kind of visualizations would be appropriate
-        const columns = Object.keys(queryResult.rows[0]);
+        const { rows, columns } = data;
+        
+        if (!rows || !columns || rows.length === 0) {
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    No data available for visualization.
+                </div>
+            `;
+            return;
+        }
+        
+        // Determine if we can create a visualization
         const numericColumns = columns.filter(col => 
-            !col.toLowerCase().includes('id') && 
-            typeof queryResult.rows[0][col] === 'number'
+            rows.length > 0 && 
+            rows.some(row => typeof row[col] === 'number' || 
+                (typeof row[col] === 'string' && !isNaN(parseFloat(row[col]))))
         );
         
         const dateColumns = columns.filter(col => 
-            (col.toLowerCase().includes('date') || col.toLowerCase().includes('time')) &&
-            typeof queryResult.rows[0][col] === 'string'
+            rows.length > 0 && 
+            rows.some(row => {
+                const val = row[col];
+                return val && (val instanceof Date || 
+                    (typeof val === 'string' && !isNaN(Date.parse(val))));
+            })
         );
         
-        const categoryColumns = columns.filter(col => 
-            typeof queryResult.rows[0][col] === 'string' && 
-            !dateColumns.includes(col)
+        const categoricalColumns = columns.filter(col => 
+            rows.length > 0 && 
+            !numericColumns.includes(col) && 
+            !dateColumns.includes(col) && 
+            rows.some(row => row[col] !== null && row[col] !== undefined)
         );
         
-        // Create visualizations based on available column types
+        // Create visualization header
+        const header = document.createElement('h4');
+        header.className = 'mb-3';
+        header.textContent = 'Data Visualization';
+        container.appendChild(header);
         
-        // 1. Bar chart for a numeric column grouped by a category
-        if (numericColumns.length > 0 && categoryColumns.length > 0) {
-            // Choose the first numeric and category columns
-            const numericColumn = numericColumns[0];
-            const categoryColumn = categoryColumns[0];
+        // Create charts container
+        const chartsContainer = document.createElement('div');
+        chartsContainer.className = 'row';
+        container.appendChild(chartsContainer);
+        
+        // Flag to track if we've created any visualizations
+        let visualizationsCreated = false;
+        
+        // Try creating a bar or line chart if we have numeric + categorical/date columns
+        if (numericColumns.length > 0 && (categoricalColumns.length > 0 || dateColumns.length > 0)) {
+            visualizationsCreated = true;
             
-            // Group data by the category
-            const groupedData = {};
-            queryResult.rows.forEach(row => {
-                const category = row[categoryColumn] || 'Unknown';
-                if (!groupedData[category]) {
-                    groupedData[category] = 0;
+            const chartType = dateColumns.length > 0 ? 'line' : 'bar';
+            const xAxisColumn = dateColumns.length > 0 ? dateColumns[0] : categoricalColumns[0];
+            
+            // Create chart wrapper
+            const chartWrapper = document.createElement('div');
+            chartWrapper.className = 'col-12 mb-4';
+            chartsContainer.appendChild(chartWrapper);
+            
+            // Create canvas for Chart.js
+            const canvas = document.createElement('canvas');
+            canvas.id = `chart-${containerId}`;
+            chartWrapper.appendChild(canvas);
+            
+            // Prepare data for Chart.js
+            const chartData = {
+                labels: rows.map(row => row[xAxisColumn]),
+                datasets: numericColumns.slice(0, 3).map((column, index) => {
+                    const colors = ['rgba(75, 192, 192, 0.6)', 'rgba(54, 162, 235, 0.6)', 'rgba(255, 205, 86, 0.6)'];
+                    return {
+                        label: column,
+                        data: rows.map(row => {
+                            const val = row[column];
+                            return typeof val === 'number' ? val : parseFloat(val);
+                        }),
+                        backgroundColor: colors[index % colors.length],
+                        borderColor: colors[index % colors.length].replace('0.6', '1'),
+                        borderWidth: 1
+                    };
+                })
+            };
+            
+            // Create Chart.js chart
+            new Chart(canvas, {
+                type: chartType,
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${chartType === 'line' ? 'Trend' : 'Comparison'} of ${numericColumns.slice(0, 3).join(', ')} by ${xAxisColumn}`
+                        }
+                    }
                 }
-                groupedData[category] += row[numericColumn] || 0;
+            });
+        }
+        
+        // Create a pie chart for categorical distribution
+        if (categoricalColumns.length > 0 && rows.length >= 3) {
+            visualizationsCreated = true;
+            
+            const column = categoricalColumns[0];
+            
+            // Count occurrences of each value
+            const countMap = {};
+            rows.forEach(row => {
+                const val = row[column] || 'Unknown';
+                countMap[val] = (countMap[val] || 0) + 1;
             });
             
-            // Prepare data for chart
-            const labels = Object.keys(groupedData);
-            const data = Object.values(groupedData);
+            // Sort by frequency and take top 8
+            const sortedData = Object.entries(countMap)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8);
             
-            // Create chart container
-            const chartContainer = document.createElement('div');
-            chartContainer.className = 'chart-container';
-            chartContainer.style.height = '300px';
-            chartContainer.style.marginBottom = '2rem';
+            // Create chart wrapper
+            const chartWrapper = document.createElement('div');
+            chartWrapper.className = 'col-md-6 mb-4';
+            chartsContainer.appendChild(chartWrapper);
             
-            // Create canvas
+            // Create canvas for Chart.js
             const canvas = document.createElement('canvas');
-            canvas.id = 'bar-chart';
-            chartContainer.appendChild(canvas);
+            canvas.id = `pie-chart-${containerId}`;
+            chartWrapper.appendChild(canvas);
             
-            // Add to visualization container
-            visualizationContainer.appendChild(chartContainer);
+            // Prepare data for Chart.js
+            const pieColors = [
+                'rgba(255, 99, 132, 0.6)',
+                'rgba(54, 162, 235, 0.6)',
+                'rgba(255, 206, 86, 0.6)',
+                'rgba(75, 192, 192, 0.6)',
+                'rgba(153, 102, 255, 0.6)',
+                'rgba(255, 159, 64, 0.6)',
+                'rgba(199, 199, 199, 0.6)',
+                'rgba(83, 102, 255, 0.6)'
+            ];
             
-            // Once the DOM is updated, create the chart
-            setTimeout(() => {
-                createBarChart(
-                    'bar-chart',
-                    labels,
-                    data,
-                    `${formatColumnName(numericColumn)} by ${formatColumnName(categoryColumn)}`
-                );
-            }, 0);
-        }
-        
-        // 2. Line chart for a numeric column over time
-        if (numericColumns.length > 0 && dateColumns.length > 0) {
-            // Choose the first numeric and date columns
-            const numericColumn = numericColumns[0];
-            const dateColumn = dateColumns[0];
+            const pieData = {
+                labels: sortedData.map(item => item[0]),
+                datasets: [{
+                    data: sortedData.map(item => item[1]),
+                    backgroundColor: pieColors,
+                    borderColor: pieColors.map(color => color.replace('0.6', '1')),
+                    borderWidth: 1
+                }]
+            };
             
-            // Sort data by date
-            const sortedData = [...queryResult.rows].sort((a, b) => 
-                new Date(a[dateColumn]) - new Date(b[dateColumn])
-            );
-            
-            // Prepare data for chart
-            const labels = sortedData.map(row => 
-                new Date(row[dateColumn]).toLocaleDateString()
-            );
-            const data = sortedData.map(row => row[numericColumn]);
-            
-            // Create chart container
-            const chartContainer = document.createElement('div');
-            chartContainer.className = 'chart-container';
-            chartContainer.style.height = '300px';
-            chartContainer.style.marginBottom = '2rem';
-            
-            // Create canvas
-            const canvas = document.createElement('canvas');
-            canvas.id = 'line-chart';
-            chartContainer.appendChild(canvas);
-            
-            // Add to visualization container
-            visualizationContainer.appendChild(chartContainer);
-            
-            // Once the DOM is updated, create the chart
-            setTimeout(() => {
-                createLineChart(
-                    'line-chart',
-                    labels,
-                    data,
-                    `${formatColumnName(numericColumn)} over time`
-                );
-            }, 0);
-        }
-        
-        // 3. Pie chart for distribution of a category
-        if (categoryColumns.length > 0) {
-            // Choose the first category column
-            const categoryColumn = categoryColumns[0];
-            
-            // Count occurrences of each category
-            const categoryCounts = {};
-            queryResult.rows.forEach(row => {
-                const category = row[categoryColumn] || 'Unknown';
-                if (!categoryCounts[category]) {
-                    categoryCounts[category] = 0;
+            // Create Chart.js chart
+            new Chart(canvas, {
+                type: 'pie',
+                data: pieData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `Distribution by ${column}`
+                        },
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                boxWidth: 12
+                            }
+                        }
+                    }
                 }
-                categoryCounts[category]++;
             });
-            
-            // Prepare data for chart
-            const labels = Object.keys(categoryCounts);
-            const data = Object.values(categoryCounts);
-            
-            // Create chart container
-            const chartContainer = document.createElement('div');
-            chartContainer.className = 'chart-container';
-            chartContainer.style.height = '300px';
-            chartContainer.style.marginBottom = '2rem';
-            
-            // Create canvas
-            const canvas = document.createElement('canvas');
-            canvas.id = 'pie-chart';
-            chartContainer.appendChild(canvas);
-            
-            // Add to visualization container
-            visualizationContainer.appendChild(chartContainer);
-            
-            // Once the DOM is updated, create the chart
-            setTimeout(() => {
-                createPieChart(
-                    'pie-chart',
-                    labels,
-                    data,
-                    `Distribution of ${formatColumnName(categoryColumn)}`
-                );
-            }, 0);
         }
         
-        // Add to the container
-        container.appendChild(visualizationContainer);
+        // Add a simple statistics summary for numeric columns
+        if (numericColumns.length > 0) {
+            visualizationsCreated = true;
+            
+            const statsContainer = document.createElement('div');
+            statsContainer.className = 'col-md-6 mb-4';
+            chartsContainer.appendChild(statsContainer);
+            
+            const statsCard = document.createElement('div');
+            statsCard.className = 'card h-100';
+            statsContainer.appendChild(statsCard);
+            
+            const cardHeader = document.createElement('div');
+            cardHeader.className = 'card-header';
+            cardHeader.textContent = 'Numeric Field Statistics';
+            statsCard.appendChild(cardHeader);
+            
+            const cardBody = document.createElement('div');
+            cardBody.className = 'card-body';
+            statsCard.appendChild(cardBody);
+            
+            // Calculate basic statistics for each numeric column
+            numericColumns.slice(0, 4).forEach(column => {
+                const values = rows.map(row => {
+                    const val = row[column];
+                    return typeof val === 'number' ? val : parseFloat(val);
+                }).filter(val => !isNaN(val));
+                
+                if (values.length === 0) return;
+                
+                const min = Math.min(...values);
+                const max = Math.max(...values);
+                const sum = values.reduce((a, b) => a + b, 0);
+                const avg = sum / values.length;
+                
+                const columnStats = document.createElement('div');
+                columnStats.className = 'mb-3';
+                columnStats.innerHTML = `
+                    <h6>${column}</h6>
+                    <div class="row">
+                        <div class="col-6 col-sm-3">
+                            <small class="text-muted">Min:</small>
+                            <div>${min.toLocaleString()}</div>
+                        </div>
+                        <div class="col-6 col-sm-3">
+                            <small class="text-muted">Max:</small>
+                            <div>${max.toLocaleString()}</div>
+                        </div>
+                        <div class="col-6 col-sm-3">
+                            <small class="text-muted">Avg:</small>
+                            <div>${avg.toLocaleString(undefined, {maximumFractionDigits: 2})}</div>
+                        </div>
+                        <div class="col-6 col-sm-3">
+                            <small class="text-muted">Count:</small>
+                            <div>${values.length.toLocaleString()}</div>
+                        </div>
+                    </div>
+                `;
+                cardBody.appendChild(columnStats);
+            });
+        }
+        
+        // If no visualizations were created, display a message
+        if (!visualizationsCreated) {
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    No suitable visualizations could be generated for this data.
+                    Try queries with numeric, date, or categorical columns.
+                </div>
+            `;
+        }
     }
-    
-    // Return public API
-    return {
-        createBarChart,
-        createPieChart,
-        createLineChart,
-        createDataTable,
-        visualizeQueryResults
-    };
-})();
+};

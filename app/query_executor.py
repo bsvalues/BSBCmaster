@@ -26,6 +26,143 @@ from app.validators import validate_pagination_params
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def generate_visualization_recommendations(data: List[Dict[str, Any]], column_types: Dict[str, str]) -> Dict[str, Any]:
+    """
+    Analyze query results and suggest appropriate visualizations.
+    
+    Args:
+        data: The query result data
+        column_types: Column types from the query
+        
+    Returns:
+        Dictionary with visualization recommendations
+    """
+    if not data or len(data) == 0:
+        return {
+            "suitable_for_visualization": False,
+            "reason": "No data available for visualization",
+            "recommendations": []
+        }
+    
+    # Extract column names from first row
+    columns = list(data[0].keys())
+    
+    # Classify column types based on sample data and metadata
+    numeric_columns = []
+    date_columns = []
+    categorical_columns = []
+    
+    for col in columns:
+        # Check data type pattern in first few rows
+        values = [row[col] for row in data[:min(10, len(data))] if row[col] is not None]
+        
+        if not values:
+            continue
+            
+        # Check for numeric columns
+        if all(isinstance(v, (int, float)) or (isinstance(v, str) and v.replace('.', '', 1).isdigit()) for v in values):
+            numeric_columns.append(col)
+        
+        # Check for date columns
+        elif all(isinstance(v, datetime) or 
+                (isinstance(v, str) and (
+                    re.match(r'^\d{4}-\d{2}-\d{2}', v) or  # ISO date
+                    re.match(r'^\d{2}/\d{2}/\d{4}', v)     # MM/DD/YYYY
+                )) 
+                for v in values):
+            date_columns.append(col)
+        
+        # Other columns are considered categorical
+        else:
+            categorical_columns.append(col)
+    
+    # If we have PostgreSQL type information, use it to refine our classification
+    for col, pg_type in column_types.items():
+        if col not in columns:
+            continue
+            
+        if "int" in pg_type.lower() or "float" in pg_type.lower() or "numeric" in pg_type.lower() or "double" in pg_type.lower():
+            if col not in numeric_columns:
+                numeric_columns.append(col)
+                # Remove from other categories if present
+                if col in categorical_columns:
+                    categorical_columns.remove(col)
+                    
+        elif "date" in pg_type.lower() or "time" in pg_type.lower():
+            if col not in date_columns:
+                date_columns.append(col)
+                # Remove from other categories if present
+                if col in categorical_columns:
+                    categorical_columns.remove(col)
+    
+    # Generate recommendations based on available column types
+    recommendations = []
+    
+    # If we have both numeric and date columns, time series visualization is possible
+    if numeric_columns and date_columns:
+        recommendations.append({
+            "type": "time_series",
+            "title": "Time Series Analysis",
+            "description": "Plot the change of numeric values over time",
+            "x_axis": date_columns[0],
+            "y_axis": numeric_columns[:3],  # Limit to first 3 numeric columns
+            "chart_type": "line"
+        })
+    
+    # If we have numeric and categorical columns, bar or column charts are suitable
+    if numeric_columns and categorical_columns:
+        recommendations.append({
+            "type": "categorical_comparison",
+            "title": "Categorical Comparison",
+            "description": "Compare numeric values across categories",
+            "x_axis": categorical_columns[0],
+            "y_axis": numeric_columns[:3],  # Limit to first 3 numeric columns
+            "chart_type": "bar"
+        })
+    
+    # If we have multiple numeric columns, scatter plot might be useful
+    if len(numeric_columns) >= 2:
+        recommendations.append({
+            "type": "correlation",
+            "title": "Correlation Analysis",
+            "description": "Explore relationships between numeric variables",
+            "x_axis": numeric_columns[0],
+            "y_axis": numeric_columns[1],
+            "chart_type": "scatter"
+        })
+    
+    # If we have a single categorical column with not too many distinct values, pie chart is suitable
+    if categorical_columns and len(data) <= 100:
+        distinct_values = set(row[categorical_columns[0]] for row in data if row[categorical_columns[0]] is not None)
+        if len(distinct_values) <= 10:
+            recommendations.append({
+                "type": "distribution",
+                "title": "Distribution Analysis",
+                "description": "View the distribution of values in a categorical field",
+                "dimension": categorical_columns[0],
+                "chart_type": "pie"
+            })
+    
+    # If we have numeric columns, statistics summary is always helpful
+    if numeric_columns:
+        recommendations.append({
+            "type": "statistics",
+            "title": "Statistical Summary",
+            "description": "View basic statistics for numeric fields",
+            "fields": numeric_columns[:5],  # Limit to first 5 numeric columns
+            "stats": ["min", "max", "avg", "sum", "count"]
+        })
+    
+    return {
+        "suitable_for_visualization": len(recommendations) > 0,
+        "recommendations": recommendations,
+        "column_classifications": {
+            "numeric": numeric_columns,
+            "temporal": date_columns,
+            "categorical": categorical_columns
+        }
+    }
+
 async def execute_parameterized_query(
     query_request: ParameterizedSQLQuery,
     allow_write: bool = False
@@ -242,6 +379,9 @@ async def execute_parameterized_query(
         # Calculate execution time
         execution_time = time.time() - start_time
         
+        # Analyze the data to provide visualization recommendations
+        visualization_recommendations = generate_visualization_recommendations(data, column_types)
+        
         return {
             "status": "success",
             "data": data,
@@ -254,7 +394,8 @@ async def execute_parameterized_query(
             },
             "column_types": column_types,
             "warning": warning,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
+            "visualization_recommendations": visualization_recommendations
         }
     
     except Exception as e:

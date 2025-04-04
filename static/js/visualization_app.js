@@ -207,3 +207,8 @@ function initDataVisualization() {
         });
     }
 }
+
+// Initialize visualizations when the DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initDataVisualization();
+});

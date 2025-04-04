@@ -89,7 +89,7 @@ async def translate_nl_to_sql(
         return result
         
     try:
-        # Create a system message with the schema information
+        # Create a more detailed system message with enhanced schema understanding
         system_message = f"""
         You are an expert SQL translator for {db_type.upper()} databases specializing in real estate assessment data.
         Translate natural language queries to SQL based on the following schema:
@@ -98,25 +98,54 @@ async def translate_nl_to_sql(
 
         CONTEXT ABOUT REAL ESTATE DATA:
         - Parcels table contains the main assessment records with unique parcel_id, address, and valuation data
+          * land_value represents the value of the land only
+          * improvement_value represents the value of buildings and structures on the land
+          * total_value is the sum of land_value and improvement_value
+          * assessment_year indicates when the property was last assessed
+        
         - Properties table contains physical characteristics like square_footage, bedrooms, bathrooms
+          * property_type categorizes properties (residential, commercial, industrial, etc.)
+          * year_built indicates the construction year of the main structure
+          * condition and quality are qualitative ratings of the property
+          * lot_size and lot_size_unit represent the land area (typical units: acres, square feet)
+        
         - Sales table contains historical sale transactions with sale_date and sale_price
-        - Properties and Sales both link to Parcels via parcel_id foreign key
-        - Recent sales typically means sales from the last year
-        - High-value properties are usually those with total_value > 500000
-        - Standard report periods are current year, last year, or last 5 years
+          * sale_type categorizes transactions (standard, foreclosure, auction, etc.)
+          * Multiple sales records may exist for the same parcel representing transaction history
+          * buyer_name and seller_name contain the transaction parties
+        
+        RELATIONSHIPS:
+        - Properties and Sales tables both link to Parcels via parcel_id foreign key
+        - One parcel can have one property record and multiple sales records (one-to-many)
+        
+        COMMON TERMINOLOGY:
+        - "Recent sales" typically means sales from the last 1-2 years
+        - "High-value properties" are usually those with total_value > 500000
+        - "Luxury properties" typically have 4+ bedrooms, 3+ bathrooms, and higher quality ratings
+        - "Investment properties" often have multiple sales within short periods
+        - "New construction" refers to properties built within the last 5 years
+        - "Market trends" typically involve analyzing sales prices over time periods
+        - "Assessment ratio" compares sale_price to total_value to evaluate assessment accuracy
+        
+        SQL OPTIMIZATION TIPS FOR {db_type.upper()}:
+        - Use appropriate indexes (parcels.parcel_id, sales.sale_date, properties.property_type)
+        - For date comparisons in {db_type.upper()}, use appropriate date functions
+        - When joining tables, start with the most restrictive table in the FROM clause
+        - Consider using windowing functions for trend analysis over time
 
         Please follow these guidelines:
         - Generate ONLY {db_type.upper()} SQL syntax
         - Include appropriate JOINs when needed
         - Use proper column and table names from the schema
-        - Format the SQL query with proper indentation
+        - Format the SQL query with proper indentation and clear structure
         - Use parameterized queries with placeholders (like :param) for user input values
-        - Provide a brief explanation of the query including business context
+        - Provide a brief explanation of the query including business context and potential use cases
         - Identify extractable parameters from the query with appropriate data types
         - For date ranges, use proper date functions appropriate for {db_type.upper()}
-        - When calculating averages or totals, handle NULL values appropriately
+        - When calculating averages or totals, handle NULL values appropriately (COALESCE or similar)
         - Include proper ORDER BY clauses for meaningful sorting
-        - For queries expected to return many rows, include LIMIT :limit parameter
+        - For queries expected to return many rows, include LIMIT :limit and OFFSET :offset parameters
+        - Add comments to complex sections of SQL for better readability
         
         Response format:
         {{
@@ -126,7 +155,10 @@ async def translate_nl_to_sql(
                 "param1": "description of parameter 1 with expected data type",
                 "param2": "description of parameter 2 with expected data type",
                 ...
-            }}
+            }},
+            "suggested_visualizations": [
+                "Brief description of visualizations that would work well with this data"
+            ]
         }}
         
         Return ONLY valid JSON.
@@ -327,43 +359,102 @@ async def generate_schema_summary(schema_info: str) -> Dict[str, Any]:
     try:
         system_message = f"""
         You are a database expert specializing in real estate property assessment systems. 
-        Analyze the following database schema and provide a comprehensive summary.
+        Analyze the following database schema and provide a comprehensive summary that will help 
+        users understand how to query this database for property assessment information.
         
         {schema_info}
         
         Include the following in your analysis:
+        
         1. The overall purpose and organization of this database
-        2. Key tables and their business functions in property assessment
-        3. Important relationships between tables
-        4. Key fields that would be useful for queries and reporting
-        5. Suggestions for common query patterns based on this schema
+           - Primary function in property assessments
+           - Key business processes supported
+           - Information architecture overview
+        
+        2. Key tables and their business functions
+           - Main tables and their core purpose
+           - Important fields with data types
+           - Business meaning of each major table
+           - Primary and foreign key relationships
+        
+        3. Data relationships and integrity
+           - How tables connect to form a complete view of properties
+           - One-to-many and many-to-many relationships
+           - Referential integrity constraints
+           - Business meaning of relationships
+        
+        4. Analytical capabilities
+           - Valuable metrics and KPIs available
+           - Time-series analysis possibilities
+           - Comparative assessment options
+           - Valuation trend analysis approaches
+        
+        5. Query patterns and visualization opportunities
+           - Common business questions this data can answer
+           - Suggested JOIN patterns for different analyses
+           - Fields suitable for grouping and aggregation
+           - Data visualization recommendations
+           - Query optimization suggestions
         
         Response format:
         {{
-            "summary": "Overall summary of the database in 1-2 sentences",
+            "summary": "Concise summary of the database and its purpose",
+            
             "tables": [
                 {{
                     "name": "table_name", 
                     "description": "Detailed description of purpose and role in property assessment", 
-                    "key_fields": ["field1", "field2"],
-                    "business_purpose": "How this table is used in property assessment workflows"
+                    "key_fields": [
+                        {{
+                            "name": "field_name",
+                            "type": "data_type",
+                            "description": "Business meaning and usage of this field",
+                            "importance": "high/medium/low"
+                        }}
+                    ],
+                    "business_purpose": "How this table is used in property assessment workflows",
+                    "example_queries": [
+                        "Example of a simple query for this table"
+                    ]
                 }},
                 ...
             ],
+            
             "relationships": [
                 {{
                     "from": "table_name", 
                     "to": "related_table", 
                     "type": "one-to-many", 
-                    "description": "Business meaning of this relationship"
+                    "join_fields": "table1.field = table2.field",
+                    "description": "Business meaning of this relationship",
+                    "example_join": "Example SQL showing how to join these tables"
                 }},
                 ...
             ],
+            
             "common_queries": [
                 {{
-                    "purpose": "Description of query purpose",
+                    "purpose": "Business question this query answers",
                     "tables_involved": ["table1", "table2"],
-                    "typical_fields": ["field1", "field2"]
+                    "description": "What this query accomplishes in business terms",
+                    "key_fields": ["field1", "field2"],
+                    "sql_pattern": "SQL pattern to answer this business question",
+                    "visualization": "Suggestion for visualizing these results"
+                }},
+                ...
+            ],
+            
+            "data_quality_considerations": [
+                "Important notes about potential data quality issues",
+                ...
+            ],
+            
+            "analytics_recommendations": [
+                {{
+                    "analysis_type": "Type of analysis possible",
+                    "description": "What insights this analysis provides",
+                    "required_fields": ["field1", "field2"],
+                    "business_value": "How this analysis benefits property assessment"
                 }},
                 ...
             ]
