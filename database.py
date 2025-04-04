@@ -7,19 +7,22 @@ import json
 import os
 import logging
 import requests
-from flask import render_template, request, jsonify, Blueprint
-
-# Import directly from main.py since we've moved the setup there
-from main import app, db, FASTAPI_URL
+from flask import render_template, request, jsonify, Blueprint, current_app
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Blueprint for database-related routes
+# Define a constant for the FastAPI URL if it's not in the environment
+FASTAPI_URL = os.environ.get("FASTAPI_URL", "http://localhost:8000")
+
+# Get db instance from app_setup
+from app_setup import db
+
+# Create a Blueprint for database-related routes
 database_bp = Blueprint('database', __name__)
 
-@app.route('/')
+@database_bp.route('/')
 def index():
     """Render the index page with API documentation."""
     return render_template('index.html', title="MCP Assessor Agent API")
