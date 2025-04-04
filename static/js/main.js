@@ -202,6 +202,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (refreshSchemaButton) {
         refreshSchemaButton.addEventListener('click', loadDatabaseSchema);
     }
+    
+    // Initialize the query builder
+    initQueryBuilder();
 });
 
 /**
@@ -407,4 +410,579 @@ function loadTableDetails(tableName) {
                 </div>
             `;
         });
+}
+
+/**
+ * Initialize the query builder component
+ */
+function initQueryBuilder() {
+    const tableSelect = document.getElementById('queryBuilderTable');
+    const columnsSelect = document.getElementById('queryBuilderColumns');
+    const limitInput = document.getElementById('queryBuilderLimit');
+    const addConditionBtn = document.getElementById('addCondition');
+    const conditionsContainer = document.getElementById('queryConditions');
+    const generatedQueryEl = document.getElementById('generatedQuery');
+    const runQueryBtn = document.getElementById('runQuery');
+    const copyQueryBtn = document.getElementById('copyQuery');
+    const queryResultsContainer = document.getElementById('queryResults');
+    
+    if (!tableSelect || !columnsSelect) return;
+    
+    // Global state for query builder
+    const queryState = {
+        selectedTable: '',
+        selectedColumns: [],
+        conditions: [],
+        limit: 10,
+        tableSchema: {}
+    };
+    
+    // Fetch tables for the dropdown
+    fetch('/api/schema-summary?db=postgres')
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Failed to load schema information');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success' && data.summary && Array.isArray(data.summary)) {
+                // Clear existing options
+                tableSelect.innerHTML = '';
+                
+                // Add default option
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = 'Select a table';
+                tableSelect.appendChild(defaultOption);
+                
+                // Sort tables alphabetically
+                const sortedTables = [...data.summary].sort();
+                
+                // Add table options
+                sortedTables.forEach(tableName => {
+                    const option = document.createElement('option');
+                    option.value = tableName;
+                    option.textContent = tableName;
+                    tableSelect.appendChild(option);
+                });
+                
+                // Display message if no tables found
+                if (sortedTables.length === 0) {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'No tables available';
+                    option.disabled = true;
+                    tableSelect.innerHTML = '';
+                    tableSelect.appendChild(option);
+                }
+            } else {
+                throw new Error('Invalid schema data received');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading tables:', error);
+            tableSelect.innerHTML = `<option value="" disabled>Error loading tables</option>`;
+        });
+    
+    // Table select change handler
+    tableSelect.addEventListener('change', function() {
+        const selectedTable = this.value;
+        queryState.selectedTable = selectedTable;
+        
+        // Reset columns selection
+        columnsSelect.innerHTML = '';
+        columnsSelect.disabled = true;
+        
+        // Reset conditions
+        resetConditions();
+        
+        // Update generated query
+        updateGeneratedQuery();
+        
+        if (selectedTable) {
+            // Fetch columns for the selected table
+            fetch('/api/discover-schema?db=postgres')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to load table details');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'success' && data.db_schema && Array.isArray(data.db_schema)) {
+                        // Filter and sort columns for the selected table
+                        const tableColumns = data.db_schema
+                            .filter(item => item.table_name === selectedTable)
+                            .sort((a, b) => a.column_name.localeCompare(b.column_name));
+                        
+                        // Store in state for later use
+                        queryState.tableSchema[selectedTable] = tableColumns;
+                        
+                        // Enable columns select
+                        columnsSelect.disabled = false;
+                        columnsSelect.innerHTML = '';
+                        
+                        // Add columns to select
+                        tableColumns.forEach(column => {
+                            const option = document.createElement('option');
+                            option.value = column.column_name;
+                            option.textContent = `${column.column_name} (${column.data_type})`;
+                            columnsSelect.appendChild(option);
+                        });
+                        
+                        // Enable add condition button
+                        addConditionBtn.disabled = false;
+                        
+                        // Enable and update condition dropdowns
+                        updateConditionColumns(selectedTable, tableColumns);
+                    } else {
+                        throw new Error('Invalid schema data received');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading columns:', error);
+                    columnsSelect.innerHTML = `<option value="" disabled>Error loading columns</option>`;
+                });
+        }
+    });
+    
+    // Columns select change handler
+    columnsSelect.addEventListener('change', function() {
+        // Get selected options
+        const selectedOptions = Array.from(this.selectedOptions).map(option => option.value);
+        queryState.selectedColumns = selectedOptions;
+        
+        // Update generated query
+        updateGeneratedQuery();
+    });
+    
+    // Limit input change handler
+    limitInput.addEventListener('input', function() {
+        let value = parseInt(this.value, 10);
+        
+        // Validate limits
+        if (isNaN(value) || value < 1) {
+            value = 1;
+        } else if (value > 100) {
+            value = 100;
+        }
+        
+        this.value = value;
+        queryState.limit = value;
+        
+        // Update generated query
+        updateGeneratedQuery();
+    });
+    
+    // Add condition button
+    addConditionBtn.addEventListener('click', function() {
+        addCondition();
+    });
+    
+    // Run query button
+    runQueryBtn.addEventListener('click', function() {
+        const query = generatedQueryEl.textContent;
+        runSqlQuery(query);
+    });
+    
+    // Copy query button
+    copyQueryBtn.addEventListener('click', function() {
+        const query = generatedQueryEl.textContent;
+        navigator.clipboard.writeText(query)
+            .then(() => {
+                // Change button text temporarily
+                const originalText = copyQueryBtn.innerHTML;
+                copyQueryBtn.innerHTML = '<i class="bi bi-check"></i> Copied!';
+                
+                setTimeout(() => {
+                    copyQueryBtn.innerHTML = originalText;
+                }, 2000);
+            })
+            .catch(err => {
+                console.error('Failed to copy query: ', err);
+                alert('Failed to copy query to clipboard.');
+            });
+    });
+    
+    // Function to add a new condition row
+    function addCondition() {
+        const conditionRow = document.createElement('div');
+        conditionRow.className = 'row g-2 mb-2 condition-row';
+        
+        // Get the table columns
+        const tableColumns = queryState.tableSchema[queryState.selectedTable] || [];
+        
+        conditionRow.innerHTML = `
+            <div class="col-md-4">
+                <select class="form-select condition-column">
+                    <option value="">Select column</option>
+                    ${tableColumns.map(col => `<option value="${col.column_name}">${col.column_name}</option>`).join('')}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select condition-operator">
+                    <option value="=">=</option>
+                    <option value="!=">!=</option>
+                    <option value=">">></option>
+                    <option value="<"><</option>
+                    <option value=">=">>=</option>
+                    <option value="<="><=</option>
+                    <option value="LIKE">LIKE</option>
+                    <option value="IN">IN</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <input type="text" class="form-control condition-value" placeholder="Value">
+            </div>
+            <div class="col-md-1">
+                <button type="button" class="btn btn-outline-danger btn-sm remove-condition">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+        
+        // Add event listener for remove button
+        const removeBtn = conditionRow.querySelector('.remove-condition');
+        removeBtn.addEventListener('click', function() {
+            conditionRow.remove();
+            updateConditions();
+            updateGeneratedQuery();
+        });
+        
+        // Add event listeners for column and operator changes
+        const columnSelect = conditionRow.querySelector('.condition-column');
+        const operatorSelect = conditionRow.querySelector('.condition-operator');
+        const valueInput = conditionRow.querySelector('.condition-value');
+        
+        columnSelect.addEventListener('change', function() {
+            updateConditions();
+            updateGeneratedQuery();
+        });
+        
+        operatorSelect.addEventListener('change', function() {
+            updateConditions();
+            updateGeneratedQuery();
+        });
+        
+        valueInput.addEventListener('input', function() {
+            updateConditions();
+            updateGeneratedQuery();
+        });
+        
+        // Append to container
+        conditionsContainer.appendChild(conditionRow);
+        
+        // Update conditions array
+        updateConditions();
+        updateGeneratedQuery();
+    }
+    
+    // Function to reset all conditions
+    function resetConditions() {
+        // Keep the first row but disable inputs
+        const firstRow = conditionsContainer.querySelector('.condition-row');
+        if (firstRow) {
+            const columnSelect = firstRow.querySelector('.condition-column');
+            const valueInput = firstRow.querySelector('.condition-value');
+            const removeBtn = firstRow.querySelector('.remove-condition');
+            
+            columnSelect.innerHTML = '<option value="">Select column</option>';
+            columnSelect.disabled = true;
+            valueInput.disabled = true;
+            removeBtn.disabled = true;
+            
+            // Remove all other rows
+            const rows = conditionsContainer.querySelectorAll('.condition-row');
+            for (let i = 1; i < rows.length; i++) {
+                rows[i].remove();
+            }
+        }
+        
+        addConditionBtn.disabled = true;
+        queryState.conditions = [];
+    }
+    
+    // Function to update condition columns based on selected table
+    function updateConditionColumns(tableName, columns) {
+        const conditionRows = conditionsContainer.querySelectorAll('.condition-row');
+        
+        conditionRows.forEach(row => {
+            const columnSelect = row.querySelector('.condition-column');
+            const valueInput = row.querySelector('.condition-value');
+            const removeBtn = row.querySelector('.remove-condition');
+            
+            // Enable inputs
+            columnSelect.disabled = false;
+            valueInput.disabled = false;
+            removeBtn.disabled = false;
+            
+            // Save current selection
+            const currentValue = columnSelect.value;
+            
+            // Clear and rebuild options
+            columnSelect.innerHTML = '<option value="">Select column</option>';
+            
+            // Add column options
+            columns.forEach(column => {
+                const option = document.createElement('option');
+                option.value = column.column_name;
+                option.textContent = column.column_name;
+                columnSelect.appendChild(option);
+            });
+            
+            // Restore selection if it still exists
+            if (currentValue && columns.some(col => col.column_name === currentValue)) {
+                columnSelect.value = currentValue;
+            }
+        });
+    }
+    
+    // Function to update conditions state from UI
+    function updateConditions() {
+        const conditionRows = conditionsContainer.querySelectorAll('.condition-row');
+        const conditions = [];
+        
+        conditionRows.forEach(row => {
+            const column = row.querySelector('.condition-column').value;
+            const operator = row.querySelector('.condition-operator').value;
+            const value = row.querySelector('.condition-value').value;
+            
+            if (column && value) {
+                conditions.push({ column, operator, value });
+            }
+        });
+        
+        queryState.conditions = conditions;
+    }
+    
+    // Function to update the generated SQL query
+    function updateGeneratedQuery() {
+        if (!queryState.selectedTable) {
+            generatedQueryEl.textContent = '-- Select a table to generate a query';
+            runQueryBtn.disabled = true;
+            copyQueryBtn.disabled = true;
+            return;
+        }
+        
+        // Build query
+        let query = 'SELECT ';
+        
+        // Add columns
+        if (queryState.selectedColumns.length === 0) {
+            query += '*';
+        } else {
+            query += queryState.selectedColumns.join(', ');
+        }
+        
+        // Add table
+        query += ` FROM ${queryState.selectedTable}`;
+        
+        // Add conditions
+        if (queryState.conditions.length > 0) {
+            query += ' WHERE ';
+            
+            queryState.conditions.forEach((condition, index) => {
+                if (index > 0) {
+                    query += ' AND ';
+                }
+                
+                // Format the value based on operator
+                let formattedValue = '';
+                if (condition.operator === 'LIKE') {
+                    // Add wildcards if not present
+                    if (!condition.value.includes('%')) {
+                        formattedValue = `'%${condition.value}%'`;
+                    } else {
+                        formattedValue = `'${condition.value}'`;
+                    }
+                } else if (condition.operator === 'IN') {
+                    // Parse comma-separated values
+                    const values = condition.value.split(',').map(v => v.trim());
+                    formattedValue = `(${values.map(v => isNaN(v) ? `'${v}'` : v).join(', ')})`;
+                } else {
+                    // Regular value
+                    formattedValue = isNaN(condition.value) ? `'${condition.value}'` : condition.value;
+                }
+                
+                query += `${condition.column} ${condition.operator} ${formattedValue}`;
+            });
+        }
+        
+        // Add limit
+        query += ` LIMIT ${queryState.limit};`;
+        
+        // Update UI
+        generatedQueryEl.textContent = query;
+        runQueryBtn.disabled = false;
+        copyQueryBtn.disabled = false;
+    }
+    
+    // Function to run SQL query and display results
+    function runSqlQuery(query) {
+        queryResultsContainer.innerHTML = `
+            <div class="d-flex justify-content-center p-3">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span class="ms-2">Executing query...</span>
+            </div>
+        `;
+        
+        // Execute query through the API
+        fetch('/api/query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                db: 'postgres',
+                query: query
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 400) {
+                    return response.json().then(err => {
+                        throw new Error(err.detail || 'Query execution failed');
+                    });
+                }
+                throw new Error('Failed to execute query');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                displayQueryResults(data);
+            } else {
+                throw new Error('Query execution failed');
+            }
+        })
+        .catch(error => {
+            queryResultsContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    ${error.message}
+                </div>
+            `;
+        });
+    }
+    
+    // Function to display query results
+    function displayQueryResults(data) {
+        if (!data.data || data.data.length === 0) {
+            queryResultsContainer.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Query executed successfully, but no results were returned.
+                </div>
+            `;
+            return;
+        }
+        
+        // Get column names from first result
+        const columns = Object.keys(data.data[0]);
+        
+        // Build table HTML
+        let html = `
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Results</h5>
+                    <span class="badge bg-secondary">${data.count} records total</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    ${columns.map(col => `<th>${col}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+        `;
+        
+        // Add data rows
+        data.data.forEach(row => {
+            html += '<tr>';
+            columns.forEach(col => {
+                const value = row[col] === null ? '<em class="text-muted">null</em>' : row[col];
+                html += `<td>${value}</td>`;
+            });
+            html += '</tr>';
+        });
+        
+        html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+        `;
+        
+        // Add pagination if available
+        if (data.pagination) {
+            const { page, total_pages, has_prev, has_next } = data.pagination;
+            
+            html += `
+                <div class="card-footer d-flex justify-content-between align-items-center">
+                    <div>
+                        Page ${page} of ${total_pages}
+                    </div>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item ${!has_prev ? 'disabled' : ''}">
+                                <a class="page-link" href="#" ${has_prev ? 'data-page="' + (page - 1) + '"' : ''}>
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item ${!has_next ? 'disabled' : ''}">
+                                <a class="page-link" href="#" ${has_next ? 'data-page="' + (page + 1) + '"' : ''}>
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            `;
+        }
+        
+        html += '</div>';
+        
+        // Update UI
+        queryResultsContainer.innerHTML = html;
+        
+        // Add pagination event listeners
+        const paginationLinks = queryResultsContainer.querySelectorAll('.page-link[data-page]');
+        paginationLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const page = parseInt(this.dataset.page, 10);
+                
+                // Clone the current query state and update page
+                const paginatedQuery = {
+                    db: 'postgres',
+                    query: generatedQueryEl.textContent,
+                    page: page,
+                    page_size: queryState.limit
+                };
+                
+                // Execute paginated query
+                fetch('/api/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(paginatedQuery)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        displayQueryResults(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error with pagination:', error);
+                });
+            });
+        });
+    }
 }
