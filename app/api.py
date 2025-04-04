@@ -311,42 +311,57 @@ async def discover_schema(
         schema_items = []
         
         if db.lower() == "postgres":
-            # For PostgreSQL, use the information_schema views with a simplified query
-            # that doesn't rely on pg_attribute joins which can be problematic
-            query = """
-            SELECT 
-                table_schema,
-                table_name,
-                column_name,
-                data_type,
-                CASE WHEN is_nullable = 'YES' THEN true ELSE false END as is_nullable,
-                column_default
-            FROM 
-                information_schema.columns
-            WHERE 
-                table_schema = 'public'
-                AND table_name NOT LIKE 'pg_%'
-                AND table_name NOT LIKE 'sql_%'
-            ORDER BY 
-                table_name, 
-                ordinal_position;
-            """
-            
-            # Execute the simple query that works reliably across PostgreSQL versions
-            result = execute_parameterized_query(db="postgres", query=query)
-            
-            # Process the results
-            for row in result["data"]:
-                schema_item = SchemaItem(
-                    table_name=row["table_name"],
-                    column_name=row["column_name"],
-                    data_type=row["data_type"],  # Use data_type directly without formatted_type
-                    is_nullable=row["is_nullable"],
-                    column_default=row["column_default"],
-                    is_primary_key=False,  # Would need additional query for this
-                    is_foreign_key=False,  # Would need additional query for this
-                )
-                schema_items.append(schema_item)
+            # Use direct connection to PostgreSQL to avoid parameterization issues
+            conn = None
+            try:
+                from app.db import get_postgres_connection
+                conn = get_postgres_connection()
+                
+                # Create a cursor
+                with conn.cursor() as cursor:
+                    # Simple schema query
+                    schema_query = """
+                    SELECT 
+                        table_schema,
+                        table_name,
+                        column_name,
+                        data_type,
+                        CASE WHEN is_nullable = 'YES' THEN true ELSE false END as is_nullable,
+                        column_default
+                    FROM 
+                        information_schema.columns
+                    WHERE 
+                        table_schema = 'public'
+                        AND table_name NOT LIKE 'pg_%'
+                        AND table_name NOT LIKE 'sql_%'
+                    ORDER BY 
+                        table_name, 
+                        ordinal_position;
+                    """
+                    
+                    cursor.execute(schema_query)
+                    
+                    # Fetch all results
+                    rows = cursor.fetchall()
+                    
+                    # Process the results
+                    for row in rows:
+                        schema_item = SchemaItem(
+                            table_name=row[1],  # table_name is the second column (index 1)
+                            column_name=row[2],  # column_name is the third column (index 2)
+                            data_type=row[3],    # data_type is the fourth column (index 3)
+                            is_nullable=row[4],  # is_nullable is the fifth column (index 4)
+                            column_default=row[5],  # column_default is the sixth column (index 5)
+                            is_primary_key=False,  # Default - would need a separate query
+                            is_foreign_key=False,  # Default - would need a separate query
+                        )
+                        schema_items.append(schema_item)
+            finally:
+                # Ensure connection is returned to pool
+                if conn:
+                    from app.db import pg_pool
+                    if pg_pool:
+                        pg_pool.putconn(conn)
                 
         return {
             "status": "success",
@@ -382,34 +397,54 @@ async def get_schema_summary(
         logger.info(f"Getting schema summary for {db}")
         
         if db.lower() == "postgres":
-            # Query to get table names
-            query = """
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = 'public' 
-                AND table_type = 'BASE TABLE'
-                AND table_name NOT LIKE 'pg_%'
-                AND table_name NOT LIKE 'sql_%'
-            ORDER BY table_name;
-            """
+            # Use direct connection to PostgreSQL to avoid parameterization issues
+            conn = None
+            table_names = []
             
-            if prefix:
-                query = """
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                    AND table_type = 'BASE TABLE'
-                    AND table_name NOT LIKE 'pg_%'
-                    AND table_name NOT LIKE 'sql_%'
-                    AND table_name LIKE %s
-                ORDER BY table_name;
-                """
-                result = execute_parameterized_query(db="postgres", query=query, params=[f"{prefix}%"])
-            else:
-                result = execute_parameterized_query(db="postgres", query=query)
-            
-            # Extract table names
-            table_names = [row["table_name"] for row in result["data"]]
+            try:
+                from app.db import get_postgres_connection
+                conn = get_postgres_connection()
+                
+                # Create a cursor
+                with conn.cursor() as cursor:
+                    # Query to get table names
+                    if prefix:
+                        # If prefix provided, filter tables by prefix
+                        query = """
+                        SELECT table_name 
+                        FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                            AND table_type = 'BASE TABLE'
+                            AND table_name NOT LIKE 'pg_%'
+                            AND table_name NOT LIKE 'sql_%'
+                            AND table_name LIKE %s
+                        ORDER BY table_name;
+                        """
+                        cursor.execute(query, (f"{prefix}%",))
+                    else:
+                        # Get all tables
+                        query = """
+                        SELECT table_name 
+                        FROM information_schema.tables 
+                        WHERE table_schema = 'public' 
+                            AND table_type = 'BASE TABLE'
+                            AND table_name NOT LIKE 'pg_%'
+                            AND table_name NOT LIKE 'sql_%'
+                        ORDER BY table_name;
+                        """
+                        cursor.execute(query)
+                    
+                    # Fetch all results
+                    rows = cursor.fetchall()
+                    
+                    # Extract table names (first column)
+                    table_names = [row[0] for row in rows]
+            finally:
+                # Ensure connection is returned to pool
+                if conn:
+                    from app.db import pg_pool
+                    if pg_pool:
+                        pg_pool.putconn(conn)
             
             return {
                 "status": "success",
