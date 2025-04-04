@@ -311,22 +311,18 @@ async def discover_schema(
         schema_items = []
         
         if db.lower() == "postgres":
-            # For PostgreSQL, use the information_schema views
-            # Query the database for schema information
+            # For PostgreSQL, use the information_schema views with a simplified query
+            # that doesn't rely on pg_attribute joins which can be problematic
             query = """
             SELECT 
                 table_schema,
                 table_name,
                 column_name,
                 data_type,
-                is_nullable,
-                column_default,
-                pg_catalog.format_type(c.atttypid, c.atttypmod) as formatted_type
+                CASE WHEN is_nullable = 'YES' THEN true ELSE false END as is_nullable,
+                column_default
             FROM 
                 information_schema.columns
-                JOIN pg_catalog.pg_attribute c ON columns.column_name = c.attname
-                JOIN pg_catalog.pg_class t ON c.attrelid = t.oid
-                JOIN pg_catalog.pg_namespace n ON t.relnamespace = n.oid
             WHERE 
                 table_schema = 'public'
                 AND table_name NOT LIKE 'pg_%'
@@ -336,38 +332,15 @@ async def discover_schema(
                 ordinal_position;
             """
             
-            # This query might cause errors if pg_attribute relations are different
-            # Using a simpler query as fallback
-            try:
-                result = execute_parameterized_query(db="postgres", query=query)
-            except Exception:
-                # Fallback to a simpler query
-                query = """
-                SELECT 
-                    table_schema,
-                    table_name,
-                    column_name,
-                    data_type,
-                    CASE WHEN is_nullable = 'YES' THEN true ELSE false END as is_nullable,
-                    column_default
-                FROM 
-                    information_schema.columns
-                WHERE 
-                    table_schema = 'public'
-                    AND table_name NOT LIKE 'pg_%'
-                    AND table_name NOT LIKE 'sql_%'
-                ORDER BY 
-                    table_name, 
-                    ordinal_position;
-                """
-                result = execute_parameterized_query(db="postgres", query=query)
+            # Execute the simple query that works reliably across PostgreSQL versions
+            result = execute_parameterized_query(db="postgres", query=query)
             
             # Process the results
             for row in result["data"]:
                 schema_item = SchemaItem(
                     table_name=row["table_name"],
                     column_name=row["column_name"],
-                    data_type=row.get("formatted_type", row["data_type"]),
+                    data_type=row["data_type"],  # Use data_type directly without formatted_type
                     is_nullable=row["is_nullable"],
                     column_default=row["column_default"],
                     is_primary_key=False,  # Would need additional query for this

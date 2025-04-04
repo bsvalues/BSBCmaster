@@ -280,47 +280,71 @@ def execute_postgres_query(
                 
             cursor.execute(f"SET statement_timeout TO {timeout_seconds * 1000}")
             
-            # Execute count query first (for pagination metadata)
-            count_query = f"SELECT COUNT(*) AS total FROM ({query}) AS subquery"
-            cursor.execute(count_query, params)
-            count_result = cursor.fetchone()
-            total_count = count_result["total"] if count_result else 0
-            
-            # Calculate pagination
-            offset = (page - 1) * page_size
-            paginated_query = f"{query} LIMIT {page_size} OFFSET {offset}"
-            
-            # Execute main query with pagination
-            cursor.execute(paginated_query, params)
-            results = cursor.fetchall()
-            
-            # Calculate pagination metadata
-            total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
-            has_next = page < total_pages
-            has_prev = page > 1
-            
-            # Create pagination info
-            pagination = {
-                "page": page,
-                "pages": total_pages,
-                "page_size": page_size,
-                "total": total_count,
-                "has_next": has_next,
-                "has_prev": has_prev,
-            }
-            
-            # Format results as list of dictionaries
-            formatted_results = [dict(row) for row in results]
-            
-            # Calculate query execution time
-            execution_time = time.time() - start_time
-            
-            return {
-                "status": "success",
-                "data": formatted_results,
-                "execution_time": execution_time,
-                "pagination": pagination
-            }
+            try:
+                # Check if the query is expected to return results (not a schema query)
+                if "information_schema.columns" in query or "information_schema.tables" in query:
+                    # For schema queries, skip the count and just execute the main query
+                    cursor.execute(query, params)
+                    results = cursor.fetchall()
+                    
+                    # No pagination for schema queries
+                    pagination = {
+                        "page": 1,
+                        "pages": 1,
+                        "page_size": len(results),
+                        "total": len(results),
+                        "has_next": False,
+                        "has_prev": False,
+                    }
+                else:
+                    # Regular query with pagination
+                    # Execute count query first (for pagination metadata)
+                    count_query = f"SELECT COUNT(*) AS total FROM ({query}) AS subquery"
+                    cursor.execute(count_query, params)
+                    count_result = cursor.fetchone()
+                    total_count = count_result["total"] if count_result else 0
+                    
+                    # Calculate pagination
+                    offset = (page - 1) * page_size
+                    paginated_query = f"{query} LIMIT {page_size} OFFSET {offset}"
+                    
+                    # Execute main query with pagination
+                    cursor.execute(paginated_query, params)
+                    results = cursor.fetchall()
+                    
+                    # Calculate pagination metadata
+                    total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
+                    has_next = page < total_pages
+                    has_prev = page > 1
+                    
+                    # Create pagination info
+                    pagination = {
+                        "page": page,
+                        "pages": total_pages,
+                        "page_size": page_size,
+                        "total": total_count,
+                        "has_next": has_next,
+                        "has_prev": has_prev,
+                    }
+                
+                # Format results as list of dictionaries
+                formatted_results = [dict(row) for row in results]
+                
+                # Calculate query execution time
+                execution_time = time.time() - start_time
+                
+                return {
+                    "status": "success",
+                    "data": formatted_results,
+                    "execution_time": execution_time,
+                    "pagination": pagination
+                }
+            except Exception as e:
+                logger.error(f"Error executing query: {str(e)}")
+                # Print more detailed error information for debugging
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}")
+                raise
     finally:
         # Return connection to pool
         if conn and pg_pool:
