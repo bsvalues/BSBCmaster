@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="95" fill="#2d3748" stroke="#4fd1c5" stroke-width="5"/>
+  
+  <!-- Database icon elements -->
+  <g transform="translate(50, 45)">
+    <!-- Database base -->
+    <ellipse cx="50" cy="25" rx="40" ry="15" fill="#4fd1c5" opacity="0.8"/>
+    
+    <!-- Database middle -->
+    <path d="M10,25 L10,85 C10,93.28 28.66,100 50,100 C71.34,100 90,93.28 90,85 L90,25" 
+          fill="none" stroke="#4fd1c5" stroke-width="4"/>
+    
+    <!-- Database rings -->
+    <path d="M10,55 C10,63.28 28.66,70 50,70 C71.34,70 90,63.28 90,55" 
+          fill="none" stroke="#4fd1c5" stroke-width="3"/>
+    
+    <!-- Connection lines -->
+    <line x1="75" y1="35" x2="100" y2="15" stroke="#4fd1c5" stroke-width="3"/>
+    <line x1="75" y1="80" x2="100" y2="100" stroke="#4fd1c5" stroke-width="3"/>
+    
+    <!-- Data points -->
+    <circle cx="105" cy="10" r="6" fill="#4fd1c5"/>
+    <circle cx="105" cy="105" r="6" fill="#4fd1c5"/>
+    
+    <!-- API text -->
+    <g transform="rotate(-45, 100, 55)">
+      <rect x="85" y="45" width="30" height="20" rx="5" fill="#2d3748" stroke="#4fd1c5" stroke-width="2"/>
+      <text x="100" y="58" font-family="Arial" font-size="12" font-weight="bold" text-anchor="middle" fill="#4fd1c5">API</text>
+    </g>
+  </g>
+  
+  <!-- Security shield -->
+  <g transform="translate(135, 135) scale(0.5, 0.5)">
+    <path d="M10,0 L50,0 L60,15 L50,30 L10,30 L0,15 Z" fill="#4fd1c5"/>
+    <text x="30" y="20" font-family="Arial" font-size="15" font-weight="bold" text-anchor="middle" fill="#2d3748">SEC</text>
+  </g>
+  
+  <!-- MCP text -->
+  <text x="100" y="160" font-family="Arial" font-size="20" font-weight="bold" text-anchor="middle" fill="#4fd1c5">MCP ASSESSOR</text>
+</svg>
