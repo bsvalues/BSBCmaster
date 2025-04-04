@@ -66,6 +66,20 @@
                     <div class="alert alert-info">
                         <strong>Base URL:</strong> <code>{{ fastapi_url }}</code>
                     </div>
+                    
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Interactive API Documentation</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>For interactive OpenAPI documentation and testing, visit the Swagger UI:</p>
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+                                <a href="{{ fastapi_docs_url|default(fastapi_url + '/docs') }}" target="_blank" class="btn btn-primary">
+                                    <i class="bi bi-box-arrow-up-right me-2"></i>Open Swagger UI
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </section>
                 
                 <section id="authentication" class="api-section">
@@ -605,7 +619,21 @@
             
             // Prepare request URL
             const baseUrl = '{{ fastapi_url }}';
-            let url = baseUrl + endpoint;
+            const apiPrefix = '{{ fastapi_docs_url|default("") }}';
+            
+            // Extract API prefix from the docs URL if provided
+            let prefix = '';
+            if (apiPrefix) {
+                // Get API prefix by removing the `/docs` from the end of the URL
+                const urlParts = apiPrefix.split('/');
+                if (urlParts.length > 0 && urlParts[urlParts.length - 1] === 'docs') {
+                    urlParts.pop(); // Remove 'docs'
+                    prefix = urlParts.slice(urlParts.indexOf(baseUrl.split('/').pop()) + 1).join('/');
+                }
+            }
+            
+            // Construct the full URL with prefix
+            let url = baseUrl + (prefix ? '/' + prefix : '') + endpoint;
             
             // Prepare request options
             const options = {

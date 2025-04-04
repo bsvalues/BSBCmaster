@@ -8,6 +8,7 @@ import os
 import logging
 import requests
 from flask import render_template, request, jsonify, Blueprint, current_app
+from sqlalchemy import text
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -15,6 +16,13 @@ logger = logging.getLogger(__name__)
 
 # Define a constant for the FastAPI URL if it's not in the environment
 FASTAPI_URL = os.environ.get("FASTAPI_URL", "http://localhost:8000")
+
+# Import FastAPI settings for API_PREFIX
+try:
+    from app.settings import settings as fastapi_settings
+    API_PREFIX = fastapi_settings.API_PREFIX
+except ImportError:
+    API_PREFIX = "/api"
 
 # Get db instance from app_setup
 from app_setup import db, app
@@ -30,33 +38,58 @@ def index():
 @database_bp.route('/api-docs')
 def api_docs():
     """Proxy to FastAPI OpenAPI documentation."""
+    # Note: FastAPI docs URL is configured in FastAPI setup with API_PREFIX
+    # Get the base URL for FastAPI docs based on current settings
+    from app.settings import settings as fastapi_settings
+    docs_url = f"{FASTAPI_URL}{fastapi_settings.API_PREFIX}/docs"
+    
     return render_template('api_docs.html', 
                          fastapi_url=FASTAPI_URL,
+                         fastapi_docs_url=docs_url,
                          title="API Documentation")
 
 @database_bp.route('/openapi.json')
 def openapi_schema():
     """Proxy to FastAPI OpenAPI schema."""
     try:
-        response = requests.get(f"{FASTAPI_URL}/openapi.json")
+        # Import settings to ensure we have the correct API prefix
+        from app.settings import settings as fastapi_settings
+        
+        # The OpenAPI schema URL is relative to the API prefix
+        # In FastAPI, the OpenAPI schema is at /openapi.json in relation to the base prefix
+        # So we need to include the API_PREFIX in the URL
+        openapi_url = f"{FASTAPI_URL}{fastapi_settings.API_PREFIX}/openapi.json"
+        
+        response = requests.get(openapi_url)
         return jsonify(response.json())
     except Exception as e:
         logger.error(f"Error fetching OpenAPI schema: {str(e)}")
-        return jsonify({"error": "Failed to fetch OpenAPI schema"}), 500
+        return jsonify({"error": f"Failed to fetch OpenAPI schema: {str(e)}"}), 500
 
 @database_bp.route('/api/health')
 def health_check():
     """Check the health of the API and its database connections."""
     try:
+        # Import settings to get the correct API prefix
+        from app.settings import settings as fastapi_settings
+        
         # Check FastAPI health
-        response = requests.get(f"{FASTAPI_URL}/health")
-        api_health = response.json()
+        # Note: In FastAPI, health check may be at API_PREFIX/health or at root /health
+        # Try both paths to ensure we can connect
+        try:
+            # First try with API_PREFIX
+            response = requests.get(f"{FASTAPI_URL}{fastapi_settings.API_PREFIX}/health")
+            api_health = response.json()
+        except Exception:
+            # If that fails, try the root health endpoint
+            response = requests.get(f"{FASTAPI_URL}/health")
+            api_health = response.json()
         
         # Check database connection through SQLAlchemy
         db_ok = False
         try:
             # Execute a simple query to test the connection
-            db.session.execute('SELECT 1')
+            db.session.execute(text('SELECT 1'))
             db_ok = True
         except Exception as e:
             logger.error(f"Database connection error: {str(e)}")
@@ -302,7 +335,7 @@ def proxy_run_query():
             'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
         }
         response = requests.post(
-            f"{FASTAPI_URL}/run-query",
+            f"{FASTAPI_URL}{API_PREFIX}/run-query",
             json=request.json,
             headers=headers
         )
@@ -326,7 +359,7 @@ def proxy_nl_to_sql():
             'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
         }
         response = requests.post(
-            f"{FASTAPI_URL}/nl-to-sql",
+            f"{FASTAPI_URL}{API_PREFIX}/nl-to-sql",
             json=request.json,
             headers=headers
         )
@@ -349,7 +382,7 @@ def proxy_discover_schema():
             'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
         }
         response = requests.get(
-            f"{FASTAPI_URL}/discover-schema",
+            f"{FASTAPI_URL}{API_PREFIX}/discover-schema",
             params=request.args,
             headers=headers
         )
@@ -372,7 +405,7 @@ def proxy_schema_summary():
             'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
         }
         response = requests.get(
-            f"{FASTAPI_URL}/schema-summary",
+            f"{FASTAPI_URL}{API_PREFIX}/schema-summary",
             params=request.args,
             headers=headers
         )
@@ -396,7 +429,7 @@ def proxy_parameterized_query():
             'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
         }
         response = requests.post(
-            f"{FASTAPI_URL}/parameterized-query",
+            f"{FASTAPI_URL}{API_PREFIX}/parameterized-query",
             json=request.json,
             headers=headers
         )

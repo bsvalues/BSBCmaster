@@ -58,11 +58,13 @@ with app.app_context():
     except Exception as e:
         logger.error(f"Error creating database tables: {e}")
 
-# Import routes
+# Import routes and database blueprint
 from routes import api_routes
+from database import database_bp
 
-# Register the blueprint
+# Register the blueprints
 app.register_blueprint(api_routes)
+app.register_blueprint(database_bp, url_prefix='/database')
 
 # Function to seed the database if needed
 def seed_database_if_needed():
