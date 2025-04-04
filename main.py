@@ -48,11 +48,15 @@ def index():
     # Get base URL for API endpoints
     base_url = request.base_url.rstrip('/')
     
+    # Import settings to get API key header name
+    from app.settings import settings
+    
     return render_template("index.html", 
                           title="MCP Assessor Agent API",
-                          version="1.0.0",
+                          version="1.1.0",
                           description="API service for accessing and querying assessment data",
                           base_url=base_url,
+                          api_key_header=settings.API_KEY_HEADER_NAME,
                           current_year=datetime.now().year)
 
 def validate_api_key():
