@@ -1,20 +1,14 @@
 #!/bin/bash
 
-# This script runs both the Flask and FastAPI applications in parallel
+# Export environment variables
+export $(cat .env)
 
-# Start FastAPI app in the background using uvicorn directly
-echo "Starting FastAPI application on port 8000..."
+# Run FastAPI service in the background
 python run_api.py &
-API_PID=$!
+FASTAPI_PID=$!
 
-# Give the FastAPI app time to start up
-sleep 2
-echo "FastAPI service should be running on port 8000"
+# Run Flask service
+gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app
 
-# Start Flask app using gunicorn
-echo "Starting Flask documentation UI on port 5000..."
-# Use the existing workflow command to maintain compatibility
-exec gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app
-
-# Note: exec replaces the current process, so we don't need the kill command
-# If this script terminates, Replit will clean up the background processes
+# Kill FastAPI service when Flask service is killed
+kill $FASTAPI_PID
