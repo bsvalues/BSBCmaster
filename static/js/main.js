@@ -205,6 +205,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize the query builder
     initQueryBuilder();
+    
+    // Initialize natural language to SQL feature
+    initNaturalLanguageToSQL();
 });
 
 /**
@@ -977,6 +980,312 @@ function initQueryBuilder() {
                 .then(data => {
                     if (data.status === 'success') {
                         displayQueryResults(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error with pagination:', error);
+                });
+            });
+        });
+    }
+}
+
+/**
+ * Initialize natural language to SQL feature
+ */
+function initNaturalLanguageToSQL() {
+    const nlPromptTextarea = document.getElementById('nlPrompt');
+    const translateButton = document.getElementById('translateNL');
+    const autoExecuteCheckbox = document.getElementById('autoExecuteNL');
+    const nlResultsContainer = document.getElementById('nlResults');
+    
+    if (!nlPromptTextarea || !translateButton) return;
+    
+    // Add event listeners
+    translateButton.addEventListener('click', function() {
+        translateNaturalLanguage();
+    });
+    
+    // Allow Enter key to submit
+    nlPromptTextarea.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            e.preventDefault();
+            translateNaturalLanguage();
+        }
+    });
+    
+    function translateNaturalLanguage() {
+        const prompt = nlPromptTextarea.value.trim();
+        
+        if (!prompt) {
+            nlResultsContainer.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-circle me-2"></i>
+                    Please enter a question or description in natural language.
+                </div>
+            `;
+            return;
+        }
+        
+        // Show loading state
+        nlResultsContainer.innerHTML = `
+            <div class="d-flex justify-content-center p-3">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span class="ms-2">Translating to SQL...</span>
+            </div>
+        `;
+        
+        // Call API to translate natural language to SQL
+        fetch('/api/nl-to-sql', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                db: 'postgres',
+                prompt: prompt
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 400) {
+                    return response.json().then(err => {
+                        throw new Error(err.detail || 'Translation failed');
+                    });
+                }
+                throw new Error('Failed to translate natural language');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success' && data.sql) {
+                displaySqlTranslation(data.sql);
+                
+                // Auto-execute if checkbox is checked
+                if (autoExecuteCheckbox.checked) {
+                    executeTranslatedQuery(data.sql);
+                }
+            } else {
+                throw new Error('Translation failed');
+            }
+        })
+        .catch(error => {
+            nlResultsContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    ${error.message}
+                </div>
+            `;
+        });
+    }
+    
+    function displaySqlTranslation(sql) {
+        nlResultsContainer.innerHTML = `
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Generated SQL</h5>
+                    <div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="copyNLQuery">
+                            <i class="bi bi-clipboard"></i> Copy
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary" id="runNLQuery">
+                            <i class="bi bi-lightning"></i> Run Query
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body bg-dark">
+                    <pre class="mb-0 text-light"><code>${sql}</code></pre>
+                </div>
+            </div>
+            <div id="nlQueryResults"></div>
+        `;
+        
+        // Add event listeners to buttons
+        document.getElementById('copyNLQuery').addEventListener('click', function() {
+            navigator.clipboard.writeText(sql)
+                .then(() => {
+                    const originalText = this.innerHTML;
+                    this.innerHTML = '<i class="bi bi-check"></i> Copied!';
+                    
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                    }, 2000);
+                })
+                .catch(err => {
+                    console.error('Failed to copy query: ', err);
+                    alert('Failed to copy query to clipboard.');
+                });
+        });
+        
+        document.getElementById('runNLQuery').addEventListener('click', function() {
+            executeTranslatedQuery(sql);
+        });
+    }
+    
+    function executeTranslatedQuery(sql) {
+        const resultsContainer = document.getElementById('nlQueryResults');
+        
+        if (!resultsContainer) return;
+        
+        // Show loading state
+        resultsContainer.innerHTML = `
+            <div class="d-flex justify-content-center p-3">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span class="ms-2">Executing query...</span>
+            </div>
+        `;
+        
+        // Execute query through the API
+        fetch('/api/query', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                db: 'postgres',
+                query: sql
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 400) {
+                    return response.json().then(err => {
+                        throw new Error(err.detail || 'Query execution failed');
+                    });
+                }
+                throw new Error('Failed to execute query');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                displayQueryResults(data, resultsContainer);
+            } else {
+                throw new Error('Query execution failed');
+            }
+        })
+        .catch(error => {
+            resultsContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    ${error.message}
+                </div>
+            `;
+        });
+    }
+    
+    function displayQueryResults(data, container) {
+        if (!data.data || data.data.length === 0) {
+            container.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    Query executed successfully, but no results were returned.
+                </div>
+            `;
+            return;
+        }
+        
+        // Get column names from first result
+        const columns = Object.keys(data.data[0]);
+        
+        // Build table HTML
+        let html = `
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Results</h5>
+                    <span class="badge bg-secondary">${data.count} records total</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    ${columns.map(col => `<th>${col}</th>`).join('')}
+                                </tr>
+                            </thead>
+                            <tbody>
+        `;
+        
+        // Add data rows
+        data.data.forEach(row => {
+            html += '<tr>';
+            columns.forEach(col => {
+                const value = row[col] === null ? '<em class="text-muted">null</em>' : row[col];
+                html += `<td>${value}</td>`;
+            });
+            html += '</tr>';
+        });
+        
+        html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+        `;
+        
+        // Add pagination if available
+        if (data.pagination) {
+            const { page, total_pages, has_prev, has_next } = data.pagination;
+            
+            html += `
+                <div class="card-footer d-flex justify-content-between align-items-center">
+                    <div>
+                        Page ${page} of ${total_pages}
+                    </div>
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item ${!has_prev ? 'disabled' : ''}">
+                                <a class="page-link" href="#" ${has_prev ? 'data-page="' + (page - 1) + '"' : ''}>
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item ${!has_next ? 'disabled' : ''}">
+                                <a class="page-link" href="#" ${has_next ? 'data-page="' + (page + 1) + '"' : ''}>
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            `;
+        }
+        
+        html += '</div>';
+        
+        // Update container
+        container.innerHTML = html;
+        
+        // Add pagination event listeners
+        const paginationLinks = container.querySelectorAll('.page-link[data-page]');
+        paginationLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const page = parseInt(this.dataset.page, 10);
+                
+                // Get the current query from the code block
+                const currentQuery = document.querySelector('#nlResults pre code').textContent;
+                
+                // Execute paginated query
+                fetch('/api/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        db: 'postgres',
+                        query: currentQuery,
+                        page: page,
+                        page_size: 10
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        displayQueryResults(data, container);
                     }
                 })
                 .catch(error => {

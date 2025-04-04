@@ -500,6 +500,48 @@ else:
             </div>
         </div>
         
+        <!-- NL to SQL Section -->
+        <div class="row mt-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0"><i class="bi bi-chat-dots"></i> Natural Language to SQL</h4>
+                        <span class="badge bg-warning">Experimental</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="bi bi-lightbulb"></i> Use natural language to generate SQL queries. This feature helps you write queries without knowing SQL syntax.
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="nlPrompt" class="form-label">Your question about the data</label>
+                                    <textarea class="form-control" id="nlPrompt" rows="3" placeholder="Example: Find all parcels with a value over 500000"></textarea>
+                                    <div class="form-text">Ask a question in plain English about the database</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <div class="d-grid gap-2 w-100">
+                                    <button type="button" class="btn btn-primary" id="translateNL">
+                                        <i class="bi bi-translate"></i> Translate to SQL
+                                    </button>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="autoExecuteNL">
+                                        <label class="form-check-label" for="autoExecuteNL">Auto-run generated query</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3" id="nlResults">
+                            <!-- Results will show here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Query Builder Section -->
         <div class="row mt-5">
             <div class="col-12">
