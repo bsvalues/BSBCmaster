@@ -15,6 +15,9 @@ def create_app() -> FastAPI:
         title="MCP Assessor Agent API",
         description="API for accessing and querying assessment data from MS SQL Server and PostgreSQL databases",
         version="1.0.0",
+        docs_url="/api/docs",
+        redoc_url="/api/redoc",
+        openapi_url="/api/openapi.json",
     )
     
     # Configure CORS

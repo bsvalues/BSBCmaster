@@ -1,23 +1,33 @@
-/* Custom CSS for MCP Assessor Agent API */
+/* MCP Assessor Agent API - Custom CSS */
 
-body {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
 }
 
-footer {
-    margin-top: auto;
+.badge {
+    transition: all 0.3s ease;
 }
 
 pre {
     background-color: var(--bs-dark);
     padding: 1rem;
-    border-radius: 0.25rem;
+    border-radius: 0.375rem;
     overflow-x: auto;
 }
 
-.status-indicator {
-    min-width: 80px;
+code {
+    color: var(--bs-info);
+}
+
+/* Custom styling for the accordion items */
+.accordion-button:not(.collapsed) {
+    background-color: rgba(13, 110, 253, 0.1);
+    color: var(--bs-primary);
+}
+
+/* Add some spacing between status items */
+#api-status, #postgres-status, #mssql-status {
+    min-width: 90px;
     text-align: center;
 }
