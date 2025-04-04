@@ -208,6 +208,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize natural language to SQL feature
     initNaturalLanguageToSQL();
+    
+    // Initialize data visualization
+    initDataVisualization();
 });
 
 /**
