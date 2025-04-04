@@ -8,6 +8,7 @@ import logging
 import requests
 import subprocess
 import threading
+import time
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -59,7 +60,39 @@ def seed_database_if_needed():
 # Seed database in a separate thread to avoid blocking app startup
 threading.Thread(target=seed_database_if_needed, daemon=True).start()
 
+# Start FastAPI service as a background process
+def start_fastapi_service():
+    """Start the FastAPI service as a background process."""
+    try:
+        logger.info("Starting FastAPI service on port 8000")
+        process = subprocess.Popen(
+            ["python", "-m", "uvicorn", "asgi:app", "--host", "0.0.0.0", "--port", "8000"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            bufsize=1
+        )
+        
+        # Monitor FastAPI output
+        def log_fastapi_output():
+            for line in iter(process.stdout.readline, ""):
+                if line:
+                    logger.info(f"[FastAPI] {line.strip()}")
+        
+        threading.Thread(target=log_fastapi_output, daemon=True).start()
+        return process
+    except Exception as e:
+        logger.error(f"Error starting FastAPI service: {e}")
+        return None
+
 if __name__ == "__main__":
+    # Start FastAPI service
+    fastapi_process = start_fastapi_service()
+    
+    # Wait for FastAPI to initialize
+    time.sleep(3)
+    
+    # Start Flask application
     port = int(os.environ.get("FLASK_PORT", 5000))
     logger.info(f"Starting Flask documentation on port {port}")
     app.run(host="0.0.0.0", port=port, debug=True)

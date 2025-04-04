@@ -1,4 +1,7 @@
 #!/bin/bash
 
-# This script starts both the FastAPI and Flask services using the combined runner
-python run_both.py
+# Start both FastAPI and Flask services for the MCP Assessor Agent API
+echo "Starting MCP Assessor Agent API services..."
+
+# Run the combined services script
+python combined_services.py
