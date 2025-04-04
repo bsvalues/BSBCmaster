@@ -79,7 +79,7 @@
             </div>
         </div>
 
-        <div class="row">
+        <div class="row mb-4">
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
@@ -98,42 +98,364 @@
                             <tbody>
                                 <tr>
                                     <td><code>/docs</code></td>
-                                    <td>GET</td>
-                                    <td><span class="badge bg-secondary">No</span></td>
+                                    <td><span class="badge badge-get">GET</span></td>
+                                    <td><span class="badge bg-secondary"><i class="bi bi-unlock"></i> No</span></td>
                                     <td>Interactive API documentation (Swagger UI)</td>
                                 </tr>
                                 <tr>
                                     <td><code>/api/health</code></td>
-                                    <td>GET</td>
-                                    <td><span class="badge bg-secondary">No</span></td>
+                                    <td><span class="badge badge-get">GET</span></td>
+                                    <td><span class="badge bg-secondary"><i class="bi bi-unlock"></i> No</span></td>
                                     <td>Health check endpoint for monitoring API status</td>
                                 </tr>
                                 <tr>
                                     <td><code>/api/run-query</code></td>
-                                    <td>POST</td>
-                                    <td><span class="badge bg-primary">Yes</span></td>
+                                    <td><span class="badge badge-post">POST</span></td>
+                                    <td><span class="badge bg-primary"><i class="bi bi-lock-fill"></i> Yes</span></td>
                                     <td>Execute a SQL query against a specified database</td>
                                 </tr>
                                 <tr>
                                     <td><code>/api/nl-to-sql</code></td>
-                                    <td>POST</td>
-                                    <td><span class="badge bg-primary">Yes</span></td>
+                                    <td><span class="badge badge-post">POST</span></td>
+                                    <td><span class="badge bg-primary"><i class="bi bi-lock-fill"></i> Yes</span></td>
                                     <td>Convert natural language to SQL query</td>
                                 </tr>
                                 <tr>
                                     <td><code>/api/discover-schema</code></td>
-                                    <td>GET</td>
-                                    <td><span class="badge bg-primary">Yes</span></td>
+                                    <td><span class="badge badge-get">GET</span></td>
+                                    <td><span class="badge bg-primary"><i class="bi bi-lock-fill"></i> Yes</span></td>
                                     <td>Get detailed database schema information</td>
                                 </tr>
                                 <tr>
                                     <td><code>/api/schema-summary</code></td>
-                                    <td>GET</td>
-                                    <td><span class="badge bg-primary">Yes</span></td>
+                                    <td><span class="badge badge-get">GET</span></td>
+                                    <td><span class="badge bg-primary"><i class="bi bi-lock-fill"></i> Yes</span></td>
                                     <td>Get a summary of the database schema</td>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Code Examples Section -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">Code Examples</h4>
+                        <span class="badge bg-info">For Developers</span>
+                    </div>
+                    <div class="card-body">
+                        <!-- Tabs for different endpoints -->
+                        <ul class="nav nav-tabs" id="codeExampleTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="run-query-tab" data-bs-toggle="tab" data-bs-target="#run-query-code" type="button" role="tab" aria-controls="run-query-code" aria-selected="true">
+                                    <i class="bi bi-code-square"></i> Run Query
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="nl-to-sql-tab" data-bs-toggle="tab" data-bs-target="#nl-to-sql-code" type="button" role="tab" aria-controls="nl-to-sql-code" aria-selected="false">
+                                    <i class="bi bi-translate"></i> NL to SQL
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="schema-tab" data-bs-toggle="tab" data-bs-target="#schema-code" type="button" role="tab" aria-controls="schema-code" aria-selected="false">
+                                    <i class="bi bi-diagram-3"></i> Schema
+                                </button>
+                            </li>
+                        </ul>
+                        
+                        <!-- Tab content -->
+                        <div class="tab-content" id="codeExampleTabsContent">
+                            <!-- Run Query Examples -->
+                            <div class="tab-pane fade show active code-tab-content" id="run-query-code" role="tabpanel" aria-labelledby="run-query-tab">
+                                <ul class="nav nav-pills mb-3" id="runQueryLanguageTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="run-query-curl-tab" data-bs-toggle="pill" data-bs-target="#run-query-curl" type="button" role="tab" aria-controls="run-query-curl" aria-selected="true">cURL</button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="run-query-python-tab" data-bs-toggle="pill" data-bs-target="#run-query-python" type="button" role="tab" aria-controls="run-query-python" aria-selected="false">Python</button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="run-query-javascript-tab" data-bs-toggle="pill" data-bs-target="#run-query-javascript" type="button" role="tab" aria-controls="run-query-javascript" aria-selected="false">JavaScript</button>
+                                    </li>
+                                </ul>
+                                <div class="tab-content" id="runQueryLanguageTabsContent">
+                                    <div class="tab-pane fade show active" id="run-query-curl" role="tabpanel" aria-labelledby="run-query-curl-tab">
+                                        <pre><code>curl -X POST "{{ base_url }}/api/run-query" \
+    -H "{{ api_key_header }}: your_api_key" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "db": "postgres",
+        "query": "SELECT * FROM parcels LIMIT 5",
+        "page": 1,
+        "page_size": 5
+    }'</code></pre>
+                                    </div>
+                                    <div class="tab-pane fade" id="run-query-python" role="tabpanel" aria-labelledby="run-query-python-tab">
+                                        <pre><code>import requests
+import json
+
+url = "{{ base_url }}/api/run-query"
+headers = {
+    "{{ api_key_header }}": "your_api_key",
+    "Content-Type": "application/json"
+}
+payload = {
+    "db": "postgres",
+    "query": "SELECT * FROM parcels LIMIT 5",
+    "page": 1,
+    "page_size": 5
+}
+
+response = requests.post(url, headers=headers, json=payload)
+data = response.json()
+
+if response.status_code == 200 and data["status"] == "success":
+    results = data["data"]
+    print(f"Retrieved {len(results)} results")
+    for row in results:
+        print(row)
+else:
+    print(f"Error: {data.get('detail', 'Unknown error')}")</code></pre>
+                                    </div>
+                                    <div class="tab-pane fade" id="run-query-javascript" role="tabpanel" aria-labelledby="run-query-javascript-tab">
+                                        <pre><code>async function runQuery() {
+    const url = "{{ base_url }}/api/run-query";
+    const headers = {
+        "{{ api_key_header }}": "your_api_key",
+        "Content-Type": "application/json"
+    };
+    const payload = {
+        db: "postgres",
+        query: "SELECT * FROM parcels LIMIT 5",
+        page: 1,
+        page_size: 5
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.status === "success") {
+            console.log(`Retrieved ${data.data.length} results`);
+            console.table(data.data);
+            return data.data;
+        } else {
+            console.error(`Error: ${data.detail || 'Unknown error'}`);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        return null;
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- NL to SQL Examples -->
+                            <div class="tab-pane fade code-tab-content" id="nl-to-sql-code" role="tabpanel" aria-labelledby="nl-to-sql-tab">
+                                <ul class="nav nav-pills mb-3" id="nlToSqlLanguageTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="nl-to-sql-curl-tab" data-bs-toggle="pill" data-bs-target="#nl-to-sql-curl" type="button" role="tab" aria-controls="nl-to-sql-curl" aria-selected="true">cURL</button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="nl-to-sql-python-tab" data-bs-toggle="pill" data-bs-target="#nl-to-sql-python" type="button" role="tab" aria-controls="nl-to-sql-python" aria-selected="false">Python</button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="nl-to-sql-javascript-tab" data-bs-toggle="pill" data-bs-target="#nl-to-sql-javascript" type="button" role="tab" aria-controls="nl-to-sql-javascript" aria-selected="false">JavaScript</button>
+                                    </li>
+                                </ul>
+                                <div class="tab-content" id="nlToSqlLanguageTabsContent">
+                                    <div class="tab-pane fade show active" id="nl-to-sql-curl" role="tabpanel" aria-labelledby="nl-to-sql-curl-tab">
+                                        <pre><code>curl -X POST "{{ base_url }}/api/nl-to-sql" \
+    -H "{{ api_key_header }}: your_api_key" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "db": "postgres",
+        "prompt": "Find all parcels with a total value over $500,000"
+    }'</code></pre>
+                                    </div>
+                                    <div class="tab-pane fade" id="nl-to-sql-python" role="tabpanel" aria-labelledby="nl-to-sql-python-tab">
+                                        <pre><code>import requests
+import json
+
+url = "{{ base_url }}/api/nl-to-sql"
+headers = {
+    "{{ api_key_header }}": "your_api_key",
+    "Content-Type": "application/json"
+}
+payload = {
+    "db": "postgres",
+    "prompt": "Find all parcels with a total value over $500,000"
+}
+
+response = requests.post(url, headers=headers, json=payload)
+data = response.json()
+
+if response.status_code == 200 and data["status"] == "success":
+    sql_query = data["sql"]
+    print(f"Generated SQL query: {sql_query}")
+    
+    # Optionally, run the generated query
+    run_query_url = "{{ base_url }}/api/run-query"
+    run_query_payload = {
+        "db": "postgres",
+        "query": sql_query
+    }
+    
+    query_response = requests.post(run_query_url, headers=headers, json=run_query_payload)
+    query_data = query_response.json()
+    
+    if query_response.status_code == 200 and query_data["status"] == "success":
+        results = query_data["data"]
+        print(f"Retrieved {len(results)} results")
+        for row in results:
+            print(row)
+else:
+    print(f"Error: {data.get('detail', 'Unknown error')}")</code></pre>
+                                    </div>
+                                    <div class="tab-pane fade" id="nl-to-sql-javascript" role="tabpanel" aria-labelledby="nl-to-sql-javascript-tab">
+                                        <pre><code>async function naturalLanguageToSQL() {
+    const url = "{{ base_url }}/api/nl-to-sql";
+    const headers = {
+        "{{ api_key_header }}": "your_api_key",
+        "Content-Type": "application/json"
+    };
+    const payload = {
+        db: "postgres",
+        prompt: "Find all parcels with a total value over $500,000"
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.status === "success") {
+            console.log(`Generated SQL query: ${data.sql}`);
+            
+            // Optionally, run the generated query
+            const runQueryUrl = "{{ base_url }}/api/run-query";
+            const runQueryPayload = {
+                db: "postgres",
+                query: data.sql
+            };
+            
+            const queryResponse = await fetch(runQueryUrl, {
+                method: 'POST',
+                headers: headers,
+                body: JSON.stringify(runQueryPayload)
+            });
+            
+            const queryData = await queryResponse.json();
+            
+            if (queryResponse.ok && queryData.status === "success") {
+                console.log(`Retrieved ${queryData.data.length} results`);
+                console.table(queryData.data);
+                return queryData.data;
+            }
+            
+            return data.sql;
+        } else {
+            console.error(`Error: ${data.detail || 'Unknown error'}`);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        return null;
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Schema Examples -->
+                            <div class="tab-pane fade code-tab-content" id="schema-code" role="tabpanel" aria-labelledby="schema-tab">
+                                <ul class="nav nav-pills mb-3" id="schemaLanguageTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="schema-curl-tab" data-bs-toggle="pill" data-bs-target="#schema-curl" type="button" role="tab" aria-controls="schema-curl" aria-selected="true">cURL</button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="schema-python-tab" data-bs-toggle="pill" data-bs-target="#schema-python" type="button" role="tab" aria-controls="schema-python" aria-selected="false">Python</button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="schema-javascript-tab" data-bs-toggle="pill" data-bs-target="#schema-javascript" type="button" role="tab" aria-controls="schema-javascript" aria-selected="false">JavaScript</button>
+                                    </li>
+                                </ul>
+                                <div class="tab-content" id="schemaLanguageTabsContent">
+                                    <div class="tab-pane fade show active" id="schema-curl" role="tabpanel" aria-labelledby="schema-curl-tab">
+                                        <pre><code>curl -X GET "{{ base_url }}/api/schema-summary?db=postgres" \
+    -H "{{ api_key_header }}: your_api_key"</code></pre>
+                                    </div>
+                                    <div class="tab-pane fade" id="schema-python" role="tabpanel" aria-labelledby="schema-python-tab">
+                                        <pre><code>import requests
+
+url = "{{ base_url }}/api/schema-summary"
+headers = {
+    "{{ api_key_header }}": "your_api_key"
+}
+params = {
+    "db": "postgres"
+}
+
+response = requests.get(url, headers=headers, params=params)
+data = response.json()
+
+if response.status_code == 200 and data["status"] == "success":
+    schema_summary = data["summary"]
+    print(f"Database has {data['count']} tables")
+    for table_info in schema_summary:
+        print(table_info)
+else:
+    print(f"Error: {data.get('detail', 'Unknown error')}")</code></pre>
+                                    </div>
+                                    <div class="tab-pane fade" id="schema-javascript" role="tabpanel" aria-labelledby="schema-javascript-tab">
+                                        <pre><code>async function getDatabaseSchema() {
+    const url = "{{ base_url }}/api/schema-summary?db=postgres";
+    const headers = {
+        "{{ api_key_header }}": "your_api_key"
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: headers
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.status === "success") {
+            console.log(`Database has ${data.count} tables`);
+            data.summary.forEach(tableInfo => {
+                console.log(tableInfo);
+            });
+            return data.summary;
+        } else {
+            console.error(`Error: ${data.detail || 'Unknown error'}`);
+            return null;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        return null;
+    }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -144,6 +466,7 @@
         <p class="text-muted">© {{ current_year }} MCP Assessor API</p>
     </footer>
 
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
     <script src="/static/js/main.js"></script>
 </body>
 </html>

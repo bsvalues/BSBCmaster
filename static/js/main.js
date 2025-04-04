@@ -169,3 +169,28 @@ function updateDatabaseStatusFromData(data) {
         }
     }
 }
+
+/**
+ * Initialize tabs and pills for code examples
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize Bootstrap tabs and pills
+    const codeExampleTabs = document.querySelectorAll('[data-bs-toggle="tab"], [data-bs-toggle="pill"]');
+    codeExampleTabs.forEach(tab => {
+        tab.addEventListener('shown.bs.tab', function (event) {
+            console.log('Tab activated:', event.target.id);
+        });
+        
+        // Create Bootstrap tab objects
+        if (typeof bootstrap !== 'undefined') {
+            new bootstrap.Tab(tab);
+        }
+    });
+    
+    // Syntax highlighting (if we add a library later)
+    const codeBlocks = document.querySelectorAll('pre code');
+    if (codeBlocks.length > 0) {
+        console.log(`Found ${codeBlocks.length} code blocks for syntax highlighting`);
+        // If we add a syntax highlighting library later, initialize it here
+    }
+});
