@@ -9,7 +9,8 @@ import logging
 import requests
 from flask import render_template, request, jsonify, Blueprint
 
-from app_setup import app, db, FASTAPI_URL
+# Import directly from main.py since we've moved the setup there
+from main import app, db, FASTAPI_URL
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -410,7 +411,7 @@ def proxy_parameterized_query():
         }), 500
 
 # Initialize models and create tables
-# Tables are now initialized in app_setup.py using before_request
+# Tables are now initialized in main.py
 # This function is kept for compatibility but is not used
 with app.app_context():
     @app.before_request

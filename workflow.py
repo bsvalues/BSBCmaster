@@ -1,62 +1,54 @@
 """
-This script serves as the entry point for the Replit workflow.
-It starts both the FastAPI service and the Flask application.
+MCP Assessor Agent API - Replit Workflow
+
+This script handles starting both the Flask documentation interface and the FastAPI service
+with proper coordination, specifically designed for Replit's workflow environment.
 """
 
 import os
+import sys
 import signal
 import subprocess
-import sys
 import threading
 import time
 import logging
-from logging.handlers import RotatingFileHandler
+from dotenv import load_dotenv
 
 # Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("workflow.log"),
+    ]
+)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# Console handler
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
-
-# File handler
-file_handler = RotatingFileHandler('workflow.log', maxBytes=10485760, backupCount=3)
-file_handler.setFormatter(formatter)
-logger.addHandler(file_handler)
-
-# Global list for process management
+# Global processes
 processes = []
 
 def log_output(process, service_name):
     """Monitor and log process output."""
-    for line in iter(process.stdout.readline, b''):
-        try:
-            decoded_line = line.decode('utf-8').strip()
-            if decoded_line:
-                logger.info(f"[{service_name}] {decoded_line}")
-        except UnicodeDecodeError:
-            logger.warning(f"[{service_name}] Could not decode output line")
-        except Exception as e:
-            logger.error(f"[{service_name}] Error processing output: {str(e)}")
-    
-    # Check if process exited with an error
-    if process.poll() is not None and process.returncode != 0:
-        logger.error(f"{service_name} exited with code {process.returncode}")
+    while True:
+        line = process.stdout.readline()
+        if not line and process.poll() is not None:
+            break
+        if line:
+            line = line.decode('utf-8').rstrip()
+            logger.info(f"[{service_name}] {line}")
 
 def start_fastapi():
     """Start the FastAPI application."""
     logger.info("Starting FastAPI service on port 8000...")
-    # Start uvicorn with app module
-    fastapi_cmd = [
-        "python", "-m", "uvicorn", "app:app", 
-        "--host", "0.0.0.0", "--port", "8000", "--reload"
-    ]
     
-    # Start the process
     try:
+        # Run FastAPI using uvicorn
+        fastapi_cmd = [
+            "python", "-m", "uvicorn", "app:app", 
+            "--host", "0.0.0.0", "--port", "8000"
+        ]
+        
         process = subprocess.Popen(
             fastapi_cmd,
             stdout=subprocess.PIPE,
@@ -73,65 +65,65 @@ def start_fastapi():
             daemon=True
         ).start()
         
-        # Wait for service to start
-        logger.info("Waiting for FastAPI to initialize...")
-        time.sleep(5)
+        # Wait for FastAPI to start
+        time.sleep(3)
         
-        # Check if process is still running
-        if process.poll() is not None:
-            logger.error(f"FastAPI failed to start (exit code {process.returncode})")
-            return False
-        
-        logger.info("FastAPI service started successfully")
         return True
+        
     except Exception as e:
         logger.error(f"Error starting FastAPI: {str(e)}")
         return False
 
 def cleanup(signum=None, frame=None):
     """Clean up processes on exit."""
-    logger.info("Cleaning up processes...")
+    logger.info("Cleaning up services...")
     for process in processes:
         try:
-            if process.poll() is None:
+            if process and process.poll() is None:
                 process.terminate()
                 process.wait(timeout=5)
         except Exception as e:
             logger.error(f"Error terminating process: {str(e)}")
     
-    logger.info("All processes stopped")
-    sys.exit(0)
+    logger.info("All services stopped")
+    if signum is not None:
+        sys.exit(0)
 
 def main():
-    """Main function to setup FastAPI before gunicorn starts Flask."""
+    """Main function to start FastAPI before gunicorn starts Flask."""
+    # Load environment variables
+    load_dotenv()
+    
     # Register signal handlers for cleanup
     signal.signal(signal.SIGINT, cleanup)
     signal.signal(signal.SIGTERM, cleanup)
     
+    logger.info("=" * 60)
     logger.info("Starting MCP Assessor Agent API services...")
+    logger.info("=" * 60)
     
-    # Start FastAPI first
+    # Start FastAPI service in background
     if not start_fastapi():
         logger.error("Failed to start FastAPI service")
-        # Don't exit, let Flask still start
+        return
     
-    # The Flask app will be started by the Replit workflow (gunicorn)
-    logger.info("FastAPI service is running, Flask will be started by gunicorn")
+    logger.info("FastAPI service started successfully on port 8000")
+    logger.info("Waiting for Replit workflow to start Flask documentation...")
     
-    # Keep the script running to maintain FastAPI
+    # Keep the script running until interrupted
     try:
-        # Wait for processes to complete or user interrupt
         while True:
-            time.sleep(1)
+            time.sleep(2)
+            
             # Check if FastAPI process has exited
             for process in processes:
                 if process.poll() is not None:
-                    logger.error(f"FastAPI service has exited unexpectedly with code {process.returncode}")
-                    # Restart FastAPI
-                    logger.info("Attempting to restart FastAPI...")
-                    processes.remove(process)
+                    logger.error(f"FastAPI has exited unexpectedly with code {process.returncode}")
                     if not start_fastapi():
                         logger.error("Failed to restart FastAPI service")
+                        return
+                    processes.remove(process)
+    
     except KeyboardInterrupt:
         logger.info("Received interrupt signal")
         cleanup()
