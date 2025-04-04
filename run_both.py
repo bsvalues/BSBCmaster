@@ -7,132 +7,118 @@ import os
 import sys
 import time
 import signal
-import multiprocessing
-import subprocess
 import logging
+import multiprocessing
+import uvicorn
+from gunicorn.app.base import BaseApplication
 from dotenv import load_dotenv
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, 
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
 
+# Set environment variables for Flask to communicate with FastAPI
+os.environ["FASTAPI_URL"] = "http://127.0.0.1:8000"
+
 def run_fastapi():
     """Start the FastAPI application using uvicorn."""
     logger.info("Starting FastAPI service on port 8000...")
     try:
-        # Use subprocess to run uvicorn with the correct module path
-        process = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            universal_newlines=True,
-            bufsize=1
-        )
-        
-        # Monitor and log uvicorn output
-        for line in process.stdout:
-            logger.info(f"FastAPI: {line.strip()}")
-            
-        # If we get here, the process has ended
-        return_code = process.wait()
-        logger.error(f"FastAPI process exited with code {return_code}")
+        # Import the app directly instead of using the command line
+        from asgi import app
+        uvicorn.run(app, host="0.0.0.0", port=8000)
     except Exception as e:
-        logger.error(f"Error starting FastAPI service: {e}")
+        logger.error(f"FastAPI service error: {e}")
+        sys.exit(1)
 
 def run_flask():
     """Start the Flask application using gunicorn."""
     logger.info("Starting Flask documentation on port 5000...")
     try:
-        # Use subprocess to run gunicorn
-        process = subprocess.Popen(
-            ["gunicorn", "--bind", "0.0.0.0:5000", "--reuse-port", "--reload", "main:app"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            universal_newlines=True,
-            bufsize=1
-        )
+        # Custom Gunicorn application class
+        class FlaskApplication(BaseApplication):
+            def __init__(self, app, options=None):
+                self.options = options or {}
+                self.application = app
+                super().__init__()
+
+            def load_config(self):
+                for key, value in self.options.items():
+                    if key in self.cfg.settings and value is not None:
+                        self.cfg.set(key, value)
+
+            def load(self):
+                return self.application
+
+        # Import Flask app
+        from main import app
         
-        # Monitor and log gunicorn output
-        for line in process.stdout:
-            logger.info(f"Flask: {line.strip()}")
-            
-        # If we get here, the process has ended
-        return_code = process.wait()
-        logger.error(f"Flask process exited with code {return_code}")
+        # Configure Gunicorn
+        options = {
+            'bind': '0.0.0.0:5000',
+            'workers': 1,
+            'reload': True,
+        }
+        
+        # Run Gunicorn with the Flask app
+        FlaskApplication(app, options).run()
     except Exception as e:
-        logger.error(f"Error starting Flask service: {e}")
+        logger.error(f"Flask service error: {e}")
+        sys.exit(1)
 
 def main():
     """Main function to run both services."""
-    logger.info("Starting both services...")
-    
-    # Create processes for both services
+    # Set up processes
     fastapi_process = multiprocessing.Process(target=run_fastapi)
     flask_process = multiprocessing.Process(target=run_flask)
     
-    # Register signal handlers for graceful shutdown
+    # Start FastAPI
+    fastapi_process.start()
+    logger.info(f"Started FastAPI process (PID: {fastapi_process.pid})")
+    
+    # Wait for FastAPI to initialize
+    time.sleep(5)
+    
+    # Start Flask
+    flask_process.start()
+    logger.info(f"Started Flask process (PID: {flask_process.pid})")
+    
+    # Function to handle signals
     def signal_handler(sig, frame):
-        logger.info("Received shutdown signal, stopping services...")
-        fastapi_process.terminate()
-        flask_process.terminate()
-        fastapi_process.join()
-        flask_process.join()
-        logger.info("All services stopped")
+        logger.info("Shutting down services...")
+        if fastapi_process.is_alive():
+            fastapi_process.terminate()
+            logger.info(f"Terminated FastAPI process (PID: {fastapi_process.pid})")
+        if flask_process.is_alive():
+            flask_process.terminate()
+            logger.info(f"Terminated Flask process (PID: {flask_process.pid})")
         sys.exit(0)
     
+    # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
-    # Start processes
-    fastapi_process.start()
-    flask_process.start()
-    
-    logger.info(f"FastAPI started with PID {fastapi_process.pid}")
-    logger.info(f"Flask started with PID {flask_process.pid}")
-    
-    # Give FastAPI a moment to start
-    time.sleep(3)
-    
-    # Check if services started successfully
-    if not fastapi_process.is_alive():
-        logger.error("FastAPI service failed to start!")
-    if not flask_process.is_alive():
-        logger.error("Flask service failed to start!")
-    
-    try:
-        # Keep the main process alive
-        while fastapi_process.is_alive() and flask_process.is_alive():
-            time.sleep(1)
-        
-        # If we get here, one of the processes has died
-        logger.error("One of the services stopped unexpectedly!")
-        
-        if not fastapi_process.is_alive():
-            logger.error("FastAPI service is no longer running")
-        if not flask_process.is_alive():
-            logger.error("Flask service is no longer running")
-        
-        # Terminate any remaining processes
-        if fastapi_process.is_alive():
-            fastapi_process.terminate()
-        if flask_process.is_alive():
-            flask_process.terminate()
-            
-    except KeyboardInterrupt:
-        # Handle Ctrl+C
-        logger.info("Keyboard interrupt received, stopping services...")
-        fastapi_process.terminate()
-        flask_process.terminate()
-    
-    # Wait for processes to complete
+    # Wait for both processes to complete
     fastapi_process.join()
     flask_process.join()
     
-    logger.info("All services stopped")
+    # If we get here, it means one of the processes exited
+    if not fastapi_process.is_alive():
+        logger.error("FastAPI process exited unexpectedly")
+    if not flask_process.is_alive():
+        logger.error("Flask process exited unexpectedly")
+    
+    # Clean up
+    if fastapi_process.is_alive():
+        fastapi_process.terminate()
+    if flask_process.is_alive():
+        flask_process.terminate()
+    
+    # Exit with error
+    sys.exit(1)
 
 if __name__ == "__main__":
     main()

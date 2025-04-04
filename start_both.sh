@@ -1,14 +1,4 @@
 #!/bin/bash
-# Start both Flask and FastAPI services
 
-# Start FastAPI in the background
-echo "Starting FastAPI service on port 8000..."
-python -m uvicorn app:app --host 0.0.0.0 --port 8000 &
-FASTAPI_PID=$!
-
-# Give FastAPI a moment to start up
-sleep 2
-
-# Start Flask in the foreground (using gunicorn as configured in the workflow)
-echo "Starting Flask documentation on port 5000..."
-exec gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app
+# This script starts both the FastAPI and Flask services using the combined runner
+python run_both.py

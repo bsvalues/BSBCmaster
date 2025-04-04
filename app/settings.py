@@ -76,9 +76,18 @@ class Settings(BaseSettings):
     LOGGING: LoggingSettings = LoggingSettings()
     OPENAI: OpenAISettings = OpenAISettings(API_KEY=os.environ.get("OPENAI_API_KEY", None))
     
-    class Config:
-        env_file = ".env"
-        env_nested_delimiter = "__"  # For nested settings, e.g. CACHE__ENABLED=false
+    # These fields are used by the Flask app but needed for env parsing
+    flask_app: Optional[str] = None
+    flask_port: Optional[str] = None
+    fastapi_port: Optional[str] = None
+    fastapi_url: Optional[str] = None
+    debug: Optional[str] = None
+    
+    model_config = {
+        "env_file": ".env",
+        "env_nested_delimiter": "__",  # For nested settings, e.g. CACHE__ENABLED=false
+        "extra": "allow"  # Allow extra fields not defined in the model
+    }
 
 
 # Create settings instance
