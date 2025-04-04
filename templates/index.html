@@ -1,809 +1,754 @@
 <!DOCTYPE html>
 <html lang="en" data-bs-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }} - {{ version }}</title>
-    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="/static/css/main.css">
-    <!-- Chart.js is loaded at the bottom of the file -->
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP Assessor Agent API</title>
+  <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+  <style>
+    .api-section {
+      padding: 2rem 0;
+      border-bottom: 1px solid var(--bs-border-color);
+    }
+    .api-section:last-child {
+      border-bottom: none;
+    }
+    .endpoint {
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 0.5rem;
+      background-color: var(--bs-body-bg);
+      border: 1px solid var(--bs-border-color);
+    }
+    .method {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-weight: bold;
+      margin-right: 0.5rem;
+    }
+    .method-get {
+      background-color: var(--bs-info-bg-subtle);
+      color: var(--bs-info);
+    }
+    .method-post {
+      background-color: var(--bs-success-bg-subtle);
+      color: var(--bs-success);
+    }
+    pre {
+      background-color: var(--bs-dark);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+    .code-block {
+      background-color: var(--bs-dark);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      overflow-x: auto;
+      color: var(--bs-light);
+    }
+    .code-comment {
+      color: var(--bs-gray-600);
+    }
+    .code-string {
+      color: var(--bs-success);
+    }
+    .code-keyword {
+      color: var(--bs-primary);
+    }
+    .table-responsive {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .nav-pills .nav-link.active {
+      background-color: var(--bs-primary);
+    }
+    .nav-pills .nav-link {
+      color: var(--bs-body-color);
+    }
+    .nav-pills .nav-link.active {
+      color: var(--bs-white);
+    }
+    .tab-content {
+      padding: 1rem 0;
+    }
+    .tab-pane {
+      animation: fadeIn 0.3s;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+  </style>
 </head>
 <body>
-    <div class="container py-4">
-        <header class="pb-3 mb-4 border-bottom">
-            <div class="d-flex align-items-center">
-                <h1 class="me-3">{{ title }}</h1>
-                <span class="badge bg-secondary">v{{ version }}</span>
-            </div>
-            <p class="lead text-muted">{{ description }}</p>
-        </header>
-
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0">API Status</h4>
-                        <span id="status-badge" class="badge bg-warning">Checking...</span>
-                    </div>
-                    <div class="card-body">
-                        <h5>Database Connections</h5>
-                        <ul id="db-status" class="list-group">
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                PostgreSQL
-                                <span id="postgres-status" class="badge bg-warning">Checking...</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                MS SQL Server
-                                <span id="mssql-status" class="badge bg-warning">Checking...</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h4 class="mb-0">Authentication</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <h5>API Key Authentication</h5>
-                            <p>Most API endpoints require authentication using an API key via the <code>{{ api_key_header }}</code> header.</p>
-                            <div class="alert alert-danger mb-3">
-                                <h6><i class="bi bi-shield-lock"></i> Security Note</h6>
-                                <p class="mb-0">Always protect your API key. Don't expose it in client-side code or public repositories.</p>
-                            </div>
-                        </div>
-                        <div class="alert alert-info">
-                            <p class="mb-2"><strong>Example Request:</strong></p>
-                            <pre class="mb-0"><code>curl -X POST "{{ base_url }}/api/run-query" \
-     -H "{{ api_key_header }}: your_api_key" \
-     -H "Content-Type: application/json" \
-     -d '{"db": "postgres", "query": "SELECT * FROM parcels LIMIT 5"}'</code></pre>
-                        </div>
-                        <div class="mt-3">
-                            <h6>Responses for Authentication Errors:</h6>
-                            <ul class="list-group">
-                                <li class="list-group-item">
-                                    <span class="badge bg-danger me-2">401</span>
-                                    Missing API key
-                                </li>
-                                <li class="list-group-item">
-                                    <span class="badge bg-danger me-2">403</span>
-                                    Invalid API key
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
+  <div class="container py-4">
+    <div class="row mb-4">
+      <div class="col-12">
+        <h1 class="display-5 fw-bold">MCP Assessor Agent API</h1>
+        <p class="lead">A secure FastAPI intermediary service for efficient and safe database querying with intelligent data translation</p>
+        <div class="d-flex gap-2 mb-4">
+          <a href="/api/docs" class="btn btn-primary">API Documentation</a>
+          <a href="/api/redoc" class="btn btn-outline-secondary">ReDoc</a>
+          <a href="/api/health" class="btn btn-outline-success">Health Check</a>
         </div>
-
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="mb-0">Available Endpoints</h4>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Endpoint</th>
-                                    <th>Method</th>
-                                    <th>Auth Required</th>
-                                    <th>Description</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td><code>/docs</code></td>
-                                    <td><span class="badge badge-get">GET</span></td>
-                                    <td><span class="badge bg-secondary"><i class="bi bi-unlock"></i> No</span></td>
-                                    <td>Interactive API documentation (Swagger UI)</td>
-                                </tr>
-                                <tr>
-                                    <td><code>/api/health</code></td>
-                                    <td><span class="badge badge-get">GET</span></td>
-                                    <td><span class="badge bg-secondary"><i class="bi bi-unlock"></i> No</span></td>
-                                    <td>Health check endpoint for monitoring API status</td>
-                                </tr>
-                                <tr>
-                                    <td><code>/api/run-query</code></td>
-                                    <td><span class="badge badge-post">POST</span></td>
-                                    <td><span class="badge bg-primary"><i class="bi bi-lock-fill"></i> Yes</span></td>
-                                    <td>Execute a SQL query against a specified database</td>
-                                </tr>
-                                <tr>
-                                    <td><code>/api/nl-to-sql</code></td>
-                                    <td><span class="badge badge-post">POST</span></td>
-                                    <td><span class="badge bg-primary"><i class="bi bi-lock-fill"></i> Yes</span></td>
-                                    <td>Convert natural language to SQL query</td>
-                                </tr>
-                                <tr>
-                                    <td><code>/api/discover-schema</code></td>
-                                    <td><span class="badge badge-get">GET</span></td>
-                                    <td><span class="badge bg-primary"><i class="bi bi-lock-fill"></i> Yes</span></td>
-                                    <td>Get detailed database schema information</td>
-                                </tr>
-                                <tr>
-                                    <td><code>/api/schema-summary</code></td>
-                                    <td><span class="badge badge-get">GET</span></td>
-                                    <td><span class="badge bg-primary"><i class="bi bi-lock-fill"></i> Yes</span></td>
-                                    <td>Get a summary of the database schema</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Code Examples Section -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0">Code Examples</h4>
-                        <span class="badge bg-info">For Developers</span>
-                    </div>
-                    <div class="card-body">
-                        <!-- Tabs for different endpoints -->
-                        <ul class="nav nav-tabs" id="codeExampleTabs" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link active" id="run-query-tab" data-bs-toggle="tab" data-bs-target="#run-query-code" type="button" role="tab" aria-controls="run-query-code" aria-selected="true">
-                                    <i class="bi bi-code-square"></i> Run Query
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="nl-to-sql-tab" data-bs-toggle="tab" data-bs-target="#nl-to-sql-code" type="button" role="tab" aria-controls="nl-to-sql-code" aria-selected="false">
-                                    <i class="bi bi-translate"></i> NL to SQL
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="schema-tab" data-bs-toggle="tab" data-bs-target="#schema-code" type="button" role="tab" aria-controls="schema-code" aria-selected="false">
-                                    <i class="bi bi-diagram-3"></i> Schema
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="visualization-tab" data-bs-toggle="tab" data-bs-target="#visualization-code" type="button" role="tab" aria-controls="visualization-code" aria-selected="false">
-                                    <i class="bi bi-bar-chart-line"></i> Data Visualization
-                                </button>
-                            </li>
-                        </ul>
-                        
-                        <!-- Tab content -->
-                        <div class="tab-content" id="codeExampleTabsContent">
-                            <!-- Run Query Examples -->
-                            <div class="tab-pane fade show active code-tab-content" id="run-query-code" role="tabpanel" aria-labelledby="run-query-tab">
-                                <ul class="nav nav-pills mb-3" id="runQueryLanguageTabs" role="tablist">
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link active" id="run-query-curl-tab" data-bs-toggle="pill" data-bs-target="#run-query-curl" type="button" role="tab" aria-controls="run-query-curl" aria-selected="true">cURL</button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link" id="run-query-python-tab" data-bs-toggle="pill" data-bs-target="#run-query-python" type="button" role="tab" aria-controls="run-query-python" aria-selected="false">Python</button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link" id="run-query-javascript-tab" data-bs-toggle="pill" data-bs-target="#run-query-javascript" type="button" role="tab" aria-controls="run-query-javascript" aria-selected="false">JavaScript</button>
-                                    </li>
-                                </ul>
-                                <div class="tab-content" id="runQueryLanguageTabsContent">
-                                    <div class="tab-pane fade show active" id="run-query-curl" role="tabpanel" aria-labelledby="run-query-curl-tab">
-                                        <pre><code>curl -X POST "{{ base_url }}/api/run-query" \
-    -H "{{ api_key_header }}: your_api_key" \
-    -H "Content-Type: application/json" \
-    -d '{
-        "db": "postgres",
-        "query": "SELECT * FROM parcels LIMIT 5",
-        "page": 1,
-        "page_size": 5
-    }'</code></pre>
-                                    </div>
-                                    <div class="tab-pane fade" id="run-query-python" role="tabpanel" aria-labelledby="run-query-python-tab">
-                                        <pre><code>import requests
-import json
-
-url = "{{ base_url }}/api/run-query"
-headers = {
-    "{{ api_key_header }}": "your_api_key",
-    "Content-Type": "application/json"
-}
-payload = {
-    "db": "postgres",
-    "query": "SELECT * FROM parcels LIMIT 5",
-    "page": 1,
-    "page_size": 5
-}
-
-response = requests.post(url, headers=headers, json=payload)
-data = response.json()
-
-if response.status_code == 200 and data["status"] == "success":
-    results = data["data"]
-    print(f"Retrieved {len(results)} results")
-    for row in results:
-        print(row)
-else:
-    print(f"Error: {data.get('detail', 'Unknown error')}")</code></pre>
-                                    </div>
-                                    <div class="tab-pane fade" id="run-query-javascript" role="tabpanel" aria-labelledby="run-query-javascript-tab">
-                                        <pre><code>async function runQuery() {
-    const url = "{{ base_url }}/api/run-query";
-    const headers = {
-        "{{ api_key_header }}": "your_api_key",
-        "Content-Type": "application/json"
-    };
-    const payload = {
-        db: "postgres",
-        query: "SELECT * FROM parcels LIMIT 5",
-        page: 1,
-        page_size: 5
-    };
-
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(payload)
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok && data.status === "success") {
-            console.log(`Retrieved ${data.data.length} results`);
-            console.table(data.data);
-            return data.data;
-        } else {
-            console.error(`Error: ${data.detail || 'Unknown error'}`);
-            return null;
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        return null;
-    }
-}</code></pre>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- NL to SQL Examples -->
-                            <div class="tab-pane fade code-tab-content" id="nl-to-sql-code" role="tabpanel" aria-labelledby="nl-to-sql-tab">
-                                <ul class="nav nav-pills mb-3" id="nlToSqlLanguageTabs" role="tablist">
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link active" id="nl-to-sql-curl-tab" data-bs-toggle="pill" data-bs-target="#nl-to-sql-curl" type="button" role="tab" aria-controls="nl-to-sql-curl" aria-selected="true">cURL</button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link" id="nl-to-sql-python-tab" data-bs-toggle="pill" data-bs-target="#nl-to-sql-python" type="button" role="tab" aria-controls="nl-to-sql-python" aria-selected="false">Python</button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link" id="nl-to-sql-javascript-tab" data-bs-toggle="pill" data-bs-target="#nl-to-sql-javascript" type="button" role="tab" aria-controls="nl-to-sql-javascript" aria-selected="false">JavaScript</button>
-                                    </li>
-                                </ul>
-                                <div class="tab-content" id="nlToSqlLanguageTabsContent">
-                                    <div class="tab-pane fade show active" id="nl-to-sql-curl" role="tabpanel" aria-labelledby="nl-to-sql-curl-tab">
-                                        <pre><code>curl -X POST "{{ base_url }}/api/nl-to-sql" \
-    -H "{{ api_key_header }}: your_api_key" \
-    -H "Content-Type: application/json" \
-    -d '{
-        "db": "postgres",
-        "prompt": "Find all parcels with a total value over $500,000"
-    }'</code></pre>
-                                    </div>
-                                    <div class="tab-pane fade" id="nl-to-sql-python" role="tabpanel" aria-labelledby="nl-to-sql-python-tab">
-                                        <pre><code>import requests
-import json
-
-url = "{{ base_url }}/api/nl-to-sql"
-headers = {
-    "{{ api_key_header }}": "your_api_key",
-    "Content-Type": "application/json"
-}
-payload = {
-    "db": "postgres",
-    "prompt": "Find all parcels with a total value over $500,000"
-}
-
-response = requests.post(url, headers=headers, json=payload)
-data = response.json()
-
-if response.status_code == 200 and data["status"] == "success":
-    sql_query = data["sql"]
-    print(f"Generated SQL query: {sql_query}")
-    
-    # Optionally, run the generated query
-    run_query_url = "{{ base_url }}/api/run-query"
-    run_query_payload = {
-        "db": "postgres",
-        "query": sql_query
-    }
-    
-    query_response = requests.post(run_query_url, headers=headers, json=run_query_payload)
-    query_data = query_response.json()
-    
-    if query_response.status_code == 200 and query_data["status"] == "success":
-        results = query_data["data"]
-        print(f"Retrieved {len(results)} results")
-        for row in results:
-            print(row)
-else:
-    print(f"Error: {data.get('detail', 'Unknown error')}")</code></pre>
-                                    </div>
-                                    <div class="tab-pane fade" id="nl-to-sql-javascript" role="tabpanel" aria-labelledby="nl-to-sql-javascript-tab">
-                                        <pre><code>async function naturalLanguageToSQL() {
-    const url = "{{ base_url }}/api/nl-to-sql";
-    const headers = {
-        "{{ api_key_header }}": "your_api_key",
-        "Content-Type": "application/json"
-    };
-    const payload = {
-        db: "postgres",
-        prompt: "Find all parcels with a total value over $500,000"
-    };
-
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(payload)
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok && data.status === "success") {
-            console.log(`Generated SQL query: ${data.sql}`);
-            
-            // Optionally, run the generated query
-            const runQueryUrl = "{{ base_url }}/api/run-query";
-            const runQueryPayload = {
-                db: "postgres",
-                query: data.sql
-            };
-            
-            const queryResponse = await fetch(runQueryUrl, {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(runQueryPayload)
-            });
-            
-            const queryData = await queryResponse.json();
-            
-            if (queryResponse.ok && queryData.status === "success") {
-                console.log(`Retrieved ${queryData.data.length} results`);
-                console.table(queryData.data);
-                return queryData.data;
-            }
-            
-            return data.sql;
-        } else {
-            console.error(`Error: ${data.detail || 'Unknown error'}`);
-            return null;
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        return null;
-    }
-}</code></pre>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Schema Examples -->
-                            <div class="tab-pane fade code-tab-content" id="schema-code" role="tabpanel" aria-labelledby="schema-tab">
-                                <ul class="nav nav-pills mb-3" id="schemaLanguageTabs" role="tablist">
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link active" id="schema-curl-tab" data-bs-toggle="pill" data-bs-target="#schema-curl" type="button" role="tab" aria-controls="schema-curl" aria-selected="true">cURL</button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link" id="schema-python-tab" data-bs-toggle="pill" data-bs-target="#schema-python" type="button" role="tab" aria-controls="schema-python" aria-selected="false">Python</button>
-                                    </li>
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link" id="schema-javascript-tab" data-bs-toggle="pill" data-bs-target="#schema-javascript" type="button" role="tab" aria-controls="schema-javascript" aria-selected="false">JavaScript</button>
-                                    </li>
-                                </ul>
-                                <div class="tab-content" id="schemaLanguageTabsContent">
-                                    <div class="tab-pane fade show active" id="schema-curl" role="tabpanel" aria-labelledby="schema-curl-tab">
-                                        <pre><code>curl -X GET "{{ base_url }}/api/schema-summary?db=postgres" \
-    -H "{{ api_key_header }}: your_api_key"</code></pre>
-                                    </div>
-                                    <div class="tab-pane fade" id="schema-python" role="tabpanel" aria-labelledby="schema-python-tab">
-                                        <pre><code>import requests
-
-url = "{{ base_url }}/api/schema-summary"
-headers = {
-    "{{ api_key_header }}": "your_api_key"
-}
-params = {
-    "db": "postgres"
-}
-
-response = requests.get(url, headers=headers, params=params)
-data = response.json()
-
-if response.status_code == 200 and data["status"] == "success":
-    schema_summary = data["summary"]
-    print(f"Database has {data['count']} tables")
-    for table_info in schema_summary:
-        print(table_info)
-else:
-    print(f"Error: {data.get('detail', 'Unknown error')}")</code></pre>
-                                    </div>
-                                    <div class="tab-pane fade" id="schema-javascript" role="tabpanel" aria-labelledby="schema-javascript-tab">
-                                        <pre><code>async function getDatabaseSchema() {
-    const url = "{{ base_url }}/api/schema-summary?db=postgres";
-    const headers = {
-        "{{ api_key_header }}": "your_api_key"
-    };
-
-    try {
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: headers
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok && data.status === "success") {
-            console.log(`Database has ${data.count} tables`);
-            data.summary.forEach(tableInfo => {
-                console.log(tableInfo);
-            });
-            return data.summary;
-        } else {
-            console.error(`Error: ${data.detail || 'Unknown error'}`);
-            return null;
-        }
-    } catch (error) {
-        console.error('Error:', error);
-        return null;
-    }
-}</code></pre>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Data Visualization Examples -->
-                            <div class="tab-pane fade code-tab-content" id="visualization-code" role="tabpanel" aria-labelledby="visualization-tab">
-                                <ul class="nav nav-pills mb-3" id="visualizationLanguageTabs" role="tablist">
-                                    <li class="nav-item" role="presentation">
-                                        <button class="nav-link active" id="visualization-javascript-tab" data-bs-toggle="pill" data-bs-target="#visualization-javascript" type="button" role="tab" aria-controls="visualization-javascript" aria-selected="true">JavaScript</button>
-                                    </li>
-                                </ul>
-                                <div class="tab-content" id="visualizationLanguageTabsContent">
-                                    <div class="tab-pane fade show active" id="visualization-javascript" role="tabpanel" aria-labelledby="visualization-javascript-tab">
-                                        <pre><code>// Step 1: Execute a SQL query to get data
-async function getVisualizationData() {
-    const apiKey = document.getElementById('apiKey').value;
-    const query = "SELECT parcel_id, total_value FROM parcels ORDER BY total_value DESC LIMIT 10";
-    
-    const response = await fetch("{{ base_url }}/api/run-query", {
-        method: 'POST',
-        headers: {
-            "{{ api_key_header }}": apiKey,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            db: "postgres",
-            query: query
-        })
-    });
-    
-    const data = await response.json();
-    return data.data;
-}
-
-// Step 2: Create a bar chart with Chart.js
-async function createBarChart() {
-    // Get the data
-    const queryData = await getVisualizationData();
-    
-    // Extract labels (parcel_ids) and values
-    const labels = queryData.map(row => row.parcel_id);
-    const values = queryData.map(row => row.total_value);
-    
-    // Create a canvas element
-    const canvas = document.createElement('canvas');
-    canvas.id = 'propertyValueChart';
-    document.getElementById('chartContainer').appendChild(canvas);
-    
-    // Create the chart
-    new Chart(canvas, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Property Values',
-                data: values,
-                backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Property Value ($)'
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Parcel ID'
-                    }
-                }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Top 10 Property Values'
-                }
-            }
-        }
-    });
-}</code></pre>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Data Visualization Section -->
-        <div class="row mt-5">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0"><i class="bi bi-graph-up"></i> Data Visualization</h4>
-                        <span class="badge bg-info">Interactive</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i> Visualize your query results with interactive charts. Select data columns to visualize and choose from different chart types.
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label for="visualizationQuery" class="form-label">SQL Query</label>
-                                    <textarea class="form-control" id="visualizationQuery" rows="5" placeholder="SELECT * FROM parcels WHERE total_value > 500000 LIMIT 50"></textarea>
-                                </div>
-                                <div class="mb-3">
-                                    <label for="chartType" class="form-label">Chart Type</label>
-                                    <select class="form-select" id="chartType">
-                                        <option value="bar">Bar Chart</option>
-                                        <option value="line">Line Chart</option>
-                                        <option value="pie">Pie Chart</option>
-                                        <option value="scatter">Scatter Plot</option>
-                                    </select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Data Columns</label>
-                                    <div id="columnSelectors">
-                                        <p class="text-muted small">Run a query to select columns</p>
-                                    </div>
-                                </div>
-                                <div class="d-grid gap-2">
-                                    <button class="btn btn-primary" id="generateVisualization">
-                                        <i class="bi bi-bar-chart-fill"></i> Generate Chart
-                                    </button>
-                                    <button class="btn btn-outline-secondary" id="runVisualizationQuery">
-                                        <i class="bi bi-lightning"></i> Run Query
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="col-md-8">
-                                <div class="card">
-                                    <div class="card-header">
-                                        Chart Preview
-                                    </div>
-                                    <div class="card-body">
-                                        <div id="chartContainer" style="min-height: 400px; display: flex; align-items: center; justify-content: center;">
-                                            <p class="text-muted">Run a query and generate a chart to see the visualization</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Database Schema Section -->
-        <div class="row mt-5">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0"><i class="bi bi-database"></i> Database Schema</h4>
-                        <button id="refresh-schema" class="btn btn-sm btn-outline-secondary">
-                            <i class="bi bi-arrow-clockwise"></i> Refresh
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i> This schema information is retrieved directly from the database using the <code>/api/schema-summary</code> and <code>/api/discover-schema</code> endpoints.
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="list-group" id="schema-table-list">
-                                    <div class="d-flex justify-content-center p-3">
-                                        <div class="spinner-border text-primary" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-8">
-                                <div id="table-details" class="border rounded p-3 bg-dark">
-                                    <div class="text-center text-muted">
-                                        <i class="bi bi-arrow-left-circle fs-4"></i>
-                                        <p>Select a table to view its structure</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- NL to SQL Section -->
-        <div class="row mt-5">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0"><i class="bi bi-chat-dots"></i> Natural Language to SQL</h4>
-                        <span class="badge bg-warning">Experimental</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="alert alert-info">
-                            <i class="bi bi-lightbulb"></i> Use natural language to generate SQL queries. This feature helps you write queries without knowing SQL syntax.
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-8">
-                                <div class="mb-3">
-                                    <label for="nlPrompt" class="form-label">Your question about the data</label>
-                                    <textarea class="form-control" id="nlPrompt" rows="3" placeholder="Example: Find all parcels with a value over 500000"></textarea>
-                                    <div class="form-text">Ask a question in plain English about the database</div>
-                                </div>
-                            </div>
-                            <div class="col-md-4 d-flex align-items-end">
-                                <div class="d-grid gap-2 w-100">
-                                    <button type="button" class="btn btn-primary" id="translateNL">
-                                        <i class="bi bi-translate"></i> Translate to SQL
-                                    </button>
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="autoExecuteNL">
-                                        <label class="form-check-label" for="autoExecuteNL">Auto-run generated query</label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-3" id="nlResults">
-                            <!-- Results will show here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Query Builder Section -->
-        <div class="row mt-5">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h4 class="mb-0"><i class="bi bi-search"></i> Query Builder</h4>
-                        <span class="badge bg-info">Beta</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i> Build and test queries without writing SQL. The query builder helps you explore the database safely.
-                        </div>
-                        
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label for="queryBuilderTable" class="form-label">Select Table</label>
-                                <select class="form-select" id="queryBuilderTable">
-                                    <option value="">Loading tables...</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="queryBuilderColumns" class="form-label">Select Columns</label>
-                                <select class="form-select" id="queryBuilderColumns" multiple disabled>
-                                    <option value="">Select a table first</option>
-                                </select>
-                                <div class="form-text">Hold Ctrl/Cmd to select multiple columns</div>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="queryBuilderLimit" class="form-label">Result Limit</label>
-                                <input type="number" class="form-control" id="queryBuilderLimit" min="1" max="100" value="10">
-                            </div>
-                        </div>
-                        
-                        <div class="mt-3">
-                            <label class="form-label">Conditions (Optional)</label>
-                            <div id="queryConditions">
-                                <div class="row g-2 mb-2 condition-row">
-                                    <div class="col-md-4">
-                                        <select class="form-select condition-column" disabled>
-                                            <option value="">Select column</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <select class="form-select condition-operator">
-                                            <option value="=">=</option>
-                                            <option value="!=">!=</option>
-                                            <option value=">">></option>
-                                            <option value="<"><</option>
-                                            <option value=">=">>=</option>
-                                            <option value="<="><=</option>
-                                            <option value="LIKE">LIKE</option>
-                                            <option value="IN">IN</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <input type="text" class="form-control condition-value" placeholder="Value" disabled>
-                                    </div>
-                                    <div class="col-md-1">
-                                        <button type="button" class="btn btn-outline-danger btn-sm remove-condition" disabled>
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="addCondition" disabled>
-                                <i class="bi bi-plus-circle"></i> Add Condition
-                            </button>
-                        </div>
-                        
-                        <div class="row mt-4">
-                            <div class="col-md-8">
-                                <div class="card bg-dark">
-                                    <div class="card-header">
-                                        <small>Generated Query</small>
-                                    </div>
-                                    <div class="card-body">
-                                        <pre id="generatedQuery" class="mb-0 text-light"><code>-- Select a table to generate a query</code></pre>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-4 d-flex align-items-end">
-                                <div class="d-grid gap-2 w-100">
-                                    <button type="button" class="btn btn-primary" id="runQuery" disabled>
-                                        <i class="bi bi-lightning"></i> Run Query
-                                    </button>
-                                    <button type="button" class="btn btn-outline-secondary" id="copyQuery" disabled>
-                                        <i class="bi bi-clipboard"></i> Copy Query
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-4" id="queryResults">
-                            <!-- Query results will be displayed here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
 
-    <footer class="container mt-5 py-3 text-center border-top">
-        <p class="text-muted">© {{ current_year }} MCP Assessor API</p>
-    </footer>
+    <ul class="nav nav-pills mb-3" id="api-tabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="overview-tab" data-bs-toggle="pill" data-bs-target="#overview" type="button" role="tab" aria-controls="overview" aria-selected="true">Overview</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="sql-tab" data-bs-toggle="pill" data-bs-target="#sql-queries" type="button" role="tab" aria-controls="sql-queries" aria-selected="false">SQL Queries</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="nl-tab" data-bs-toggle="pill" data-bs-target="#nl-queries" type="button" role="tab" aria-controls="nl-queries" aria-selected="false">Natural Language</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="schema-tab" data-bs-toggle="pill" data-bs-target="#schema" type="button" role="tab" aria-controls="schema" aria-selected="false">Schema</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="try-it-tab" data-bs-toggle="pill" data-bs-target="#try-it" type="button" role="tab" aria-controls="try-it" aria-selected="false">Try It</button>
+      </li>
+    </ul>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
-    <script src="/static/js/main.js"></script>
-    <script src="/static/js/visualization.js"></script>
+    <div class="tab-content" id="api-tab-content">
+      <!-- Overview Tab -->
+      <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
+        <div class="row">
+          <div class="col-md-8">
+            <h2>MCP Assessor Agent API</h2>
+            <p>The MCP Assessor Agent API serves as a secure intermediary between clients and databases, providing enhanced query capabilities, security features, and natural language processing.</p>
+            
+            <h3 class="mt-4">Key Features</h3>
+            <ul class="list-group mb-4">
+              <li class="list-group-item d-flex align-items-center">
+                <span class="badge bg-primary rounded-pill me-2">1</span>
+                <div>
+                  <strong>Secure Parameterized Queries</strong>
+                  <p class="mb-0">Protection against SQL injection through proper parameterization</p>
+                </div>
+              </li>
+              <li class="list-group-item d-flex align-items-center">
+                <span class="badge bg-primary rounded-pill me-2">2</span>
+                <div>
+                  <strong>Natural Language to SQL Translation</strong>
+                  <p class="mb-0">Convert plain English queries to SQL using OpenAI</p>
+                </div>
+              </li>
+              <li class="list-group-item d-flex align-items-center">
+                <span class="badge bg-primary rounded-pill me-2">3</span>
+                <div>
+                  <strong>Database Schema Discovery</strong>
+                  <p class="mb-0">Explore database structure and relationships</p>
+                </div>
+              </li>
+              <li class="list-group-item d-flex align-items-center">
+                <span class="badge bg-primary rounded-pill me-2">4</span>
+                <div>
+                  <strong>Rate Limiting & Caching</strong>
+                  <p class="mb-0">Performance optimization and resource protection</p>
+                </div>
+              </li>
+            </ul>
+
+            <h3>Authentication</h3>
+            <p>All API endpoints require an API key to be provided in the <code>X-API-Key</code> header:</p>
+            <pre><code>X-API-Key: your_api_key_here</code></pre>
+          </div>
+          <div class="col-md-4">
+            <div class="card">
+              <div class="card-header">
+                Quick Links
+              </div>
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item">
+                  <a href="/api/docs" class="text-decoration-none">OpenAPI Documentation</a>
+                </li>
+                <li class="list-group-item">
+                  <a href="/api/schema" class="text-decoration-none">Database Schema</a>
+                </li>
+                <li class="list-group-item">
+                  <a href="/api/health" class="text-decoration-none">Health Check</a>
+                </li>
+              </ul>
+            </div>
+
+            <div class="card mt-4">
+              <div class="card-header">
+                API Status
+              </div>
+              <div class="card-body">
+                <div id="api-status">
+                  <div class="d-flex align-items-center">
+                    <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span>Checking API status...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SQL Queries Tab -->
+      <div class="tab-pane fade" id="sql-queries" role="tabpanel" aria-labelledby="sql-tab">
+        <h2>SQL Query Endpoints</h2>
+        <p>Use these endpoints to execute SQL queries against the database.</p>
+
+        <div class="endpoint">
+          <div class="d-flex align-items-start mb-3">
+            <span class="method method-post">POST</span>
+            <div>
+              <h5 class="mb-0">/api/run-query</h5>
+              <p class="text-muted">Execute a SQL query with parameterization</p>
+            </div>
+          </div>
+
+          <h6>Request Body Example:</h6>
+          <div class="code-block mb-3">
+            <pre>{
+  "db": "postgres",
+  "query": "SELECT * FROM parcels WHERE city = :city_name LIMIT 10",
+  "params": {
+    "city_name": "Springfield"
+  },
+  "page": 1,
+  "page_size": 10
+}</pre>
+          </div>
+
+          <h6>Response Example:</h6>
+          <div class="code-block">
+            <pre>{
+  "status": "success",
+  "data": [
+    {
+      "id": 1,
+      "parcel_id": "12345",
+      "address": "123 Main St",
+      "city": "Springfield",
+      "state": "IL",
+      "zip_code": "62701",
+      "land_value": 50000.00,
+      "improvement_value": 150000.00,
+      "total_value": 200000.00,
+      "assessment_year": 2023
+    },
+    // More results...
+  ],
+  "execution_time": 0.056,
+  "pagination": {
+    "page": 1,
+    "page_size": 10,
+    "total_pages": 5,
+    "total_items": 42
+  },
+  "column_types": {
+    "id": "int4",
+    "parcel_id": "varchar",
+    "address": "varchar",
+    "city": "varchar",
+    "state": "varchar",
+    "zip_code": "varchar",
+    "land_value": "numeric",
+    "improvement_value": "numeric",
+    "total_value": "numeric",
+    "assessment_year": "int4"
+  }
+}</pre>
+          </div>
+
+          <div class="alert alert-info mt-3">
+            <strong>Security Note:</strong> Always use parameterized queries instead of string concatenation to avoid SQL injection.
+          </div>
+        </div>
+      </div>
+
+      <!-- Natural Language Tab -->
+      <div class="tab-pane fade" id="nl-queries" role="tabpanel" aria-labelledby="nl-tab">
+        <h2>Natural Language Query Endpoints</h2>
+        <p>These endpoints allow you to query the database using natural language, which is then translated to SQL.</p>
+
+        <div class="endpoint">
+          <div class="d-flex align-items-start mb-3">
+            <span class="method method-post">POST</span>
+            <div>
+              <h5 class="mb-0">/api/nl-to-sql</h5>
+              <p class="text-muted">Translate natural language to SQL query</p>
+            </div>
+          </div>
+
+          <h6>Request Body Example:</h6>
+          <div class="code-block mb-3">
+            <pre>{
+  "db": "postgres",
+  "prompt": "Show me all properties in Springfield with a value over 200000",
+  "include_schema": true
+}</pre>
+          </div>
+
+          <h6>Response Example:</h6>
+          <div class="code-block">
+            <pre>{
+  "status": "success",
+  "sql": "SELECT p.*, prop.*\nFROM parcels p\nJOIN properties prop ON p.id = prop.parcel_id\nWHERE p.city = :city_name AND p.total_value > :min_value\nORDER BY p.total_value DESC",
+  "explanation": "This query joins the parcels and properties tables to find all properties in Springfield with a total value over $200,000, ordered by value from highest to lowest.",
+  "parameters": {
+    "city_name": "City name to search for",
+    "min_value": "Minimum property value"
+  },
+  "execution_time": 0.823,
+  "confidence": 0.95
+}</pre>
+          </div>
+
+          <div class="alert alert-info mt-3">
+            <strong>Note:</strong> The natural language translation is powered by OpenAI's GPT-4o model. Provide clear, specific prompts for best results.
+          </div>
+        </div>
+      </div>
+
+      <!-- Schema Tab -->
+      <div class="tab-pane fade" id="schema" role="tabpanel" aria-labelledby="schema-tab">
+        <h2>Database Schema Endpoints</h2>
+        <p>These endpoints provide information about the database structure and relationships.</p>
+
+        <div class="endpoint">
+          <div class="d-flex align-items-start mb-3">
+            <span class="method method-get">GET</span>
+            <div>
+              <h5 class="mb-0">/api/schema</h5>
+              <p class="text-muted">Get detailed database schema information</p>
+            </div>
+          </div>
+
+          <h6>Response Example:</h6>
+          <div class="code-block">
+            <pre>{
+  "status": "success",
+  "db_schema": [
+    {
+      "table_name": "parcels",
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": false,
+      "column_default": "nextval('parcels_id_seq'::regclass)",
+      "is_primary_key": true,
+      "is_foreign_key": false,
+      "references_table": null,
+      "references_column": null,
+      "description": "Unique identifier for the parcel"
+    },
+    // More columns...
+  ],
+  "tables": [
+    {
+      "name": "parcels",
+      "description": "Real estate parcel information (main assessment record).",
+      "columns": [...],
+      "primary_keys": ["id"],
+      "foreign_keys": {},
+      "row_count": 1000
+    },
+    // More tables...
+  ],
+  "execution_time": 0.123
+}</pre>
+          </div>
+        </div>
+
+        <div class="endpoint mt-4">
+          <div class="d-flex align-items-start mb-3">
+            <span class="method method-get">GET</span>
+            <div>
+              <h5 class="mb-0">/api/schema/summary</h5>
+              <p class="text-muted">Get a simplified summary of the database schema</p>
+            </div>
+          </div>
+
+          <h6>Response Example:</h6>
+          <div class="code-block">
+            <pre>{
+  "status": "success",
+  "summary": ["parcels", "properties", "sales"],
+  "table_counts": {
+    "parcels": 1000,
+    "properties": 950,
+    "sales": 1500
+  },
+  "relationships": [
+    {"from": "properties", "to": "parcels", "type": "many-to-one"},
+    {"from": "sales", "to": "parcels", "type": "many-to-one"}
+  ]
+}</pre>
+          </div>
+        </div>
+
+        <div class="card mt-4">
+          <div class="card-header">
+            <h5 class="mb-0">Database Tables Overview</h5>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-striped">
+                <thead>
+                  <tr>
+                    <th>Table</th>
+                    <th>Description</th>
+                    <th>Key Fields</th>
+                    <th>Relationships</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>parcels</strong></td>
+                    <td>Main assessment records for real estate parcels</td>
+                    <td>id, parcel_id, address, city, state, zip_code</td>
+                    <td>Has many properties, Has many sales</td>
+                  </tr>
+                  <tr>
+                    <td><strong>properties</strong></td>
+                    <td>Physical property characteristics</td>
+                    <td>id, parcel_id, property_type, year_built, square_footage</td>
+                    <td>Belongs to parcel</td>
+                  </tr>
+                  <tr>
+                    <td><strong>sales</strong></td>
+                    <td>Property sale transaction history</td>
+                    <td>id, parcel_id, sale_date, sale_price, sale_type</td>
+                    <td>Belongs to parcel</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Try It Tab -->
+      <div class="tab-pane fade" id="try-it" role="tabpanel" aria-labelledby="try-it-tab">
+        <h2>Try the API</h2>
+        <p>Use the forms below to experiment with the API directly from your browser.</p>
+
+        <div class="card mb-4">
+          <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs" id="try-api-tabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="nl-query-tab" data-bs-toggle="tab" data-bs-target="#nl-query" type="button" role="tab" aria-controls="nl-query" aria-selected="true">Natural Language Query</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sql-query-tab" data-bs-toggle="tab" data-bs-target="#sql-query" type="button" role="tab" aria-controls="sql-query" aria-selected="false">SQL Query</button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="schema-query-tab" data-bs-toggle="tab" data-bs-target="#schema-query" type="button" role="tab" aria-controls="schema-query" aria-selected="false">Schema Info</button>
+              </li>
+            </ul>
+          </div>
+          <div class="card-body">
+            <div class="tab-content" id="try-api-tab-content">
+              <!-- Natural Language Query Form -->
+              <div class="tab-pane fade show active" id="nl-query" role="tabpanel" aria-labelledby="nl-query-tab">
+                <form id="nl-query-form">
+                  <div class="mb-3">
+                    <label for="nl-prompt" class="form-label">Natural Language Prompt</label>
+                    <textarea class="form-control" id="nl-prompt" rows="3" placeholder="e.g., Show me all properties in Springfield with a value over 200000"></textarea>
+                  </div>
+                  <div class="mb-3">
+                    <label for="nl-db-type" class="form-label">Database Type</label>
+                    <select class="form-select" id="nl-db-type">
+                      <option value="postgres" selected>PostgreSQL</option>
+                      <option value="mssql">SQL Server</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="" id="include-schema" checked>
+                      <label class="form-check-label" for="include-schema">
+                        Include schema information
+                      </label>
+                    </div>
+                  </div>
+                  <div class="mb-3">
+                    <label for="api-key-nl" class="form-label">API Key</label>
+                    <input type="password" class="form-control" id="api-key-nl" placeholder="Enter your API key">
+                  </div>
+                  <button type="submit" class="btn btn-primary">Translate</button>
+                </form>
+                <div class="mt-4" id="nl-result-container" style="display: none;">
+                  <h5>Translation Result</h5>
+                  <div class="code-block" id="nl-result"></div>
+                </div>
+              </div>
+
+              <!-- SQL Query Form -->
+              <div class="tab-pane fade" id="sql-query" role="tabpanel" aria-labelledby="sql-query-tab">
+                <form id="sql-query-form">
+                  <div class="mb-3">
+                    <label for="sql-query-input" class="form-label">SQL Query</label>
+                    <textarea class="form-control" id="sql-query-input" rows="4" placeholder="e.g., SELECT * FROM parcels WHERE city = :city_name LIMIT 10"></textarea>
+                  </div>
+                  <div class="mb-3">
+                    <label for="sql-db-type" class="form-label">Database Type</label>
+                    <select class="form-select" id="sql-db-type">
+                      <option value="postgres" selected>PostgreSQL</option>
+                      <option value="mssql">SQL Server</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label for="sql-params" class="form-label">Parameters (JSON)</label>
+                    <textarea class="form-control" id="sql-params" rows="2" placeholder='e.g., {"city_name": "Springfield"}'></textarea>
+                  </div>
+                  <div class="row mb-3">
+                    <div class="col-md-6">
+                      <label for="sql-page" class="form-label">Page</label>
+                      <input type="number" class="form-control" id="sql-page" value="1" min="1">
+                    </div>
+                    <div class="col-md-6">
+                      <label for="sql-page-size" class="form-label">Page Size</label>
+                      <input type="number" class="form-control" id="sql-page-size" value="10" min="1" max="100">
+                    </div>
+                  </div>
+                  <div class="mb-3">
+                    <label for="api-key-sql" class="form-label">API Key</label>
+                    <input type="password" class="form-control" id="api-key-sql" placeholder="Enter your API key">
+                  </div>
+                  <button type="submit" class="btn btn-primary">Execute Query</button>
+                </form>
+                <div class="mt-4" id="sql-result-container" style="display: none;">
+                  <h5>Query Result</h5>
+                  <div class="code-block" id="sql-result"></div>
+                </div>
+              </div>
+
+              <!-- Schema Query Form -->
+              <div class="tab-pane fade" id="schema-query" role="tabpanel" aria-labelledby="schema-query-tab">
+                <form id="schema-query-form">
+                  <div class="mb-3">
+                    <label for="schema-db-type" class="form-label">Database Type</label>
+                    <select class="form-select" id="schema-db-type">
+                      <option value="postgres" selected>PostgreSQL</option>
+                      <option value="mssql">SQL Server</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label for="schema-type" class="form-label">Schema Information Type</label>
+                    <select class="form-select" id="schema-type">
+                      <option value="full" selected>Full Schema</option>
+                      <option value="summary">Schema Summary</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label for="api-key-schema" class="form-label">API Key</label>
+                    <input type="password" class="form-control" id="api-key-schema" placeholder="Enter your API key">
+                  </div>
+                  <button type="submit" class="btn btn-primary">Get Schema</button>
+                </form>
+                <div class="mt-4" id="schema-result-container" style="display: none;">
+                  <h5>Schema Result</h5>
+                  <div class="code-block" id="schema-result"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="bg-dark text-light py-4 mt-5">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-6">
+          <h5>MCP Assessor Agent API</h5>
+          <p>A secure FastAPI intermediary service for efficient and safe database querying</p>
+        </div>
+        <div class="col-md-6 text-md-end">
+          <p>API Version: 1.0.0</p>
+          <p>© 2024 MCP Assessor</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Check API status
+      fetch('/api/health')
+        .then(response => response.json())
+        .then(data => {
+          const statusEl = document.getElementById('api-status');
+          if (data.status === 'success') {
+            statusEl.innerHTML = `
+              <div class="d-flex align-items-center">
+                <span class="badge bg-success me-2">Online</span>
+                <span>API is operational</span>
+              </div>
+              <div class="mt-2">
+                <small>Version: ${data.api_version || '1.0.0'}</small><br>
+                <small>Uptime: ${data.uptime ? Math.floor(data.uptime / 3600) + ' hours' : 'Unknown'}</small>
+              </div>
+            `;
+          } else {
+            statusEl.innerHTML = `
+              <div class="d-flex align-items-center">
+                <span class="badge bg-danger me-2">Offline</span>
+                <span>API is currently unavailable</span>
+              </div>
+            `;
+          }
+        })
+        .catch(error => {
+          document.getElementById('api-status').innerHTML = `
+            <div class="d-flex align-items-center">
+              <span class="badge bg-warning me-2">Unknown</span>
+              <span>Could not connect to API</span>
+            </div>
+          `;
+        });
+
+      // Form Submission Handlers
+      document.getElementById('nl-query-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const resultContainer = document.getElementById('nl-result-container');
+        const resultEl = document.getElementById('nl-result');
+        
+        resultContainer.style.display = 'block';
+        resultEl.innerHTML = '<div class="spinner-border text-light" role="status"><span class="visually-hidden">Loading...</span></div>';
+        
+        const prompt = document.getElementById('nl-prompt').value;
+        const dbType = document.getElementById('nl-db-type').value;
+        const includeSchema = document.getElementById('include-schema').checked;
+        const apiKey = document.getElementById('api-key-nl').value;
+        
+        if (!prompt) {
+          resultEl.innerHTML = '<div class="alert alert-danger">Please enter a prompt</div>';
+          return;
+        }
+        
+        if (!apiKey) {
+          resultEl.innerHTML = '<div class="alert alert-danger">Please enter an API key</div>';
+          return;
+        }
+        
+        fetch('/api/nl-to-sql', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': apiKey
+          },
+          body: JSON.stringify({
+            db: dbType,
+            prompt: prompt,
+            include_schema: includeSchema
+          })
+        })
+          .then(response => response.json())
+          .then(data => {
+            resultEl.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+          })
+          .catch(error => {
+            resultEl.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+          });
+      });
+      
+      document.getElementById('sql-query-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const resultContainer = document.getElementById('sql-result-container');
+        const resultEl = document.getElementById('sql-result');
+        
+        resultContainer.style.display = 'block';
+        resultEl.innerHTML = '<div class="spinner-border text-light" role="status"><span class="visually-hidden">Loading...</span></div>';
+        
+        const query = document.getElementById('sql-query-input').value;
+        const dbType = document.getElementById('sql-db-type').value;
+        const paramsStr = document.getElementById('sql-params').value;
+        const page = document.getElementById('sql-page').value;
+        const pageSize = document.getElementById('sql-page-size').value;
+        const apiKey = document.getElementById('api-key-sql').value;
+        
+        if (!query) {
+          resultEl.innerHTML = '<div class="alert alert-danger">Please enter a SQL query</div>';
+          return;
+        }
+        
+        if (!apiKey) {
+          resultEl.innerHTML = '<div class="alert alert-danger">Please enter an API key</div>';
+          return;
+        }
+        
+        let params = {};
+        if (paramsStr) {
+          try {
+            params = JSON.parse(paramsStr);
+          } catch (e) {
+            resultEl.innerHTML = '<div class="alert alert-danger">Invalid JSON in parameters</div>';
+            return;
+          }
+        }
+        
+        fetch('/api/run-query', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': apiKey
+          },
+          body: JSON.stringify({
+            db: dbType,
+            query: query,
+            params: params,
+            page: parseInt(page),
+            page_size: parseInt(pageSize)
+          })
+        })
+          .then(response => response.json())
+          .then(data => {
+            resultEl.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+          })
+          .catch(error => {
+            resultEl.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+          });
+      });
+      
+      document.getElementById('schema-query-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const resultContainer = document.getElementById('schema-result-container');
+        const resultEl = document.getElementById('schema-result');
+        
+        resultContainer.style.display = 'block';
+        resultEl.innerHTML = '<div class="spinner-border text-light" role="status"><span class="visually-hidden">Loading...</span></div>';
+        
+        const dbType = document.getElementById('schema-db-type').value;
+        const schemaType = document.getElementById('schema-type').value;
+        const apiKey = document.getElementById('api-key-schema').value;
+        
+        if (!apiKey) {
+          resultEl.innerHTML = '<div class="alert alert-danger">Please enter an API key</div>';
+          return;
+        }
+        
+        const endpoint = schemaType === 'summary' ? '/api/schema/summary' : '/api/schema';
+        
+        fetch(`${endpoint}?db=${dbType}`, {
+          method: 'GET',
+          headers: {
+            'X-API-Key': apiKey
+          }
+        })
+          .then(response => response.json())
+          .then(data => {
+            resultEl.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+          })
+          .catch(error => {
+            resultEl.innerHTML = `<div class="alert alert-danger">Error: ${error.message}</div>`;
+          });
+      });
+    });
+  </script>
 </body>
 </html>
