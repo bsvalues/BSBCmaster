@@ -40,7 +40,7 @@ async def index(request: Request):
         "current_year": datetime.now().year
     })
 
-@router.get("/api/health", response_model=HealthResponse)
+@router.get("/health", response_model=HealthResponse)
 async def health_check():
     """
     Check the health of the API and its database connections.
@@ -56,7 +56,7 @@ async def health_check():
     }
 
 @router.post(
-    "/api/run-query", 
+    "/run-query", 
     response_model=QueryResult,
     dependencies=[Depends(get_api_key)]
 )
@@ -118,7 +118,7 @@ async def run_sql_query(payload: SQLQuery):
         )
 
 @router.post(
-    "/api/nl-to-sql", 
+    "/nl-to-sql", 
     response_model=SQLTranslation,
     dependencies=[Depends(get_api_key)]
 )
@@ -162,7 +162,7 @@ async def nl_to_sql(prompt: NLPrompt):
         )
 
 @router.get(
-    "/api/discover-schema", 
+    "/discover-schema", 
     response_model=SchemaResponse,
     dependencies=[Depends(get_api_key)]
 )
@@ -241,7 +241,7 @@ async def discover_schema(db: str = Query(..., regex="^(mssql|postgres)$")):
         )
 
 @router.get(
-    "/api/schema-summary", 
+    "/schema-summary", 
     response_model=SchemaSummary,
     dependencies=[Depends(get_api_key)]
 )

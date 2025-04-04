@@ -5,8 +5,17 @@ This file provides a Flask application for documentation of the MCP Assessor Age
 import os
 import logging
 import asyncio
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect
 from datetime import datetime
+
+# Try importing FastAPI components
+try:
+    from fastapi import FastAPI
+    from fastapi.middleware.wsgi import WSGIMiddleware
+    FASTAPI_AVAILABLE = True
+except ImportError:
+    logging.warning("FastAPI imports not available, API documentation will be limited")
+    FASTAPI_AVAILABLE = False
 
 # Configure root logging
 logging.basicConfig(
@@ -56,12 +65,107 @@ def health_check():
         "db_connections": db_status
     })
 
-# Import the FastAPI app and create ASGI to WSGI adapter
-from asgi import app as fastapi_app
-from fastapi.middleware.wsgi import WSGIMiddleware
+# Create API documentation endpoint
 
-# Mount the FastAPI app on the Flask app at the /api path
-fastapi_app.mount("/flask", WSGIMiddleware(app))
+# Create documentation endpoint
+@app.route('/api/docs')
+def api_docs():
+    from app.db import test_db_connections
+    db_status = test_db_connections()
+    
+    # Create API documentation
+    api_endpoints = [
+        {
+            "path": "/api/health",
+            "method": "GET",
+            "description": "Check API health and database connections",
+            "parameters": [],
+            "responses": {
+                "200": {
+                    "description": "API health status",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "status": {"type": "string"},
+                            "db_connections": {
+                                "type": "object",
+                                "properties": {
+                                    "postgres": {"type": "boolean"},
+                                    "mssql": {"type": "boolean"}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "path": "/api/run-query",
+            "method": "POST",
+            "description": "Execute SQL query against specified database with pagination",
+            "parameters": {
+                "db": {"type": "string", "required": True, "description": "Database type (mssql or postgres)"},
+                "query": {"type": "string", "required": True, "description": "SQL query to execute"},
+                "page": {"type": "integer", "required": False, "description": "Page number for paginated results (starting from 1)"},
+                "page_size": {"type": "integer", "required": False, "description": "Number of records per page"}
+            },
+            "responses": {
+                "200": {"description": "Query results with pagination metadata"},
+                "400": {"description": "Bad request - invalid query or parameters"},
+                "500": {"description": "Database error"}
+            }
+        },
+        {
+            "path": "/api/nl-to-sql",
+            "method": "POST",
+            "description": "Convert natural language to SQL query",
+            "parameters": {
+                "db": {"type": "string", "required": True, "description": "Database type (mssql or postgres)"},
+                "prompt": {"type": "string", "required": True, "description": "Natural language prompt to convert to SQL"}
+            },
+            "responses": {
+                "200": {"description": "Translated SQL query"},
+                "400": {"description": "Bad request - missing parameters"},
+                "500": {"description": "Translation error"}
+            }
+        },
+        {
+            "path": "/api/discover-schema",
+            "method": "GET",
+            "description": "Discover database schema",
+            "parameters": {
+                "db": {"type": "string", "required": True, "description": "Database type (mssql or postgres)"}
+            },
+            "responses": {
+                "200": {"description": "Database schema information"},
+                "400": {"description": "Bad request - invalid parameters"},
+                "500": {"description": "Schema discovery error"}
+            }
+        },
+        {
+            "path": "/api/schema-summary",
+            "method": "GET",
+            "description": "Get a summarized view of the database schema",
+            "parameters": {
+                "db": {"type": "string", "required": True, "description": "Database type (mssql or postgres)"},
+                "prefix": {"type": "string", "required": False, "description": "Optional table name prefix to filter by"}
+            },
+            "responses": {
+                "200": {"description": "Schema summary information"},
+                "400": {"description": "Bad request - invalid parameters"},
+                "500": {"description": "Schema summary error"}
+            }
+        }
+    ]
+    
+    return jsonify({
+        "title": "MCP Assessor Agent API",
+        "version": "1.1.0",
+        "description": "API for executing SQL queries and exploring database schemas with robust security",
+        "endpoints": api_endpoints,
+        "status": "ok",
+        "db_connections": db_status
+    })
 
 # Initialize FastAPI endpoints
 @app.route('/api/run-query', methods=['POST'])

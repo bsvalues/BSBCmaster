@@ -6,6 +6,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check API health on page load
     updateDatabaseStatus();
     
+    // Set up refresh button listener
+    const refreshButton = document.getElementById('refresh-status');
+    if (refreshButton) {
+        refreshButton.addEventListener('click', updateDatabaseStatus);
+    }
+    
+    // Load API documentation if available
+    loadApiDocumentation();
+    
     // Set up periodic health checks
     setInterval(updateDatabaseStatus, 30000); // Every 30 seconds
 });
@@ -18,7 +27,7 @@ function updateDatabaseStatus() {
         .then(response => response.json())
         .then(data => {
             // Update overall status
-            const statusBadge = document.getElementById('status-badge');
+            const statusBadge = document.getElementById('api-status');
             if (data.status === 'ok') {
                 statusBadge.textContent = 'Healthy';
                 statusBadge.className = 'badge bg-success';
@@ -38,14 +47,51 @@ function updateDatabaseStatus() {
         })
         .catch(error => {
             console.error('Error checking API health:', error);
-            const statusBadge = document.getElementById('status-badge');
-            statusBadge.textContent = 'Error';
-            statusBadge.className = 'badge bg-danger';
+            const statusBadge = document.getElementById('api-status');
+            if (statusBadge) {
+                statusBadge.textContent = 'Error';
+                statusBadge.className = 'badge bg-danger';
+            }
             
-            const dbStatuses = document.querySelectorAll('#db-status .badge');
-            dbStatuses.forEach(badge => {
-                badge.textContent = 'Unknown';
-                badge.className = 'badge bg-secondary';
-            });
+            const postgresStatus = document.getElementById('postgres-status');
+            if (postgresStatus) {
+                postgresStatus.textContent = 'Unknown';
+                postgresStatus.className = 'badge bg-secondary';
+            }
+            
+            const mssqlStatus = document.getElementById('mssql-status');
+            if (mssqlStatus) {
+                mssqlStatus.textContent = 'Unknown';
+                mssqlStatus.className = 'badge bg-secondary';
+            }
+        });
+}
+
+/**
+ * Load API documentation from the /api/docs endpoint
+ */
+function loadApiDocumentation() {
+    fetch('/api/docs')
+        .then(response => response.json())
+        .then(data => {
+            // Update version
+            const versionBadge = document.querySelector('.badge.bg-info');
+            if (versionBadge && data.version) {
+                versionBadge.textContent = 'v' + data.version;
+            }
+            
+            // Update description
+            const descElement = document.querySelector('p.text-light-emphasis');
+            if (descElement && data.description) {
+                descElement.textContent = data.description;
+            }
+            
+            // If there are endpoints defined in the documentation
+            if (data.endpoints && Array.isArray(data.endpoints)) {
+                console.log('Found ' + data.endpoints.length + ' API endpoints in documentation');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading API documentation:', error);
         });
 }
