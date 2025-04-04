@@ -23,9 +23,9 @@ logger = logging.getLogger(__name__)
 # Check if API_KEY is set
 api_key = os.environ.get("API_KEY")
 if not api_key:
-    default_key = "mcp_assessor_api_default_key_2024_secure_random_token_987654321"
-    logger.warning(f"API_KEY not set. Using default value: {default_key}")
-    os.environ["API_KEY"] = default_key
+    custom_key = "b6212a0ff43102f608553e842293eba0ec013ff6926459f96fba31d0fabacd2e"
+    logger.warning(f"API_KEY not set. Using custom value: {custom_key[:8]}...")
+    os.environ["API_KEY"] = custom_key
 
 # Import models for database initialization
 import models

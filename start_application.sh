@@ -14,7 +14,7 @@ export FASTAPI_URL=http://localhost:8000
 
 # Set API_KEY if not already set
 if [ -z "$API_KEY" ]; then
-    export API_KEY=mcp_assessor_api_default_key_2024_secure_random_token_987654321
+    export API_KEY=b6212a0ff43102f608553e842293eba0ec013ff6926459f96fba31d0fabacd2e
 fi
 
 # Check if the database needs to be seeded
