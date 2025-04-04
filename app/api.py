@@ -138,22 +138,91 @@ async def nl_to_sql(prompt: NLPrompt):
     logger.info(f"Processing NL->SQL request: {prompt.prompt}")
     
     try:
-        # This would normally call an LLM service
-        # Simulated response for demonstration
-        if prompt.db == "postgres":
-            # Example implementation - in a real system, this would call an LLM
-            if "parcel" in prompt.prompt.lower() and "value" in prompt.prompt.lower():
-                simulated_sql = "SELECT * FROM parcels WHERE total_value > 500000 LIMIT 100"
+        # Import OpenAI service
+        from .openai_service import openai_service
+        
+        # Check if OpenAI service is available
+        if not openai_service.is_available():
+            logger.warning("OpenAI service not available, falling back to simulated response")
+            # Fallback to simulated response
+            if prompt.db == "postgres":
+                if "parcel" in prompt.prompt.lower() and "value" in prompt.prompt.lower():
+                    simulated_sql = "SELECT * FROM parcels WHERE total_value > 500000 LIMIT 100"
+                else:
+                    simulated_sql = f"SELECT * FROM properties LIMIT 50"
             else:
-                simulated_sql = f"SELECT * FROM properties LIMIT 50"
+                simulated_sql = f"SELECT TOP 50 * FROM properties"
+            
+            return {
+                "status": "success", 
+                "sql": simulated_sql
+            }
+        
+        # Get schema information to help OpenAI generate better SQL
+        schema_info = {}
+        try:
+            # Fetch schema information for the specified database
+            if prompt.db == "postgres":
+                query = """
+                    SELECT table_name, column_name, data_type 
+                    FROM information_schema.columns 
+                    WHERE table_schema = 'public'
+                """
+                schema_result = execute_parameterized_query(prompt.db, query, page=1, page_size=1000)
+                
+                # Organize schema by table
+                tables = {}
+                for row in schema_result["data"]:
+                    table_name = row["table_name"]
+                    if table_name not in tables:
+                        tables[table_name] = []
+                    tables[table_name].append({
+                        "column_name": row["column_name"],
+                        "data_type": row["data_type"]
+                    })
+                schema_info["tables"] = tables
+            
+            elif prompt.db == "mssql":
+                query = """
+                    SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE 
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                """
+                schema_result = execute_parameterized_query(prompt.db, query, page=1, page_size=1000)
+                
+                # Organize schema by table
+                tables = {}
+                for row in schema_result["data"]:
+                    table_name = row["TABLE_NAME"]
+                    if table_name not in tables:
+                        tables[table_name] = []
+                    tables[table_name].append({
+                        "column_name": row["COLUMN_NAME"],
+                        "data_type": row["DATA_TYPE"]
+                    })
+                schema_info["tables"] = tables
+                
+        except Exception as e:
+            logger.warning(f"Failed to fetch schema for NL to SQL: {str(e)}")
+            # Continue without schema information
+        
+        # Call OpenAI service to translate natural language to SQL
+        sql_query = openai_service.nl_to_sql(prompt.prompt, prompt.db, schema_info)
+        
+        if sql_query:
+            return {
+                "status": "success", 
+                "sql": sql_query
+            }
         else:
-            simulated_sql = f"SELECT TOP 50 * FROM properties"
+            # If translation failed, return error
+            raise HTTPException(
+                status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to translate natural language to SQL. Please try rephrasing your question."
+            )
         
-        return {
-            "status": "success", 
-            "sql": simulated_sql
-        }
-        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"Error in NL->SQL processing: {str(e)}")
         raise HTTPException(

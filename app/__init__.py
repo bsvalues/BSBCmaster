@@ -36,6 +36,21 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     async def startup_db_clients():
         await initialize_db()
+        
+        # Initialize OpenAI service
+        try:
+            from .openai_service import openai_service
+            if not openai_service.is_available():
+                logger.warning("OpenAI service not initialized. Natural language to SQL conversion will use simulated responses.")
+                if not openai_service.api_key:
+                    logger.warning("OPENAI_API_KEY environment variable is not set.")
+                    logger.info("Set OPENAI_API_KEY environment variable to enable natural language to SQL functionality.")
+            else:
+                logger.info("OpenAI service initialized successfully")
+        except ImportError as e:
+            logger.warning(f"Failed to import OpenAI service: {e}")
+        except Exception as e:
+            logger.warning(f"Error initializing OpenAI service: {e}")
     
     @app.on_event("shutdown")
     async def shutdown_db_clients():
