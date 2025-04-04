@@ -128,6 +128,7 @@ def execute_parameterized_query(
     if params is None:
         params = []
     
+    # Safety check for query content
     if not is_safe_query(query):
         logger.warning(f"Unsafe SQL query attempted: {query}")
         raise HTTPException(
@@ -138,6 +139,20 @@ def execute_parameterized_query(
     results = []
     
     try:
+        # Convert query placeholders based on database type
+        if db == "postgres" and "?" in query and params:
+            # Convert ? placeholders to %s for PostgreSQL
+            # Note: This is a simple replacement - for a real app, use a proper SQL parser
+            pg_query = query.replace("?", "%s")
+            logger.debug(f"Converted placeholders for PostgreSQL: {pg_query}")
+            query = pg_query
+        elif db == "mssql" and "%s" in query and params:
+            # Convert %s placeholders to ? for MSSQL
+            ms_query = query.replace("%s", "?")
+            logger.debug(f"Converted placeholders for MSSQL: {ms_query}")
+            query = ms_query
+        
+        # Execute the query with parameters based on database type
         if db == "mssql":
             with get_mssql_connection() as conn:
                 cursor = conn.cursor()
@@ -146,20 +161,37 @@ def execute_parameterized_query(
                     rows = cursor.fetchall()
                     columns = [column[0] for column in cursor.description]
                     results = [dict(zip(columns, row)) for row in rows]
+                    
+                    # For INSERT/UPDATE/DELETE that doesn't return rows but has an impact
+                    if not results and cursor.rowcount > 0:
+                        results = [{"affected_rows": cursor.rowcount}]
                 
         elif db == "postgres":
             with get_postgres_connection() as conn:
                 with conn.cursor() as cursor:
+                    # For PostgreSQL with parameters as a list (not tuple)
                     cursor.execute(query, params)
-                    if cursor.description:  # Check if the query returns results
+                    
+                    # Check if the query returns results
+                    if cursor.description:  
                         rows = cursor.fetchall()
                         columns = [desc[0] for desc in cursor.description]
                         results = [dict(zip(columns, row)) for row in rows]
+                    
+                    # For INSERT/UPDATE/DELETE that doesn't return rows but has an impact
+                    elif cursor.rowcount > 0:
+                        results = [{"affected_rows": cursor.rowcount}]
+                        
+                # Commit changes if this is a modification operation
+                if not query.strip().upper().startswith("SELECT"):
+                    conn.commit()
+                    logger.info(f"Changes committed to PostgreSQL database")
         
         return results
         
     except Exception as e:
         logger.error(f"Database error during parameterized query execution: {str(e)}")
+        # Log the full error for debugging but don't expose it to clients
         # Sanitize error message to avoid exposing sensitive info
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
@@ -169,7 +201,7 @@ def execute_parameterized_query(
 def parse_for_parameters(query: str) -> Tuple[str, List[Any]]:
     """
     Parse a raw SQL query to extract potential parameters.
-    This is a basic implementation that handles common SQL literals.
+    This implementation handles common SQL literals including strings and numbers.
     
     Args:
         query: Raw SQL query with potential literal values
@@ -179,60 +211,100 @@ def parse_for_parameters(query: str) -> Tuple[str, List[Any]]:
             - Modified query with parameter placeholders
             - List of extracted parameter values
     """
-    # This implementation handles common SQL injection patterns, but 
-    # in a production environment, consider using a proper SQL parser library
+    # This enhanced implementation handles both string and numeric parameters
+    # while still avoiding table/column names and SQL keywords
     
-    # This regex will match:
-    # 1. Strings in single quotes
-    # 2. Numbers (integer and decimal)
-    # But will avoid:
-    # - Table names and column names
-    # - SQL keywords and functions
-    # - Comments
+    # First, remove SQL comments to avoid false positives
+    cleaned_query = re.sub(r'--.*?$', '', query, flags=re.MULTILINE)
+    cleaned_query = re.sub(r'/\*.*?\*/', '', cleaned_query, flags=re.DOTALL)
     
-    # Static patterns to ignore (common SQL keywords that might appear in WHERE clauses)
-    skip_patterns = [
-        r'SELECT\s+', r'FROM\s+', r'WHERE\s+', r'GROUP\s+BY', r'ORDER\s+BY',
-        r'HAVING\s+', r'JOIN\s+', r'LIMIT\s+', r'OFFSET\s+', r'AS\s+',
-        r'AND\s+', r'OR\s+', r'NOT\s+', r'IS\s+NULL', r'IS\s+NOT\s+NULL',
-        r'IN\s+\(', r'BETWEEN\s+', r'LIKE\s+', r'ILIKE\s+',
-        r'COUNT\s*\(', r'SUM\s*\(', r'AVG\s*\(', r'MIN\s*\(', r'MAX\s*\(',
-        r'DISTINCT\s+', r'UNION\s+', r'INTERSECT\s+', r'EXCEPT\s+'
-    ]
+    # Store all parameters we find
+    all_params = []
+    modified_query = cleaned_query
     
-    # Create a temp copy to avoid modifying the original too soon
-    processed_query = query
+    # Track positions to adjust offsets as we replace
+    offset_adjustment = 0
     
-    # Remove comments
-    processed_query = re.sub(r'--.*?$', '', processed_query, flags=re.MULTILINE)
-    processed_query = re.sub(r'/\*.*?\*/', '', processed_query, flags=re.DOTALL)
+    # 1. Extract and replace string literals (handle both single and double quotes)
+    # Note: This doesn't handle escaped quotes within strings - a more robust parser would
+    string_pattern = r"'([^']*)'|\"([^\"]*)\""
     
-    # Skip obvious SQL keywords
-    for pattern in skip_patterns:
-        processed_query = re.sub(pattern, ' SKIP ', processed_query, flags=re.IGNORECASE)
+    string_matches = list(re.finditer(string_pattern, cleaned_query))
     
-    # Extract string literals (single-quoted)
-    string_params = []
-    string_pattern = r"'([^']*)'"
+    for match in string_matches:
+        # Get the matched string and its group (either group 1 or 2 will have the content)
+        param_value = match.group(1) if match.group(1) is not None else match.group(2)
+        all_params.append(param_value)
+        
+        # Calculate position in the modified query
+        start_pos = match.start() - offset_adjustment
+        end_pos = match.end() - offset_adjustment
+        
+        # Replace with placeholder in modified query
+        old_length = end_pos - start_pos
+        modified_query = modified_query[:start_pos] + "?" + modified_query[end_pos:]
+        
+        # Update offset adjustment
+        offset_adjustment += old_length - 1  # -1 for the "?" we inserted
     
-    for match in re.finditer(string_pattern, processed_query):
-        string_params.append(match.group(1))
+    # 2. Now extract numeric parameters as well (only in WHERE, HAVING clauses to avoid table aliases)
+    # First, identify WHERE and HAVING clauses
+    where_clause_matches = list(re.finditer(r'\bWHERE\b|\bHAVING\b|\bON\b', modified_query, re.IGNORECASE))
     
-    # Replace quoted strings with placeholders
-    modified_query = re.sub(string_pattern, '?', query) if string_params else query
+    if where_clause_matches:
+        # Get the position of the first WHERE/HAVING/ON
+        condition_start = where_clause_matches[0].start()
+        condition_section = modified_query[condition_start:]
+        
+        # Look for numeric values in conditions (avoid capturing things like LIMIT 10)
+        # Match numbers in comparison operations
+        number_pattern = r'(=|>|<|>=|<=|!=|<>)\s*(-?\d+(?:\.\d+)?)\b(?!\s*\()'
+        
+        number_matches = list(re.finditer(number_pattern, condition_section))
+        
+        # Track a separate offset adjustment for the condition section
+        condition_offset_adjustment = 0
+        
+        for match in number_matches:
+            operator = match.group(1)
+            number_value = match.group(2)
+            
+            # Try to convert to appropriate numeric type
+            try:
+                if '.' in number_value:
+                    param_value = float(number_value)
+                else:
+                    param_value = int(number_value)
+                
+                all_params.append(param_value)
+                
+                # Calculate position in the modified condition section
+                value_start = match.start(2) - condition_offset_adjustment
+                value_end = match.end(2) - condition_offset_adjustment
+                
+                # Replace with placeholder in modified condition section
+                value_length = value_end - value_start
+                condition_section = (condition_section[:value_start] + 
+                                    "?" + 
+                                    condition_section[value_end:])
+                
+                # Update the condition offset adjustment
+                condition_offset_adjustment += value_length - 1
+            except ValueError:
+                # Skip if we can't parse the number for any reason
+                continue
+        
+        # Reconstruct the full query with the modified condition section
+        modified_query = modified_query[:condition_start] + condition_section
     
-    # For simplicity, we're only handling string parameters in this implementation
-    # In a real implementation, you'd also handle numeric parameters and other types
-    
-    # Check if we actually made any changes
-    if modified_query == query and not string_params:
-        # No changes made, just return original
+    # If no parameters were extracted, return the original query
+    if not all_params:
         return query, []
     
     logger.info(f"Parameterized query: {modified_query}")
-    logger.info(f"Parameters extracted: {string_params}")
+    logger.info(f"Parameters extracted: {all_params}")
     
-    return modified_query, string_params
+    return modified_query, all_params
 
 def test_db_connections() -> Dict[str, bool]:
     """Test connections to configured databases."""
