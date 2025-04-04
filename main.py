@@ -44,28 +44,13 @@ from flask import Flask, render_template, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 
-# Database setup
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
-app = Flask(__name__)
-
-# Configure the database connection
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", os.urandom(24))
-
-# Initialize the app with the extension
-db.init_app(app)
+# Import app and db from app_setup (already configured)
+from app_setup import app, db
 
 # Import models for database initialization
 from models import Parcel, Property, Sale
 
-# Create database tables
+# Ensure database tables are created
 with app.app_context():
     try:
         db.create_all()

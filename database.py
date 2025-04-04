@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 FASTAPI_URL = os.environ.get("FASTAPI_URL", "http://localhost:8000")
 
 # Get db instance from app_setup
-from app_setup import db
+from app_setup import db, app
 
 # Create a Blueprint for database-related routes
 database_bp = Blueprint('database', __name__)
@@ -27,14 +27,14 @@ def index():
     """Render the index page with API documentation."""
     return render_template('index.html', title="MCP Assessor Agent API")
 
-@app.route('/api-docs')
+@database_bp.route('/api-docs')
 def api_docs():
     """Proxy to FastAPI OpenAPI documentation."""
     return render_template('api_docs.html', 
-                           fastapi_url=FASTAPI_URL,
-                           title="API Documentation")
+                         fastapi_url=FASTAPI_URL,
+                         title="API Documentation")
 
-@app.route('/openapi.json')
+@database_bp.route('/openapi.json')
 def openapi_schema():
     """Proxy to FastAPI OpenAPI schema."""
     try:
@@ -44,7 +44,7 @@ def openapi_schema():
         logger.error(f"Error fetching OpenAPI schema: {str(e)}")
         return jsonify({"error": "Failed to fetch OpenAPI schema"}), 500
 
-@app.route('/api/health')
+@database_bp.route('/api/health')
 def health_check():
     """Check the health of the API and its database connections."""
     try:
@@ -55,19 +55,18 @@ def health_check():
         # Check database connection through SQLAlchemy
         db_ok = False
         try:
-            with app.app_context():
-                # Execute a simple query to test the connection
-                db.session.execute('SELECT 1')
-                db_ok = True
+            # Execute a simple query to test the connection
+            db.session.execute('SELECT 1')
+            db_ok = True
         except Exception as e:
             logger.error(f"Database connection error: {str(e)}")
         
         result = {
-            "status": "success" if api_health["status"] == "success" and db_ok else "error",
+            "status": "success" if api_health.get("status") == "healthy" and db_ok else "error",
             "message": "API and database are operational" if db_ok else "Database connection issue",
             "database_status": {
                 "flask_db": db_ok,
-                **api_health["database_status"]
+                "api_status": api_health.get("status", "error")
             },
             "timestamp": datetime.datetime.utcnow().isoformat()
         }
@@ -82,7 +81,7 @@ def health_check():
             "timestamp": datetime.datetime.utcnow().isoformat()
         }), 500
 
-@app.route('/api/parcels')
+@database_bp.route('/api/parcels')
 def get_parcels():
     """Get a list of parcels with optional filtering."""
     try:
@@ -91,41 +90,40 @@ def get_parcels():
         state = request.args.get('state')
         year = request.args.get('year')
         
-        # Build query based on filters
-        with app.app_context():
-            from models import Parcel
-            
-            query = db.session.query(Parcel)
-            
-            if city:
-                query = query.filter(Parcel.city.ilike(f"%{city}%"))
-            if state:
-                query = query.filter(Parcel.state == state)
-            if year:
-                query = query.filter(Parcel.assessment_year == int(year))
-            
-            # Execute query
-            parcels = query.limit(100).all()
-            
-            # Convert to JSON-serializable format
-            result = []
-            for parcel in parcels:
-                result.append({
-                    "id": parcel.id,
-                    "parcel_id": parcel.parcel_id,
-                    "address": parcel.address,
-                    "city": parcel.city,
-                    "state": parcel.state,
-                    "zip_code": parcel.zip_code,
-                    "total_value": float(parcel.total_value),
-                    "assessment_year": parcel.assessment_year
-                })
-            
-            return jsonify({
-                "status": "success",
-                "count": len(result),
-                "data": result
+        # Import models
+        from models import Parcel
+        
+        query = db.session.query(Parcel)
+        
+        if city:
+            query = query.filter(Parcel.city.ilike(f"%{city}%"))
+        if state:
+            query = query.filter(Parcel.state == state)
+        if year:
+            query = query.filter(Parcel.assessment_year == int(year))
+        
+        # Execute query
+        parcels = query.limit(100).all()
+        
+        # Convert to JSON-serializable format
+        result = []
+        for parcel in parcels:
+            result.append({
+                "id": parcel.id,
+                "parcel_id": parcel.parcel_id,
+                "address": parcel.address,
+                "city": parcel.city,
+                "state": parcel.state,
+                "zip_code": parcel.zip_code,
+                "total_value": float(parcel.total_value),
+                "assessment_year": parcel.assessment_year
             })
+        
+        return jsonify({
+            "status": "success",
+            "count": len(result),
+            "data": result
+        })
     except Exception as e:
         logger.error(f"Error fetching parcels: {str(e)}")
         return jsonify({
@@ -133,83 +131,82 @@ def get_parcels():
             "message": f"Failed to fetch parcels: {str(e)}"
         }), 500
 
-@app.route('/api/parcels/<parcel_id>')
+@database_bp.route('/api/parcels/<parcel_id>')
 def get_parcel(parcel_id):
     """Get detailed information about a specific parcel."""
     try:
-        with app.app_context():
-            from models import Parcel, Property, Sale
-            
-            # Find the parcel
-            parcel = db.session.query(Parcel).filter(Parcel.parcel_id == parcel_id).first()
-            
-            if not parcel:
-                return jsonify({
-                    "status": "error",
-                    "message": f"Parcel with ID {parcel_id} not found"
-                }), 404
-            
-            # Get related property details
-            property_details = db.session.query(Property).filter(Property.parcel_id == parcel.id).all()
-            properties = []
-            for prop in property_details:
-                properties.append({
-                    "id": prop.id,
-                    "property_type": prop.property_type,
-                    "year_built": prop.year_built,
-                    "square_footage": prop.square_footage,
-                    "bedrooms": prop.bedrooms,
-                    "bathrooms": prop.bathrooms,
-                    "lot_size": prop.lot_size,
-                    "lot_size_unit": prop.lot_size_unit,
-                    "stories": prop.stories,
-                    "condition": prop.condition,
-                    "quality": prop.quality,
-                    "tax_district": prop.tax_district,
-                    "zoning": prop.zoning
-                })
-            
-            # Get sales history
-            sales_history = db.session.query(Sale).filter(Sale.parcel_id == parcel.id).all()
-            sales = []
-            for sale in sales_history:
-                sales.append({
-                    "id": sale.id,
-                    "sale_date": sale.sale_date.isoformat(),
-                    "sale_price": float(sale.sale_price),
-                    "sale_type": sale.sale_type,
-                    "transaction_id": sale.transaction_id,
-                    "buyer_name": sale.buyer_name,
-                    "seller_name": sale.seller_name,
-                    "financing_type": sale.financing_type
-                })
-            
-            # Build detailed response
-            result = {
-                "parcel": {
-                    "id": parcel.id,
-                    "parcel_id": parcel.parcel_id,
-                    "address": parcel.address,
-                    "city": parcel.city,
-                    "state": parcel.state,
-                    "zip_code": parcel.zip_code,
-                    "land_value": float(parcel.land_value),
-                    "improvement_value": float(parcel.improvement_value),
-                    "total_value": float(parcel.total_value),
-                    "assessment_year": parcel.assessment_year,
-                    "latitude": parcel.latitude,
-                    "longitude": parcel.longitude,
-                    "created_at": parcel.created_at.isoformat(),
-                    "updated_at": parcel.updated_at.isoformat()
-                },
-                "properties": properties,
-                "sales_history": sales
-            }
-            
+        from models import Parcel, Property, Sale
+        
+        # Find the parcel
+        parcel = db.session.query(Parcel).filter(Parcel.parcel_id == parcel_id).first()
+        
+        if not parcel:
             return jsonify({
-                "status": "success",
-                "data": result
+                "status": "error",
+                "message": f"Parcel with ID {parcel_id} not found"
+            }), 404
+        
+        # Get related property details
+        property_details = db.session.query(Property).filter(Property.parcel_id == parcel.id).all()
+        properties = []
+        for prop in property_details:
+            properties.append({
+                "id": prop.id,
+                "property_type": prop.property_type,
+                "year_built": prop.year_built,
+                "square_footage": prop.square_footage,
+                "bedrooms": prop.bedrooms,
+                "bathrooms": prop.bathrooms,
+                "lot_size": prop.lot_size,
+                "lot_size_unit": prop.lot_size_unit,
+                "stories": prop.stories,
+                "condition": prop.condition,
+                "quality": prop.quality,
+                "tax_district": prop.tax_district,
+                "zoning": prop.zoning
             })
+        
+        # Get sales history
+        sales_history = db.session.query(Sale).filter(Sale.parcel_id == parcel.id).all()
+        sales = []
+        for sale in sales_history:
+            sales.append({
+                "id": sale.id,
+                "sale_date": sale.sale_date.isoformat(),
+                "sale_price": float(sale.sale_price),
+                "sale_type": sale.sale_type,
+                "transaction_id": sale.transaction_id,
+                "buyer_name": sale.buyer_name,
+                "seller_name": sale.seller_name,
+                "financing_type": sale.financing_type
+            })
+        
+        # Build detailed response
+        result = {
+            "parcel": {
+                "id": parcel.id,
+                "parcel_id": parcel.parcel_id,
+                "address": parcel.address,
+                "city": parcel.city,
+                "state": parcel.state,
+                "zip_code": parcel.zip_code,
+                "land_value": float(parcel.land_value),
+                "improvement_value": float(parcel.improvement_value),
+                "total_value": float(parcel.total_value),
+                "assessment_year": parcel.assessment_year,
+                "latitude": parcel.latitude,
+                "longitude": parcel.longitude,
+                "created_at": parcel.created_at.isoformat(),
+                "updated_at": parcel.updated_at.isoformat()
+            },
+            "properties": properties,
+            "sales_history": sales
+        }
+        
+        return jsonify({
+            "status": "success",
+            "data": result
+        })
     except Exception as e:
         logger.error(f"Error fetching parcel details: {str(e)}")
         return jsonify({
@@ -217,7 +214,7 @@ def get_parcel(parcel_id):
             "message": f"Failed to fetch parcel details: {str(e)}"
         }), 500
 
-@app.route('/api/schema')
+@database_bp.route('/api/schema')
 def get_schema():
     """Get database schema details for parcels, properties, and sales tables."""
     try:
@@ -295,7 +292,7 @@ def get_schema():
         }), 500
 
 # Proxy routes for FastAPI endpoints
-@app.route('/api/run-query', methods=['POST'])
+@database_bp.route('/api/run-query', methods=['POST'])
 def proxy_run_query():
     """Proxy for the FastAPI run-query endpoint."""
     try:
@@ -319,7 +316,7 @@ def proxy_run_query():
             "message": f"Failed to proxy request: {str(e)}"
         }), 500
 
-@app.route('/api/nl-to-sql', methods=['POST'])
+@database_bp.route('/api/nl-to-sql', methods=['POST'])
 def proxy_nl_to_sql():
     """Proxy for the FastAPI natural language to SQL endpoint."""
     try:
@@ -343,7 +340,7 @@ def proxy_nl_to_sql():
             "message": f"Failed to proxy request: {str(e)}"
         }), 500
 
-@app.route('/api/discover-schema')
+@database_bp.route('/api/discover-schema')
 def proxy_discover_schema():
     """Proxy for the FastAPI schema discovery endpoint."""
     try:
@@ -366,7 +363,7 @@ def proxy_discover_schema():
             "message": f"Failed to proxy request: {str(e)}"
         }), 500
 
-@app.route('/api/schema-summary')
+@database_bp.route('/api/schema-summary')
 def proxy_schema_summary():
     """Proxy for the FastAPI schema summary endpoint."""
     try:
@@ -389,7 +386,7 @@ def proxy_schema_summary():
             "message": f"Failed to proxy request: {str(e)}"
         }), 500
 
-@app.route('/api/parameterized-query', methods=['POST'])
+@database_bp.route('/api/parameterized-query', methods=['POST'])
 def proxy_parameterized_query():
     """Proxy for the FastAPI parameterized query endpoint."""
     try:
@@ -412,16 +409,3 @@ def proxy_parameterized_query():
             "status": "error",
             "message": f"Failed to proxy request: {str(e)}"
         }), 500
-
-# Initialize models and create tables
-# Tables are now initialized in main.py
-# This function is kept for compatibility but is not used
-with app.app_context():
-    @app.before_request
-    def initialize_database():
-        """Initialize database tables before first request."""
-        # Use function attribute to track if tables have been created
-        if not getattr(initialize_database, 'tables_created', False):
-            db.create_all()
-            app.logger.info("Database tables created successfully")
-            initialize_database.tables_created = True
