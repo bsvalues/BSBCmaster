@@ -1,237 +1,216 @@
-import os
+"""
+This module provides the Flask routes for the MCP Assessor Agent API database interface.
+"""
+
 import datetime
-from flask import Flask, render_template, jsonify, request
-from flask_sqlalchemy import SQLAlchemy
-from flask_cors import CORS
-
-# Initialize the Flask application
-app = Flask(__name__)
-CORS(app)  # Enable CORS
-
-# Configure the app settings
-app.secret_key = os.environ.get("SESSION_SECRET", "dev_secret_key")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-    "connect_args": {"sslmode": "prefer"},
-}
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-# Initialize the SQLAlchemy extension
-db = SQLAlchemy(app)
-
-# Import necessary modules for proxying
+import json
+import os
+import logging
 import requests
-from flask import jsonify, render_template, request, Response, stream_with_context
+from flask import render_template, request, jsonify, Blueprint
 
-# Define routes
+from app_setup import app, db, FASTAPI_URL
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Blueprint for database-related routes
+database_bp = Blueprint('database', __name__)
+
 @app.route('/')
 def index():
     """Render the index page with API documentation."""
-    context = {
-        'title': 'MCP Assessor Agent API',
-        'version': '1.0.0',
-        'description': 'A secure FastAPI intermediary service for efficient and safe database querying across multiple database systems, with a focus on real estate property data management and analysis.',
-        'api_key_header': 'X-API-Key',
-        'base_url': request.host_url.rstrip('/')
-    }
-    return render_template('index.html', **context)
+    return render_template('index.html', title="MCP Assessor Agent API")
 
-# Proxy route to FastAPI for documentation
-@app.route('/api/docs')
-@app.route('/api/docs/')
+@app.route('/api-docs')
 def api_docs():
     """Proxy to FastAPI OpenAPI documentation."""
-    fastapi_url = "http://0.0.0.0:8000/api/docs"
-    try:
-        response = requests.get(fastapi_url)
-        return Response(
-            response.content,
-            status=response.status_code,
-            content_type=response.headers.get('Content-Type', 'text/html')
-        )
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": "FastAPI service unavailable", "details": str(e)}), 503
+    return render_template('api_docs.html', 
+                           fastapi_url=FASTAPI_URL,
+                           title="API Documentation")
 
-# Proxy route to FastAPI's OpenAPI schema
-@app.route('/api/openapi.json')
+@app.route('/openapi.json')
 def openapi_schema():
     """Proxy to FastAPI OpenAPI schema."""
-    fastapi_url = "http://0.0.0.0:8000/api/openapi.json"
     try:
-        response = requests.get(fastapi_url)
-        return Response(
-            response.content,
-            status=response.status_code,
-            content_type=response.headers.get('Content-Type', 'application/json')
-        )
-    except requests.exceptions.RequestException:
-        # If FastAPI isn't available, return a minimal schema
-        return jsonify({
-            "openapi": "3.0.2",
-            "info": {
-                "title": "MCP Assessor Agent API",
-                "version": "1.0.0", 
-                "description": "API service is currently unavailable. Please try again later."
-            },
-            "paths": {}
-        })
+        response = requests.get(f"{FASTAPI_URL}/openapi.json")
+        return jsonify(response.json())
+    except Exception as e:
+        logger.error(f"Error fetching OpenAPI schema: {str(e)}")
+        return jsonify({"error": "Failed to fetch OpenAPI schema"}), 500
 
 @app.route('/api/health')
 def health_check():
     """Check the health of the API and its database connections."""
-    # Check database connection
-    db_healthy = True
     try:
-        # Execute a simple query
-        db.session.execute('SELECT 1')
-    except Exception as e:
-        db_healthy = False
-    
-    return jsonify({
-        'status': 'success' if db_healthy else 'error',
-        'message': 'API is running',
-        'database_status': {
-            'postgres': db_healthy
+        # Check FastAPI health
+        response = requests.get(f"{FASTAPI_URL}/health")
+        api_health = response.json()
+        
+        # Check database connection through SQLAlchemy
+        db_ok = False
+        try:
+            with app.app_context():
+                # Execute a simple query to test the connection
+                db.session.execute('SELECT 1')
+                db_ok = True
+        except Exception as e:
+            logger.error(f"Database connection error: {str(e)}")
+        
+        result = {
+            "status": "success" if api_health["status"] == "success" and db_ok else "error",
+            "message": "API and database are operational" if db_ok else "Database connection issue",
+            "database_status": {
+                "flask_db": db_ok,
+                **api_health["database_status"]
+            },
+            "timestamp": datetime.datetime.utcnow().isoformat()
         }
-    })
+        
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Health check error: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Health check failed: {str(e)}",
+            "database_status": {"flask_db": False},
+            "timestamp": datetime.datetime.utcnow().isoformat()
+        }), 500
 
 @app.route('/api/parcels')
 def get_parcels():
     """Get a list of parcels with optional filtering."""
     try:
-        # Get query parameters for filtering
+        # Extract query parameters
         city = request.args.get('city')
         state = request.args.get('state')
-        min_value = request.args.get('min_value', type=float)
-        max_value = request.args.get('max_value', type=float)
+        year = request.args.get('year')
         
-        # Start with base query
-        query = Parcel.query
-        
-        # Apply filters if provided
-        if city:
-            query = query.filter(Parcel.city == city)
-        if state:
-            query = query.filter(Parcel.state == state)
-        if min_value:
-            query = query.filter(Parcel.total_value >= min_value)
-        if max_value:
-            query = query.filter(Parcel.total_value <= max_value)
-        
-        # Get pagination parameters
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-        
-        # Execute paginated query
-        paginated = query.paginate(page=page, per_page=per_page)
-        
-        # Format results
-        results = []
-        for parcel in paginated.items:
-            results.append({
-                'id': parcel.id,
-                'parcel_id': parcel.parcel_id,
-                'address': parcel.address,
-                'city': parcel.city,
-                'state': parcel.state,
-                'zip_code': parcel.zip_code,
-                'total_value': float(parcel.total_value),
-                'assessment_year': parcel.assessment_year,
-                'latitude': parcel.latitude,
-                'longitude': parcel.longitude
+        # Build query based on filters
+        with app.app_context():
+            from models import Parcel
+            
+            query = db.session.query(Parcel)
+            
+            if city:
+                query = query.filter(Parcel.city.ilike(f"%{city}%"))
+            if state:
+                query = query.filter(Parcel.state == state)
+            if year:
+                query = query.filter(Parcel.assessment_year == int(year))
+            
+            # Execute query
+            parcels = query.limit(100).all()
+            
+            # Convert to JSON-serializable format
+            result = []
+            for parcel in parcels:
+                result.append({
+                    "id": parcel.id,
+                    "parcel_id": parcel.parcel_id,
+                    "address": parcel.address,
+                    "city": parcel.city,
+                    "state": parcel.state,
+                    "zip_code": parcel.zip_code,
+                    "total_value": float(parcel.total_value),
+                    "assessment_year": parcel.assessment_year
+                })
+            
+            return jsonify({
+                "status": "success",
+                "count": len(result),
+                "data": result
             })
-        
-        # Return response with pagination metadata
-        return jsonify({
-            'status': 'success',
-            'data': results,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total_items': paginated.total,
-                'total_pages': paginated.pages,
-                'has_next': paginated.has_next,
-                'has_prev': paginated.has_prev
-            }
-        })
     except Exception as e:
+        logger.error(f"Error fetching parcels: {str(e)}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            "status": "error",
+            "message": f"Failed to fetch parcels: {str(e)}"
         }), 500
 
-@app.route('/api/parcels/<int:parcel_id>')
+@app.route('/api/parcels/<parcel_id>')
 def get_parcel(parcel_id):
     """Get detailed information about a specific parcel."""
     try:
-        # Get the parcel by ID
-        parcel = Parcel.query.get_or_404(parcel_id)
-        
-        # Format property details
-        property_details = []
-        for prop in parcel.property_details:
-            property_details.append({
-                'id': prop.id,
-                'property_type': prop.property_type,
-                'year_built': prop.year_built,
-                'square_footage': prop.square_footage,
-                'bedrooms': prop.bedrooms,
-                'bathrooms': prop.bathrooms,
-                'lot_size': prop.lot_size,
-                'lot_size_unit': prop.lot_size_unit,
-                'condition': prop.condition,
-                'quality': prop.quality,
-                'tax_district': prop.tax_district,
-                'zoning': prop.zoning
+        with app.app_context():
+            from models import Parcel, Property, Sale
+            
+            # Find the parcel
+            parcel = db.session.query(Parcel).filter(Parcel.parcel_id == parcel_id).first()
+            
+            if not parcel:
+                return jsonify({
+                    "status": "error",
+                    "message": f"Parcel with ID {parcel_id} not found"
+                }), 404
+            
+            # Get related property details
+            property_details = db.session.query(Property).filter(Property.parcel_id == parcel.id).all()
+            properties = []
+            for prop in property_details:
+                properties.append({
+                    "id": prop.id,
+                    "property_type": prop.property_type,
+                    "year_built": prop.year_built,
+                    "square_footage": prop.square_footage,
+                    "bedrooms": prop.bedrooms,
+                    "bathrooms": prop.bathrooms,
+                    "lot_size": prop.lot_size,
+                    "lot_size_unit": prop.lot_size_unit,
+                    "stories": prop.stories,
+                    "condition": prop.condition,
+                    "quality": prop.quality,
+                    "tax_district": prop.tax_district,
+                    "zoning": prop.zoning
+                })
+            
+            # Get sales history
+            sales_history = db.session.query(Sale).filter(Sale.parcel_id == parcel.id).all()
+            sales = []
+            for sale in sales_history:
+                sales.append({
+                    "id": sale.id,
+                    "sale_date": sale.sale_date.isoformat(),
+                    "sale_price": float(sale.sale_price),
+                    "sale_type": sale.sale_type,
+                    "transaction_id": sale.transaction_id,
+                    "buyer_name": sale.buyer_name,
+                    "seller_name": sale.seller_name,
+                    "financing_type": sale.financing_type
+                })
+            
+            # Build detailed response
+            result = {
+                "parcel": {
+                    "id": parcel.id,
+                    "parcel_id": parcel.parcel_id,
+                    "address": parcel.address,
+                    "city": parcel.city,
+                    "state": parcel.state,
+                    "zip_code": parcel.zip_code,
+                    "land_value": float(parcel.land_value),
+                    "improvement_value": float(parcel.improvement_value),
+                    "total_value": float(parcel.total_value),
+                    "assessment_year": parcel.assessment_year,
+                    "latitude": parcel.latitude,
+                    "longitude": parcel.longitude,
+                    "created_at": parcel.created_at.isoformat(),
+                    "updated_at": parcel.updated_at.isoformat()
+                },
+                "properties": properties,
+                "sales_history": sales
+            }
+            
+            return jsonify({
+                "status": "success",
+                "data": result
             })
-        
-        # Format sales history
-        sales_history = []
-        for sale in parcel.sales:
-            sales_history.append({
-                'id': sale.id,
-                'sale_date': sale.sale_date.isoformat(),
-                'sale_price': float(sale.sale_price),
-                'sale_type': sale.sale_type,
-                'transaction_id': sale.transaction_id,
-                'buyer_name': sale.buyer_name,
-                'seller_name': sale.seller_name,
-                'financing_type': sale.financing_type
-            })
-        
-        # Sort sales by date (newest first)
-        sales_history.sort(key=lambda x: x['sale_date'], reverse=True)
-        
-        # Assemble the full parcel data
-        result = {
-            'id': parcel.id,
-            'parcel_id': parcel.parcel_id,
-            'address': parcel.address,
-            'city': parcel.city,
-            'state': parcel.state,
-            'zip_code': parcel.zip_code,
-            'land_value': float(parcel.land_value),
-            'improvement_value': float(parcel.improvement_value),
-            'total_value': float(parcel.total_value),
-            'assessment_year': parcel.assessment_year,
-            'latitude': parcel.latitude,
-            'longitude': parcel.longitude,
-            'property_details': property_details,
-            'sales_history': sales_history,
-            'created_at': parcel.created_at.isoformat(),
-            'updated_at': parcel.updated_at.isoformat()
-        }
-        
-        return jsonify({
-            'status': 'success',
-            'data': result
-        })
     except Exception as e:
+        logger.error(f"Error fetching parcel details: {str(e)}")
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            "status": "error",
+            "message": f"Failed to fetch parcel details: {str(e)}"
         }), 500
 
 @app.route('/api/schema')
@@ -239,286 +218,206 @@ def get_schema():
     """Get database schema details for parcels, properties, and sales tables."""
     try:
         schema = {
-            'parcels': {
-                'name': 'parcels',
-                'description': 'Real estate parcel information (main assessment record)',
-                'columns': [
-                    {'name': 'id', 'type': 'integer', 'primary_key': True},
-                    {'name': 'parcel_id', 'type': 'string', 'unique': True},
-                    {'name': 'address', 'type': 'string'},
-                    {'name': 'city', 'type': 'string'},
-                    {'name': 'state', 'type': 'string'},
-                    {'name': 'zip_code', 'type': 'string'},
-                    {'name': 'land_value', 'type': 'numeric'},
-                    {'name': 'improvement_value', 'type': 'numeric'},
-                    {'name': 'total_value', 'type': 'numeric'},
-                    {'name': 'assessment_year', 'type': 'integer'},
-                    {'name': 'latitude', 'type': 'float'},
-                    {'name': 'longitude', 'type': 'float'},
-                    {'name': 'created_at', 'type': 'datetime'},
-                    {'name': 'updated_at', 'type': 'datetime'}
-                ],
-                'relationships': [
-                    {'name': 'property_details', 'target': 'properties', 'type': 'one-to-many'},
-                    {'name': 'sales', 'target': 'sales', 'type': 'one-to-many'}
+            "parcels": {
+                "name": "parcels",
+                "description": "Real estate parcel information (main assessment record)",
+                "columns": [
+                    {"name": "id", "type": "Integer", "primary_key": True, "description": "Primary key"},
+                    {"name": "parcel_id", "type": "String(50)", "description": "Unique parcel identifier"},
+                    {"name": "address", "type": "String(255)", "description": "Property street address"},
+                    {"name": "city", "type": "String(100)", "description": "Property city"},
+                    {"name": "state", "type": "String(50)", "description": "Property state"},
+                    {"name": "zip_code", "type": "String(20)", "description": "Property postal code"},
+                    {"name": "land_value", "type": "Numeric(12,2)", "description": "Assessed land value"},
+                    {"name": "improvement_value", "type": "Numeric(12,2)", "description": "Assessed improvements value"},
+                    {"name": "total_value", "type": "Numeric(12,2)", "description": "Total assessed value"},
+                    {"name": "assessment_year", "type": "Integer", "description": "Year of assessment"},
+                    {"name": "latitude", "type": "Float", "description": "Geographic latitude"},
+                    {"name": "longitude", "type": "Float", "description": "Geographic longitude"},
+                    {"name": "created_at", "type": "DateTime", "description": "Record creation timestamp"},
+                    {"name": "updated_at", "type": "DateTime", "description": "Record update timestamp"}
                 ]
             },
-            'properties': {
-                'name': 'properties',
-                'description': 'Physical property characteristics',
-                'columns': [
-                    {'name': 'id', 'type': 'integer', 'primary_key': True},
-                    {'name': 'parcel_id', 'type': 'integer', 'foreign_key': 'parcels.id'},
-                    {'name': 'property_type', 'type': 'string'},
-                    {'name': 'year_built', 'type': 'integer'},
-                    {'name': 'square_footage', 'type': 'integer'},
-                    {'name': 'bedrooms', 'type': 'integer'},
-                    {'name': 'bathrooms', 'type': 'float'},
-                    {'name': 'lot_size', 'type': 'float'},
-                    {'name': 'lot_size_unit', 'type': 'string'},
-                    {'name': 'stories', 'type': 'float'},
-                    {'name': 'condition', 'type': 'string'},
-                    {'name': 'quality', 'type': 'string'},
-                    {'name': 'tax_district', 'type': 'string'},
-                    {'name': 'zoning', 'type': 'string'},
-                    {'name': 'created_at', 'type': 'datetime'},
-                    {'name': 'updated_at', 'type': 'datetime'}
-                ],
-                'relationships': [
-                    {'name': 'parcel', 'target': 'parcels', 'type': 'many-to-one'}
+            "properties": {
+                "name": "properties",
+                "description": "Physical property characteristics",
+                "columns": [
+                    {"name": "id", "type": "Integer", "primary_key": True, "description": "Primary key"},
+                    {"name": "parcel_id", "type": "Integer", "foreign_key": "parcels.id", "description": "Foreign key to parcels table"},
+                    {"name": "property_type", "type": "String(50)", "description": "Type of property (residential, commercial, etc.)"},
+                    {"name": "year_built", "type": "Integer", "description": "Year the property was constructed"},
+                    {"name": "square_footage", "type": "Integer", "description": "Total building area in square feet"},
+                    {"name": "bedrooms", "type": "Integer", "description": "Number of bedrooms"},
+                    {"name": "bathrooms", "type": "Float", "description": "Number of bathrooms"},
+                    {"name": "lot_size", "type": "Float", "description": "Size of the lot"},
+                    {"name": "lot_size_unit", "type": "String(20)", "description": "Unit of measurement for lot size"},
+                    {"name": "stories", "type": "Float", "description": "Number of stories"},
+                    {"name": "condition", "type": "String(50)", "description": "Property condition rating"},
+                    {"name": "quality", "type": "String(50)", "description": "Property quality rating"},
+                    {"name": "tax_district", "type": "String(50)", "description": "Taxation district"},
+                    {"name": "zoning", "type": "String(50)", "description": "Zoning classification"},
+                    {"name": "created_at", "type": "DateTime", "description": "Record creation timestamp"},
+                    {"name": "updated_at", "type": "DateTime", "description": "Record update timestamp"}
                 ]
             },
-            'sales': {
-                'name': 'sales',
-                'description': 'Property sale transaction history',
-                'columns': [
-                    {'name': 'id', 'type': 'integer', 'primary_key': True},
-                    {'name': 'parcel_id', 'type': 'integer', 'foreign_key': 'parcels.id'},
-                    {'name': 'sale_date', 'type': 'date'},
-                    {'name': 'sale_price', 'type': 'numeric'},
-                    {'name': 'sale_type', 'type': 'string'},
-                    {'name': 'transaction_id', 'type': 'string'},
-                    {'name': 'buyer_name', 'type': 'string'},
-                    {'name': 'seller_name', 'type': 'string'},
-                    {'name': 'financing_type', 'type': 'string'},
-                    {'name': 'created_at', 'type': 'datetime'},
-                    {'name': 'updated_at', 'type': 'datetime'}
-                ],
-                'relationships': [
-                    {'name': 'parcel', 'target': 'parcels', 'type': 'many-to-one'}
+            "sales": {
+                "name": "sales",
+                "description": "Property sale transaction history",
+                "columns": [
+                    {"name": "id", "type": "Integer", "primary_key": True, "description": "Primary key"},
+                    {"name": "parcel_id", "type": "Integer", "foreign_key": "parcels.id", "description": "Foreign key to parcels table"},
+                    {"name": "sale_date", "type": "Date", "description": "Date of property sale"},
+                    {"name": "sale_price", "type": "Numeric(12,2)", "description": "Sale price"},
+                    {"name": "sale_type", "type": "String(50)", "description": "Type of sale transaction"},
+                    {"name": "transaction_id", "type": "String(50)", "description": "Unique transaction identifier"},
+                    {"name": "buyer_name", "type": "String(255)", "description": "Name of buyer"},
+                    {"name": "seller_name", "type": "String(255)", "description": "Name of seller"},
+                    {"name": "financing_type", "type": "String(50)", "description": "Type of financing used"},
+                    {"name": "created_at", "type": "DateTime", "description": "Record creation timestamp"},
+                    {"name": "updated_at", "type": "DateTime", "description": "Record update timestamp"}
                 ]
             }
         }
         
         return jsonify({
-            'status': 'success',
-            'schema': schema
+            "status": "success",
+            "data": schema
         })
     except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-# Model definitions
-class Parcel(db.Model):
-    """Real estate parcel information (main assessment record)."""
-    __tablename__ = 'parcels'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    parcel_id = db.Column(db.String(50), unique=True, nullable=False, index=True)
-    address = db.Column(db.String(255), nullable=False)
-    city = db.Column(db.String(100), nullable=False)
-    state = db.Column(db.String(50), nullable=False)
-    zip_code = db.Column(db.String(20), nullable=False)
-    
-    # Assessment values
-    land_value = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    improvement_value = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    total_value = db.Column(db.Numeric(12, 2), nullable=False, default=0)
-    assessment_year = db.Column(db.Integer, nullable=False)
-    
-    # Geographic info
-    latitude = db.Column(db.Float, nullable=True)
-    longitude = db.Column(db.Float, nullable=True)
-    
-    # Metadata
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-    
-    # Relationships
-    property_details = db.relationship('Property', backref='parcel', lazy=True, cascade="all, delete-orphan")
-    sales = db.relationship('Sale', backref='parcel', lazy=True, cascade="all, delete-orphan")
-    
-    def __repr__(self):
-        return f"<Parcel {self.parcel_id} at {self.address}>"
-
-class Property(db.Model):
-    """Physical property characteristics."""
-    __tablename__ = 'properties'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    parcel_id = db.Column(db.Integer, db.ForeignKey('parcels.id'), nullable=False)
-    
-    # Property characteristics
-    property_type = db.Column(db.String(50), nullable=False)
-    year_built = db.Column(db.Integer, nullable=True)
-    square_footage = db.Column(db.Integer, nullable=True)
-    bedrooms = db.Column(db.Integer, nullable=True)
-    bathrooms = db.Column(db.Float, nullable=True)
-    lot_size = db.Column(db.Float, nullable=True)
-    lot_size_unit = db.Column(db.String(20), nullable=True)
-    stories = db.Column(db.Float, nullable=True)
-    condition = db.Column(db.String(50), nullable=True)
-    quality = db.Column(db.String(50), nullable=True)
-    
-    # Tax info
-    tax_district = db.Column(db.String(50), nullable=True)
-    zoning = db.Column(db.String(50), nullable=True)
-    
-    # Metadata
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-    
-    def __repr__(self):
-        return f"<Property {self.id} - {self.property_type} {self.square_footage}sqft>"
-
-class Sale(db.Model):
-    """Property sale transaction history."""
-    __tablename__ = 'sales'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    parcel_id = db.Column(db.Integer, db.ForeignKey('parcels.id'), nullable=False)
-    
-    # Transaction details
-    sale_date = db.Column(db.Date, nullable=False)
-    sale_price = db.Column(db.Numeric(12, 2), nullable=False)
-    sale_type = db.Column(db.String(50), nullable=True)
-    transaction_id = db.Column(db.String(50), nullable=True)
-    
-    # Buyer/Seller info
-    buyer_name = db.Column(db.String(255), nullable=True)
-    seller_name = db.Column(db.String(255), nullable=True)
-    
-    # Financing
-    financing_type = db.Column(db.String(50), nullable=True)
-    
-    # Metadata
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
-    
-    def __repr__(self):
-        return f"<Sale {self.id} - ${self.sale_price} on {self.sale_date}>"
-
-# Add a general proxy for FastAPI endpoints
-@app.route('/api/run-query', methods=['GET', 'POST'])
-def proxy_run_query():
-    """Proxy for the FastAPI run-query endpoint."""
-    fastapi_url = "http://0.0.0.0:8000/api/run-query"
-    try:
-        if request.method == 'POST':
-            # Forward the POST request to FastAPI
-            headers = {key: value for key, value in request.headers if key != 'Host'}
-            response = requests.post(
-                fastapi_url, 
-                json=request.get_json(), 
-                headers=headers
-            )
-        else:
-            # Forward the GET request parameters
-            headers = {key: value for key, value in request.headers if key != 'Host'}
-            response = requests.get(
-                fastapi_url,
-                params=request.args,
-                headers=headers
-            )
-        
-        return Response(
-            response.content,
-            status=response.status_code,
-            content_type=response.headers.get('Content-Type', 'application/json')
-        )
-    except requests.exceptions.RequestException as e:
+        logger.error(f"Error fetching schema: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": "Failed to reach FastAPI service",
-            "details": str(e)
-        }), 503
+            "message": f"Failed to fetch schema: {str(e)}"
+        }), 500
 
-# Add proxy routes for natural language to SQL translation
+# Proxy routes for FastAPI endpoints
+@app.route('/api/run-query', methods=['POST'])
+def proxy_run_query():
+    """Proxy for the FastAPI run-query endpoint."""
+    try:
+        # Forward the request to FastAPI
+        headers = {
+            'Content-Type': 'application/json',
+            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+        }
+        response = requests.post(
+            f"{FASTAPI_URL}/run-query",
+            json=request.json,
+            headers=headers
+        )
+        
+        # Return the response from FastAPI
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        logger.error(f"Error proxying run-query: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to proxy request: {str(e)}"
+        }), 500
+
 @app.route('/api/nl-to-sql', methods=['POST'])
 def proxy_nl_to_sql():
     """Proxy for the FastAPI natural language to SQL endpoint."""
-    fastapi_url = "http://0.0.0.0:8000/api/nl-to-sql"
     try:
-        headers = {key: value for key, value in request.headers if key != 'Host'}
+        # Forward the request to FastAPI
+        headers = {
+            'Content-Type': 'application/json',
+            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+        }
         response = requests.post(
-            fastapi_url, 
-            json=request.get_json(), 
+            f"{FASTAPI_URL}/nl-to-sql",
+            json=request.json,
             headers=headers
         )
-        return Response(
-            response.content,
-            status=response.status_code,
-            content_type=response.headers.get('Content-Type', 'application/json')
-        )
-    except requests.exceptions.RequestException as e:
+        
+        # Return the response from FastAPI
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        logger.error(f"Error proxying nl-to-sql: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": "Failed to reach FastAPI service",
-            "details": str(e)
-        }), 503
+            "message": f"Failed to proxy request: {str(e)}"
+        }), 500
 
-# Add proxy routes for schema discovery
 @app.route('/api/discover-schema')
 def proxy_discover_schema():
     """Proxy for the FastAPI schema discovery endpoint."""
-    fastapi_url = "http://0.0.0.0:8000/api/discover-schema"
     try:
-        # Forward the GET request parameters
-        headers = {key: value for key, value in request.headers if key != 'Host'}
+        # Forward the request to FastAPI
+        headers = {
+            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+        }
         response = requests.get(
-            fastapi_url,
+            f"{FASTAPI_URL}/discover-schema",
             params=request.args,
             headers=headers
         )
-        return Response(
-            response.content,
-            status=response.status_code,
-            content_type=response.headers.get('Content-Type', 'application/json')
-        )
-    except requests.exceptions.RequestException as e:
+        
+        # Return the response from FastAPI
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        logger.error(f"Error proxying discover-schema: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": "Failed to reach FastAPI service",
-            "details": str(e)
-        }), 503
+            "message": f"Failed to proxy request: {str(e)}"
+        }), 500
 
 @app.route('/api/schema-summary')
 def proxy_schema_summary():
     """Proxy for the FastAPI schema summary endpoint."""
-    fastapi_url = "http://0.0.0.0:8000/api/schema-summary"
     try:
-        # Forward the GET request parameters
-        headers = {key: value for key, value in request.headers if key != 'Host'}
+        # Forward the request to FastAPI
+        headers = {
+            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+        }
         response = requests.get(
-            fastapi_url,
+            f"{FASTAPI_URL}/schema-summary",
             params=request.args,
             headers=headers
         )
-        return Response(
-            response.content,
-            status=response.status_code,
-            content_type=response.headers.get('Content-Type', 'application/json')
-        )
-    except requests.exceptions.RequestException as e:
+        
+        # Return the response from FastAPI
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        logger.error(f"Error proxying schema-summary: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": "Failed to reach FastAPI service", 
-            "details": str(e)
-        }), 503
+            "message": f"Failed to proxy request: {str(e)}"
+        }), 500
 
-# Create the database tables if they don't exist
+@app.route('/api/parameterized-query', methods=['POST'])
+def proxy_parameterized_query():
+    """Proxy for the FastAPI parameterized query endpoint."""
+    try:
+        # Forward the request to FastAPI
+        headers = {
+            'Content-Type': 'application/json',
+            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+        }
+        response = requests.post(
+            f"{FASTAPI_URL}/parameterized-query",
+            json=request.json,
+            headers=headers
+        )
+        
+        # Return the response from FastAPI
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        logger.error(f"Error proxying parameterized-query: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to proxy request: {str(e)}"
+        }), 500
+
+# Initialize models and create tables
+# Tables are now initialized in app_setup.py using before_request
+# This function is kept for compatibility but is not used
 with app.app_context():
-    db.create_all()
-    print("Database tables created successfully")
+    @app.before_request
+    def initialize_database():
+        """Initialize database tables before first request."""
+        # Use function attribute to track if tables have been created
+        if not getattr(initialize_database, 'tables_created', False):
+            db.create_all()
+            app.logger.info("Database tables created successfully")
+            initialize_database.tables_created = True

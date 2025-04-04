@@ -1,0 +1,727 @@
+{% extends 'base.html' %}
+
+{% block title %}API Documentation{% endblock %}
+
+{% block head %}
+<style>
+    .api-section {
+        margin-bottom: 3rem;
+    }
+    .parameter-table {
+        font-size: 0.9rem;
+    }
+    .try-it-section {
+        background-color: rgba(var(--bs-primary-rgb), 0.05);
+        border-radius: var(--bs-border-radius);
+        padding: 1.5rem;
+        margin: 1.5rem 0;
+    }
+    .badge {
+        font-size: 0.75rem;
+    }
+    .request-url {
+        font-family: monospace;
+        padding: 0.5rem;
+        background-color: var(--bs-dark);
+        border-radius: var(--bs-border-radius);
+        overflow-x: auto;
+    }
+    .response-area {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-3">
+        <div class="list-group sticky-top pt-3">
+            <a class="list-group-item list-group-item-action" href="#overview">Overview</a>
+            <a class="list-group-item list-group-item-action" href="#authentication">Authentication</a>
+            <a class="list-group-item list-group-item-action" href="#sql-queries">SQL Queries</a>
+            <a class="list-group-item list-group-item-action" href="#parameterized-queries">Parameterized Queries</a>
+            <a class="list-group-item list-group-item-action" href="#natural-language">Natural Language</a>
+            <a class="list-group-item list-group-item-action" href="#schema">Schema Discovery</a>
+            <a class="list-group-item list-group-item-action" href="#health">Health Check</a>
+            <a class="list-group-item list-group-item-action" href="#try-it">Try It Out</a>
+        </div>
+    </div>
+    
+    <div class="col-lg-9">
+        <div class="card">
+            <div class="card-body">
+                <h1 class="card-title">API Documentation</h1>
+                
+                <section id="overview" class="api-section">
+                    <h2>Overview</h2>
+                    <p>
+                        The MCP Assessor Agent API provides a secure interface for querying assessment data across multiple databases.
+                        It supports standard SQL queries, parameterized queries for enhanced security, and natural language processing
+                        for converting English queries to SQL.
+                    </p>
+                    <p>
+                        This API is designed for real estate data analysis, with a focus on parcels, property characteristics, and sales history.
+                    </p>
+                    <div class="alert alert-info">
+                        <strong>Base URL:</strong> <code>{{ fastapi_url }}</code>
+                    </div>
+                </section>
+                
+                <section id="authentication" class="api-section">
+                    <h2>Authentication</h2>
+                    <p>
+                        All API requests must include an API key in the <code>X-API-Key</code> header.
+                    </p>
+                    <pre><code>X-API-Key: your_api_key</code></pre>
+                    <div class="alert alert-warning">
+                        <strong>Note:</strong> Keep your API key secure. Do not share it or expose it in client-side code.
+                    </div>
+                </section>
+                
+                <section id="sql-queries" class="api-section">
+                    <h2>SQL Queries</h2>
+                    <p>
+                        Execute SQL queries against the specified database with pagination.
+                    </p>
+                    
+                    <div class="api-endpoint">
+                        <h4>
+                            <span class="badge method-badge badge-post">POST</span>
+                            <code>/run-query</code>
+                        </h4>
+                        <p>Execute a SQL query with optional pagination.</p>
+                        
+                        <h5>Request Body:</h5>
+                        <div class="code-block">
+<pre><code>{
+    "db": "postgres",
+    "query": "SELECT * FROM parcels WHERE city = 'Seattle' LIMIT 10",
+    "page": 1,
+    "page_size": 10
+}</code></pre>
+                        </div>
+                        
+                        <h5>Parameters:</h5>
+                        <table class="table table-sm parameter-table">
+                            <thead>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>db</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>Database to query (postgres or mssql)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>query</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>SQL query to execute</td>
+                                </tr>
+                                <tr>
+                                    <td><code>page</code></td>
+                                    <td>integer</td>
+                                    <td>No</td>
+                                    <td>Page number (starting from 1, default: 1)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>page_size</code></td>
+                                    <td>integer</td>
+                                    <td>No</td>
+                                    <td>Number of records per page (default: 50, max: 1000)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <h5>Response:</h5>
+                        <div class="code-block">
+<pre><code>{
+    "status": "success",
+    "data": [
+        {
+            "id": 1,
+            "parcel_id": "12345-6789",
+            "address": "123 Main St",
+            "city": "Seattle",
+            // ...other fields
+        },
+        // ...more results
+    ],
+    "execution_time": 0.235,
+    "pagination": {
+        "page": 1,
+        "page_size": 10,
+        "total_pages": 5,
+        "total_records": 42
+    },
+    "column_types": {
+        "id": "integer",
+        "parcel_id": "string",
+        // ...other columns
+    },
+    "timestamp": "2025-04-01T12:34:56.789Z"
+}</code></pre>
+                        </div>
+                    </div>
+                </section>
+                
+                <section id="parameterized-queries" class="api-section">
+                    <h2>Parameterized Queries</h2>
+                    <p>
+                        Execute parameterized SQL queries for improved security against SQL injection attacks.
+                    </p>
+                    
+                    <div class="api-endpoint">
+                        <h4>
+                            <span class="badge method-badge badge-post">POST</span>
+                            <code>/parameterized-query</code>
+                        </h4>
+                        <p>Execute a parameterized SQL query with values passed separately.</p>
+                        
+                        <h5>Request Body:</h5>
+                        <div class="code-block">
+<pre><code>{
+    "db": "postgres",
+    "query": "SELECT * FROM parcels WHERE city = :city AND assessment_year >= :year",
+    "params": {
+        "city": "Seattle",
+        "year": 2020
+    },
+    "param_style": "named",
+    "page": 1,
+    "page_size": 10
+}</code></pre>
+                        </div>
+                        
+                        <h5>Parameters:</h5>
+                        <table class="table table-sm parameter-table">
+                            <thead>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>db</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>Database to query (postgres or mssql)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>query</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>SQL query with parameter placeholders</td>
+                                </tr>
+                                <tr>
+                                    <td><code>params</code></td>
+                                    <td>object</td>
+                                    <td>Yes</td>
+                                    <td>Parameter values (key-value pairs)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>param_style</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td>Parameter style (named, qmark, format, or numeric)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>page</code></td>
+                                    <td>integer</td>
+                                    <td>No</td>
+                                    <td>Page number (starting from 1, default: 1)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>page_size</code></td>
+                                    <td>integer</td>
+                                    <td>No</td>
+                                    <td>Number of records per page (default: 50, max: 1000)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <h5>Response:</h5>
+                        <p>Same as the <code>/run-query</code> endpoint.</p>
+                    </div>
+                </section>
+                
+                <section id="natural-language" class="api-section">
+                    <h2>Natural Language to SQL</h2>
+                    <p>
+                        Convert natural language queries to SQL using OpenAI's language models.
+                    </p>
+                    
+                    <div class="api-endpoint">
+                        <h4>
+                            <span class="badge method-badge badge-post">POST</span>
+                            <code>/nl-to-sql</code>
+                        </h4>
+                        <p>Translate a natural language prompt to SQL.</p>
+                        
+                        <h5>Request Body:</h5>
+                        <div class="code-block">
+<pre><code>{
+    "db": "postgres",
+    "prompt": "Find all properties in Seattle with at least 3 bedrooms built after 2000"
+}</code></pre>
+                        </div>
+                        
+                        <h5>Parameters:</h5>
+                        <table class="table table-sm parameter-table">
+                            <thead>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>db</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>Target database (postgres or mssql)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>prompt</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>Natural language query (3-1000 characters)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>include_schema</code></td>
+                                    <td>boolean</td>
+                                    <td>No</td>
+                                    <td>Whether to include schema in response (default: true)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <h5>Response:</h5>
+                        <div class="code-block">
+<pre><code>{
+    "status": "success",
+    "sql": "SELECT p.parcel_id, p.address, p.city, pr.bedrooms, pr.year_built FROM parcels p JOIN properties pr ON p.id = pr.parcel_id WHERE p.city = 'Seattle' AND pr.bedrooms >= 3 AND pr.year_built > 2000",
+    "explanation": "This query joins the parcels and properties tables to find properties in Seattle with at least 3 bedrooms that were built after the year 2000. It returns the parcel ID, address, city, number of bedrooms, and year built.",
+    "parameters": {
+        "city": "The city to search for (Seattle)",
+        "min_bedrooms": "Minimum number of bedrooms (3)",
+        "min_year": "Minimum year built (2000)"
+    },
+    "execution_time": 1.456,
+    "confidence": 0.95
+}</code></pre>
+                        </div>
+                    </div>
+                </section>
+                
+                <section id="schema" class="api-section">
+                    <h2>Schema Discovery</h2>
+                    <p>
+                        Discover database schema information to help with query construction.
+                    </p>
+                    
+                    <div class="api-endpoint">
+                        <h4>
+                            <span class="badge method-badge badge-get">GET</span>
+                            <code>/discover-schema?db=postgres</code>
+                        </h4>
+                        <p>Get detailed schema information for the specified database.</p>
+                        
+                        <h5>Parameters:</h5>
+                        <table class="table table-sm parameter-table">
+                            <thead>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>db</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>Database to discover schema for (postgres or mssql)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <h5>Response:</h5>
+                        <div class="code-block">
+<pre><code>{
+    "status": "success",
+    "db_schema": [
+        {
+            "table_name": "parcels",
+            "column_name": "id",
+            "data_type": "integer",
+            "is_nullable": false,
+            "column_default": "nextval('parcels_id_seq'::regclass)",
+            "is_primary_key": true,
+            "is_foreign_key": false
+        },
+        // ...more columns
+    ],
+    "tables": [
+        {
+            "name": "parcels",
+            "description": "Real estate parcel information",
+            "columns": [...],
+            "primary_keys": ["id"],
+            "foreign_keys": {},
+            "row_count": 10000
+        },
+        // ...more tables
+    ],
+    "execution_time": 0.156
+}</code></pre>
+                        </div>
+                    </div>
+                    
+                    <div class="api-endpoint">
+                        <h4>
+                            <span class="badge method-badge badge-get">GET</span>
+                            <code>/schema-summary?db=postgres&prefix=</code>
+                        </h4>
+                        <p>Get a summary of the database schema with table names and counts.</p>
+                        
+                        <h5>Parameters:</h5>
+                        <table class="table table-sm parameter-table">
+                            <thead>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>db</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>Database to get summary for (postgres or mssql)</td>
+                                </tr>
+                                <tr>
+                                    <td><code>prefix</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td>Optional table name prefix to filter by</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <h5>Response:</h5>
+                        <div class="code-block">
+<pre><code>{
+    "status": "success",
+    "summary": ["parcels", "properties", "sales"],
+    "table_counts": {
+        "parcels": 10000,
+        "properties": 15000,
+        "sales": 25000
+    },
+    "relationships": [
+        {
+            "source_table": "properties",
+            "source_column": "parcel_id",
+            "target_table": "parcels",
+            "target_column": "id"
+        },
+        {
+            "source_table": "sales",
+            "source_column": "parcel_id",
+            "target_table": "parcels",
+            "target_column": "id"
+        }
+    ]
+}</code></pre>
+                        </div>
+                    </div>
+                </section>
+                
+                <section id="health" class="api-section">
+                    <h2>Health Check</h2>
+                    <p>
+                        Check the health of the API and its database connections.
+                    </p>
+                    
+                    <div class="api-endpoint">
+                        <h4>
+                            <span class="badge method-badge badge-get">GET</span>
+                            <code>/health</code>
+                        </h4>
+                        <p>Get the health status of the API and connected databases.</p>
+                        
+                        <h5>Response:</h5>
+                        <div class="code-block">
+<pre><code>{
+    "status": "success",
+    "message": "API is operational",
+    "database_status": {
+        "postgres": true,
+        "mssql": true
+    },
+    "databases": [
+        {
+            "name": "postgres",
+            "type": "PostgreSQL",
+            "version": "14.5",
+            "connected": true,
+            "tables": ["parcels", "properties", "sales"]
+        },
+        {
+            "name": "mssql",
+            "type": "SQL Server",
+            "version": "2019",
+            "connected": true,
+            "tables": ["parcels", "properties", "sales"]
+        }
+    ],
+    "api_version": "1.0.0",
+    "uptime": 12345.67
+}</code></pre>
+                        </div>
+                    </div>
+                </section>
+                
+                <section id="try-it" class="api-section">
+                    <h2>Try It Out</h2>
+                    <div class="try-it-section">
+                        <div class="mb-3">
+                            <label for="endpoint-select" class="form-label">Endpoint</label>
+                            <select class="form-select" id="endpoint-select">
+                                <option value="/run-query">SQL Query</option>
+                                <option value="/parameterized-query">Parameterized Query</option>
+                                <option value="/nl-to-sql">Natural Language to SQL</option>
+                                <option value="/discover-schema">Schema Discovery</option>
+                                <option value="/schema-summary">Schema Summary</option>
+                                <option value="/health">Health Check</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="api-key" class="form-label">API Key</label>
+                            <input type="text" class="form-control" id="api-key" placeholder="Enter your API key">
+                        </div>
+                        
+                        <div class="mb-3" id="request-body-container">
+                            <label for="request-body" class="form-label">Request Body</label>
+                            <textarea class="form-control" id="request-body" rows="6">
+{
+    "db": "postgres",
+    "query": "SELECT * FROM parcels LIMIT 5"
+}</textarea>
+                        </div>
+                        
+                        <div class="mb-3 text-end">
+                            <button class="btn btn-primary" id="send-request">Send Request</button>
+                        </div>
+                        
+                        <div id="response-container" style="display: none;">
+                            <h5>Response</h5>
+                            <div class="request-url mb-2" id="request-url"></div>
+                            <div class="response-area code-block" id="response-output">
+                                <pre><code>Response will appear here...</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const endpointSelect = document.getElementById('endpoint-select');
+        const requestBodyContainer = document.getElementById('request-body-container');
+        const requestBody = document.getElementById('request-body');
+        const apiKey = document.getElementById('api-key');
+        const sendRequestBtn = document.getElementById('send-request');
+        const responseContainer = document.getElementById('response-container');
+        const requestUrlDisplay = document.getElementById('request-url');
+        const responseOutput = document.getElementById('response-output');
+        
+        // Default request bodies for different endpoints
+        const defaultBodies = {
+            '/run-query': {
+                db: 'postgres',
+                query: 'SELECT * FROM parcels LIMIT 5',
+                page: 1,
+                page_size: 5
+            },
+            '/parameterized-query': {
+                db: 'postgres',
+                query: 'SELECT * FROM parcels WHERE city = :city LIMIT 5',
+                params: {
+                    city: 'Seattle'
+                },
+                param_style: 'named',
+                page: 1,
+                page_size: 5
+            },
+            '/nl-to-sql': {
+                db: 'postgres',
+                prompt: 'Find all properties in Seattle with at least 3 bedrooms'
+            }
+        };
+        
+        // Update request body when endpoint changes
+        endpointSelect.addEventListener('change', function() {
+            const endpoint = endpointSelect.value;
+            
+            // Show/hide request body based on endpoint method
+            if (endpoint === '/discover-schema' || endpoint === '/schema-summary' || endpoint === '/health') {
+                requestBodyContainer.style.display = 'none';
+            } else {
+                requestBodyContainer.style.display = 'block';
+                // Set default request body
+                if (defaultBodies[endpoint]) {
+                    requestBody.value = JSON.stringify(defaultBodies[endpoint], null, 4);
+                }
+            }
+        });
+        
+        // Send request
+        sendRequestBtn.addEventListener('click', function() {
+            const endpoint = endpointSelect.value;
+            const key = apiKey.value;
+            
+            // Prepare request URL
+            const baseUrl = '{{ fastapi_url }}';
+            let url = baseUrl + endpoint;
+            
+            // Prepare request options
+            const options = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': key
+                }
+            };
+            
+            // Add request body for POST endpoints
+            if (endpoint === '/run-query' || endpoint === '/parameterized-query' || endpoint === '/nl-to-sql') {
+                options.method = 'POST';
+                try {
+                    options.body = requestBody.value;
+                } catch (e) {
+                    alert('Invalid JSON in request body');
+                    return;
+                }
+            } else {
+                options.method = 'GET';
+                // Add query params for GET endpoints
+                if (endpoint === '/discover-schema' || endpoint === '/schema-summary') {
+                    url += '?db=postgres';
+                }
+            }
+            
+            // Show the request URL
+            requestUrlDisplay.textContent = `${options.method} ${url}`;
+            
+            // Show response container
+            responseContainer.style.display = 'block';
+            responseOutput.querySelector('code').textContent = 'Loading...';
+            
+            // Send the request (mock for demo)
+            setTimeout(() => {
+                // Mock successful response
+                let mockResponse;
+                
+                if (endpoint === '/health') {
+                    mockResponse = {
+                        status: 'success',
+                        message: 'API is operational',
+                        database_status: {
+                            postgres: true,
+                            mssql: false
+                        },
+                        api_version: '1.0.0',
+                        uptime: 1234.56
+                    };
+                } else if (endpoint === '/discover-schema') {
+                    mockResponse = {
+                        status: 'success',
+                        db_schema: [
+                            {
+                                table_name: 'parcels',
+                                column_name: 'id',
+                                data_type: 'integer',
+                                is_nullable: false,
+                                is_primary_key: true
+                            },
+                            {
+                                table_name: 'parcels',
+                                column_name: 'address',
+                                data_type: 'character varying(255)',
+                                is_nullable: false,
+                                is_primary_key: false
+                            }
+                        ]
+                    };
+                } else if (endpoint === '/schema-summary') {
+                    mockResponse = {
+                        status: 'success',
+                        summary: ['parcels', 'properties', 'sales'],
+                        table_counts: {
+                            parcels: 10000,
+                            properties: 15000,
+                            sales: 25000
+                        }
+                    };
+                } else if (endpoint === '/nl-to-sql') {
+                    mockResponse = {
+                        status: 'success',
+                        sql: 'SELECT p.parcel_id, p.address, p.city, pr.bedrooms FROM parcels p JOIN properties pr ON p.id = pr.parcel_id WHERE p.city = \'Seattle\' AND pr.bedrooms >= 3 LIMIT 10',
+                        explanation: 'This query joins parcels and properties to find Seattle properties with at least 3 bedrooms.'
+                    };
+                } else {
+                    mockResponse = {
+                        status: 'success',
+                        data: [
+                            {
+                                id: 1,
+                                parcel_id: 'ABC123',
+                                address: '123 Main St',
+                                city: 'Seattle'
+                            },
+                            {
+                                id: 2,
+                                parcel_id: 'DEF456',
+                                address: '456 Oak Ave',
+                                city: 'Portland'
+                            }
+                        ],
+                        execution_time: 0.123,
+                        pagination: {
+                            page: 1,
+                            page_size: 5,
+                            total_pages: 2000,
+                            total_records: 10000
+                        }
+                    };
+                }
+                
+                // Display the response
+                responseOutput.querySelector('code').textContent = JSON.stringify(mockResponse, null, 2);
+            }, 500);
+        });
+    });
+</script>
+{% endblock %}

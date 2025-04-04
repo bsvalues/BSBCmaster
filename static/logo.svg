@@ -1,0 +1,25 @@
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Database base -->
+  <ellipse cx="50" cy="75" rx="30" ry="10" fill="#3498db" opacity="0.8" />
+  <path d="M20 60 Q20 75 50 85 Q80 75 80 60 V30 Q80 20 50 30 Q20 20 20 30 Z" fill="none" stroke="#3498db" stroke-width="3" />
+  <ellipse cx="50" cy="30" rx="30" ry="10" fill="#3498db" opacity="0.8" />
+  
+  <!-- Cross-sections of the database -->
+  <path d="M20 45 Q20 55 50 65 Q80 55 80 45" fill="none" stroke="#3498db" stroke-width="2" />
+  
+  <!-- Shield overlay -->
+  <path d="M50 10 L70 20 Q70 40 65 50 Q60 60 50 70 Q40 60 35 50 Q30 40 30 20 Z" fill="none" stroke="#2ecc71" stroke-width="3" />
+  
+  <!-- Secure lock icon -->
+  <rect x="43" y="30" width="14" height="12" rx="2" fill="#2ecc71" />
+  <rect x="46" y="22" width="8" height="10" rx="4" fill="none" stroke="#2ecc71" stroke-width="3" />
+  <circle cx="50" cy="35" r="2" fill="#ffffff" />
+  <line x1="50" y1="35" x2="50" y2="38" stroke="#ffffff" stroke-width="2" />
+  
+  <!-- Data flow lines -->
+  <path d="M30 50 L40 55 L50 50 L60 55 L70 50" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="2,1" />
+  <path d="M30 40 L70 40" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="2,1" />
+  
+  <!-- MCP text -->
+  <text x="36" y="85" font-family="Arial, sans-serif" font-weight="bold" font-size="10" fill="#ffffff">MCP</text>
+</svg>

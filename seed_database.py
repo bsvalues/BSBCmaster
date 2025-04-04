@@ -2,249 +2,210 @@
 This script seeds the database with sample data for testing purposes.
 """
 
-import os
-import logging
 import random
 import datetime
-from decimal import Decimal
+import logging
+from faker import Faker
+import os
+from dotenv import load_dotenv
 
-from flask import Flask
-from database import app, db, Parcel, Property, Sale
+# Load environment variables
+load_dotenv()
+
+# Import Flask app and database connection
+from app_setup import app, db
+from models import Parcel, Property, Sale
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Initialize Faker
+fake = Faker()
 
 def create_sample_parcels(count=10):
     """Create sample parcel records."""
-    logger.info(f"Creating {count} sample parcels")
-    
-    # Lists for generating sample data
-    cities = ["Springfield", "Riverside", "Oakridge", "Maplewood", "Pine Valley", "Cedar Hills"]
-    states = ["CA", "NY", "TX", "FL", "WA", "IL"]
-    street_types = ["St", "Ave", "Blvd", "Dr", "Ln", "Rd", "Way", "Pl"]
-    
+    logger.info(f"Creating {count} sample parcels...")
     parcels = []
-    for i in range(1, count + 1):
-        street_number = random.randint(100, 9999)
-        street_name = random.choice(["Main", "Oak", "Pine", "Maple", "Cedar", "Elm", "Washington", "Park", "Lake", "River"])
-        street_type = random.choice(street_types)
-        address = f"{street_number} {street_name} {street_type}"
-        
+    
+    # List of cities for sample data
+    cities = ["Seattle", "Portland", "San Francisco", "Los Angeles", "Chicago", 
+              "New York", "Boston", "Austin", "Denver", "Miami"]
+    
+    # List of states for sample data
+    states = ["WA", "OR", "CA", "IL", "NY", "MA", "TX", "CO", "FL"]
+    
+    for i in range(count):
         city = random.choice(cities)
         state = random.choice(states)
-        zip_code = f"{random.randint(10000, 99999)}"
         
-        land_value = Decimal(random.randint(5000, 500000))
-        improvement_value = Decimal(random.randint(10000, 1000000))
-        total_value = land_value + improvement_value
-        
-        assessment_year = random.choice([2022, 2023, 2024])
-        
-        # Generate a unique parcel ID
-        parcel_id = f"{state[:2]}-{city[:3]}-{zip_code[:5]}-{i:03d}"
-        
-        # Create latitude and longitude (simplified for demo)
-        latitude = 37.0 + (random.random() * 5)
-        longitude = -122.0 - (random.random() * 5)
-        
-        # Create the parcel record
         parcel = Parcel(
-            parcel_id=parcel_id,
-            address=address,
+            parcel_id=f"P{fake.unique.random_number(digits=8)}",
+            address=fake.street_address(),
             city=city,
             state=state,
-            zip_code=zip_code,
-            land_value=land_value,
-            improvement_value=improvement_value,
-            total_value=total_value,
-            assessment_year=assessment_year,
-            latitude=latitude,
-            longitude=longitude
+            zip_code=fake.zipcode(),
+            land_value=round(random.uniform(50000, 500000), 2),
+            improvement_value=round(random.uniform(100000, 1000000), 2),
+            assessment_year=random.randint(2020, 2024),
+            latitude=fake.latitude(),
+            longitude=fake.longitude(),
+            created_at=datetime.datetime.utcnow(),
+            updated_at=datetime.datetime.utcnow()
         )
+        
+        # Calculate total value
+        parcel.total_value = parcel.land_value + parcel.improvement_value
         
         parcels.append(parcel)
     
-    # Add all parcels to the database
+    # Add parcels to the database
     db.session.add_all(parcels)
     db.session.commit()
     
+    logger.info(f"Created {len(parcels)} sample parcels.")
     return parcels
 
 def create_sample_properties(parcels):
     """Create sample property records for the given parcels."""
-    logger.info(f"Creating properties for {len(parcels)} parcels")
-    
-    property_types = ["Single Family", "Multi-Family", "Condominium", "Townhouse", "Commercial", "Industrial", "Vacant Land"]
-    conditions = ["Excellent", "Good", "Average", "Fair", "Poor"]
-    qualities = ["Luxury", "High", "Average", "Low", "Very Low"]
-    tax_districts = ["Central", "North", "South", "East", "West"]
-    zoning_types = ["Residential", "Commercial", "Industrial", "Agricultural", "Mixed-Use"]
-    
+    logger.info(f"Creating sample properties for {len(parcels)} parcels...")
     properties = []
-    for parcel in parcels:
-        # Determine property type
-        property_type = random.choice(property_types)
-        
-        # Generate property attributes based on type
-        if property_type == "Vacant Land":
-            year_built = None
-            square_footage = None
-            bedrooms = None
-            bathrooms = None
-            stories = None
-        else:
-            current_year = datetime.datetime.now().year
-            year_built = random.randint(1950, current_year - 1)
-            
-            if property_type in ["Single Family", "Multi-Family", "Condominium", "Townhouse"]:
-                square_footage = random.randint(800, 5000)
-                bedrooms = random.randint(1, 6)
-                bathrooms = random.choice([1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])
-                stories = random.choice([1.0, 1.5, 2.0, 2.5, 3.0])
-            else:  # Commercial or Industrial
-                square_footage = random.randint(2000, 50000)
-                bedrooms = None
-                bathrooms = random.randint(1, 10)
-                stories = random.randint(1, 5)
-        
-        # Common attributes
-        lot_size = random.uniform(0.1, 10.0)
-        lot_size_unit = "acres"
-        condition = random.choice(conditions)
-        quality = random.choice(qualities)
-        tax_district = random.choice(tax_districts)
-        zoning = random.choice(zoning_types)
-        
-        # Create the property record
-        property_record = Property(
-            parcel_id=parcel.id,
-            property_type=property_type,
-            year_built=year_built,
-            square_footage=square_footage,
-            bedrooms=bedrooms,
-            bathrooms=bathrooms,
-            lot_size=lot_size,
-            lot_size_unit=lot_size_unit,
-            stories=stories,
-            condition=condition,
-            quality=quality,
-            tax_district=tax_district,
-            zoning=zoning
-        )
-        
-        properties.append(property_record)
     
-    # Add all properties to the database
+    # List of property types for sample data
+    property_types = ["Single Family", "Multi-Family", "Condominium", "Townhouse", 
+                      "Apartment", "Commercial", "Industrial", "Vacant Land"]
+    
+    # List of conditions for sample data
+    conditions = ["Excellent", "Good", "Average", "Fair", "Poor"]
+    
+    # List of quality ratings for sample data
+    qualities = ["Luxury", "High", "Average", "Economy", "Low"]
+    
+    # List of zoning types for sample data
+    zonings = ["Residential", "Commercial", "Industrial", "Mixed Use", "Agricultural"]
+    
+    for parcel in parcels:
+        # Number of properties per parcel (1-3)
+        num_properties = random.randint(1, 3)
+        
+        for _ in range(num_properties):
+            property_type = random.choice(property_types)
+            
+            # Skip building details for vacant land
+            if property_type == "Vacant Land":
+                prop = Property(
+                    parcel_id=parcel.id,
+                    property_type=property_type,
+                    lot_size=round(random.uniform(0.1, 10.0), 2),
+                    lot_size_unit="acres",
+                    condition=random.choice(conditions),
+                    quality=random.choice(qualities),
+                    tax_district=f"District {random.randint(1, 5)}",
+                    zoning=random.choice(zonings),
+                    created_at=datetime.datetime.utcnow(),
+                    updated_at=datetime.datetime.utcnow()
+                )
+            else:
+                prop = Property(
+                    parcel_id=parcel.id,
+                    property_type=property_type,
+                    year_built=random.randint(1950, 2023),
+                    square_footage=random.randint(1000, 5000),
+                    bedrooms=random.randint(1, 6) if "Family" in property_type or "Condominium" in property_type else None,
+                    bathrooms=round(random.uniform(1.0, 5.0), 1) if "Family" in property_type or "Condominium" in property_type else None,
+                    lot_size=round(random.uniform(0.1, 1.0), 2),
+                    lot_size_unit="acres",
+                    stories=round(random.uniform(1.0, 3.0), 1) if "Family" in property_type else None,
+                    condition=random.choice(conditions),
+                    quality=random.choice(qualities),
+                    tax_district=f"District {random.randint(1, 5)}",
+                    zoning=random.choice(zonings),
+                    created_at=datetime.datetime.utcnow(),
+                    updated_at=datetime.datetime.utcnow()
+                )
+            
+            properties.append(prop)
+    
+    # Add properties to the database
     db.session.add_all(properties)
     db.session.commit()
     
+    logger.info(f"Created {len(properties)} sample properties.")
     return properties
 
 def create_sample_sales(parcels):
     """Create sample sale records for the given parcels."""
-    logger.info(f"Creating sales history for {len(parcels)} parcels")
-    
-    sale_types = ["Standard", "Foreclosure", "Short Sale", "Auction", "New Construction"]
-    financing_types = ["Conventional", "FHA", "VA", "Cash", "Seller Financing", "USDA", "Other"]
-    
+    logger.info(f"Creating sample sales for {len(parcels)} parcels...")
     sales = []
+    
+    # List of sale types for sample data
+    sale_types = ["Standard", "Foreclosure", "Short Sale", "New Construction", "Auction"]
+    
+    # List of financing types for sample data
+    financing_types = ["Conventional", "FHA", "VA", "Cash", "Owner Financing"]
+    
     for parcel in parcels:
-        # Generate 1-3 sales per parcel
-        num_sales = random.randint(1, 3)
+        # Number of sales per parcel (1-5)
+        num_sales = random.randint(1, 5)
         
-        # Start with a base sale date 5-15 years ago
-        current_date = datetime.datetime.now().date()
-        years_back = random.randint(5, 15)
-        base_sale_date = current_date.replace(year=current_date.year - years_back)
+        # Generate sales dates in chronological order
+        sale_years = sorted(random.sample(range(2010, 2025), num_sales))
         
-        for i in range(num_sales):
-            # For multiple sales, each subsequent sale happens 2-5 years after the previous
-            if i > 0:
-                years_forward = random.randint(2, 5)
-                base_sale_date = base_sale_date.replace(year=base_sale_date.year + years_forward)
-                
-                # Don't create future sales
-                if base_sale_date > current_date:
-                    break
+        for i, year in enumerate(sale_years):
+            # Generate random sale date within the year
+            sale_date = datetime.date(year, random.randint(1, 12), random.randint(1, 28))
             
-            # Adjust the sale date by a random number of days
-            days_adjustment = random.randint(-180, 180)
-            sale_date = base_sale_date + datetime.timedelta(days=days_adjustment)
+            # Base price with some randomness
+            base_price = round(random.uniform(200000, 800000), 2)
             
-            # Make sure the sale date isn't in the future
-            if sale_date > current_date:
-                sale_date = current_date - datetime.timedelta(days=random.randint(1, 30))
+            # Increase price for later sales (appreciation)
+            appreciation_factor = 1.0 + (i * 0.1)  # 10% appreciation per sale
+            sale_price = round(base_price * appreciation_factor, 2)
             
-            # Generate sale price (related to the total value but with some variance)
-            base_price = float(parcel.total_value)
-            variance_factor = random.uniform(0.8, 1.2)  # 80% to 120% of the assessed value
-            sale_price = Decimal(base_price * variance_factor).quantize(Decimal('0.01'))
-            
-            # Set other sale attributes
-            sale_type = random.choice(sale_types)
-            transaction_id = f"TX-{parcel.parcel_id}-{sale_date.year}{sale_date.month:02d}{sale_date.day:02d}"
-            
-            # Generate random names for buyer and seller
-            first_names = ["John", "Jane", "Michael", "Emily", "David", "Sarah", "James", "Jennifer", "Robert", "Linda"]
-            last_names = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Wilson", "Taylor", "Anderson"]
-            
-            buyer_name = f"{random.choice(first_names)} {random.choice(last_names)}"
-            seller_name = f"{random.choice(first_names)} {random.choice(last_names)}"
-            
-            # Ensure buyer and seller are different
-            while seller_name == buyer_name:
-                seller_name = f"{random.choice(first_names)} {random.choice(last_names)}"
-            
-            financing_type = random.choice(financing_types)
-            
-            # Create the sale record
             sale = Sale(
                 parcel_id=parcel.id,
                 sale_date=sale_date,
                 sale_price=sale_price,
-                sale_type=sale_type,
-                transaction_id=transaction_id,
-                buyer_name=buyer_name,
-                seller_name=seller_name,
-                financing_type=financing_type
+                sale_type=random.choice(sale_types),
+                transaction_id=fake.uuid4(),
+                buyer_name=fake.name(),
+                seller_name=fake.name(),
+                financing_type=random.choice(financing_types),
+                created_at=datetime.datetime.utcnow(),
+                updated_at=datetime.datetime.utcnow()
             )
             
             sales.append(sale)
     
-    # Add all sales to the database
+    # Add sales to the database
     db.session.add_all(sales)
     db.session.commit()
     
+    logger.info(f"Created {len(sales)} sample sales.")
     return sales
 
 def seed_database():
     """Main function to seed the database."""
+    logger.info("Starting database seeding...")
+    
     with app.app_context():
+        # Check if database is already seeded
+        existing_count = db.session.query(Parcel).count()
+        if existing_count > 0:
+            logger.info(f"Database already contains {existing_count} parcels. Skipping seeding.")
+            return
+        
         try:
-            # Check if database is already seeded
-            existing_count = Parcel.query.count()
-            if existing_count > 0:
-                logger.info(f"Database already contains {existing_count} parcels")
-                user_input = input("Do you want to add more sample data? (y/n): ")
-                if user_input.lower() != 'y':
-                    logger.info("Database seeding cancelled")
-                    return
+            # Create sample data
+            parcels = create_sample_parcels(count=50)
+            create_sample_properties(parcels)
+            create_sample_sales(parcels)
             
-            # Create sample data - adjust counts as needed
-            parcels = create_sample_parcels(count=20)
-            properties = create_sample_properties(parcels)
-            sales = create_sample_sales(parcels)
-            
-            logger.info(f"Created {len(parcels)} parcels")
-            logger.info(f"Created {len(properties)} properties")
-            logger.info(f"Created {len(sales)} sales")
-            
-            logger.info("Database seeding completed successfully")
-            
+            logger.info("Database seeding completed successfully.")
         except Exception as e:
-            logger.error(f"Error seeding database: {str(e)}")
             db.session.rollback()
+            logger.error(f"Error seeding database: {str(e)}")
+            raise
 
 if __name__ == "__main__":
     seed_database()

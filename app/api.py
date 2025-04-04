@@ -3,7 +3,8 @@ This module defines the API routes and handlers.
 """
 
 import logging
-from typing import Optional, Dict, Any
+import re
+from typing import Optional, Dict, Any, List, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
@@ -11,7 +12,7 @@ from starlette.responses import JSONResponse
 
 from app.db import execute_parameterized_query, parse_for_parameters, test_db_connections
 from app.models import (
-    SQLQuery, NLPrompt, QueryResult, SQLTranslation, 
+    SQLQuery, NLPrompt, QueryResult, SQLTranslation, ParameterizedSQLQuery,
     SchemaResponse, SchemaSummary, HealthResponse, SchemaItem
 )
 from app.openai_service import translate_nl_to_sql
@@ -93,6 +94,108 @@ async def run_sql_query(
         raise
     except Exception as e:
         logger.error(f"Error executing query: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Query execution error: {str(e)}"
+        )
+
+@router.post("/parameterized-query", response_model=QueryResult)
+async def run_parameterized_query(
+    payload: ParameterizedSQLQuery,
+    api_key: str = Depends(get_api_key)
+):
+    """
+    Execute a parameterized SQL query against the specified database.
+    
+    This endpoint provides a secure way to execute SQL queries with proper parameter binding,
+    which helps protect against SQL injection attacks. Parameters are passed separately
+    from the query string and bound by the database driver.
+    
+    Args:
+        payload: Contains the database type, SQL query with placeholders, parameter values,
+                and optional pagination parameters
+                
+    Returns:
+        QueryResult: The results of the SQL query with pagination metadata
+        
+    Raises:
+        HTTPException: If the query is unsafe or if a database error occurs
+    """
+    try:
+        # Extract query parameters
+        db = payload.db.value
+        query = payload.query
+        params = payload.params or {}
+        param_style = payload.param_style.value
+        page = payload.page
+        page_size = payload.page_size
+        
+        logger.info(f"Executing parameterized query on {db} with {len(params)} params")
+        
+        # Validate parameter usage in query based on param_style
+        if param_style == "named":
+            # Verify all named parameters are present
+            param_names = re.findall(r':(\w+)', query)
+            missing_params = [name for name in param_names if name not in params]
+            if missing_params:
+                logger.warning(f"Missing parameters: {missing_params}")
+                raise HTTPException(
+                    status_code=HTTP_400_BAD_REQUEST,
+                    detail=f"Missing parameters: {', '.join(missing_params)}"
+                )
+        elif param_style == "qmark":
+            # Count ? placeholders and verify params count matches
+            placeholder_count = query.count('?')
+            if not isinstance(params, list) and placeholder_count > 0:
+                # Convert dict to list if needed
+                try:
+                    params = list(params.values())
+                except (AttributeError, TypeError):
+                    logger.warning("Invalid parameters format for qmark style")
+                    raise HTTPException(
+                        status_code=HTTP_400_BAD_REQUEST,
+                        detail="For qmark style, parameters should be a list or dict with values"
+                    )
+            if placeholder_count != len(params):
+                logger.warning(f"Parameter count mismatch: {placeholder_count} placeholders, {len(params)} values")
+                raise HTTPException(
+                    status_code=HTTP_400_BAD_REQUEST,
+                    detail=f"Parameter count mismatch: {placeholder_count} placeholders, {len(params)} values"
+                )
+        
+        # Execute the query
+        try:
+            from app.query_executor import execute_parameterized_query as exec_query
+            result = await exec_query(payload, allow_write=False)
+            return result
+        except ImportError:
+            # Fallback to the db module function if query_executor isn't available
+            if param_style == "named":
+                # For named parameters, pass as dict
+                result = execute_parameterized_query(
+                    db=db,
+                    query=query,
+                    params=params,
+                    page=page,
+                    page_size=page_size
+                )
+            else:
+                # For qmark, numeric, or format style, pass as list
+                param_list = list(params.values()) if isinstance(params, dict) else params
+                result = execute_parameterized_query(
+                    db=db,
+                    query=query,
+                    params=param_list,
+                    page=page,
+                    page_size=page_size
+                )
+            
+            return result
+    except HTTPException:
+        # Pass through HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error executing parameterized query: {str(e)}")
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Query execution error: {str(e)}"
