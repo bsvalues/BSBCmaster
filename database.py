@@ -43,7 +43,7 @@ def index():
 @app.route('/api/docs/')
 def api_docs():
     """Proxy to FastAPI OpenAPI documentation."""
-    fastapi_url = "http://localhost:8000/api/docs"
+    fastapi_url = "http://0.0.0.0:8000/api/docs"
     try:
         response = requests.get(fastapi_url)
         return Response(
@@ -58,7 +58,7 @@ def api_docs():
 @app.route('/api/openapi.json')
 def openapi_schema():
     """Proxy to FastAPI OpenAPI schema."""
-    fastapi_url = "http://localhost:8000/api/openapi.json"
+    fastapi_url = "http://0.0.0.0:8000/api/openapi.json"
     try:
         response = requests.get(fastapi_url)
         return Response(
@@ -414,7 +414,7 @@ class Sale(db.Model):
 @app.route('/api/run-query', methods=['GET', 'POST'])
 def proxy_run_query():
     """Proxy for the FastAPI run-query endpoint."""
-    fastapi_url = "http://localhost:8000/api/run-query"
+    fastapi_url = "http://0.0.0.0:8000/api/run-query"
     try:
         if request.method == 'POST':
             # Forward the POST request to FastAPI
@@ -449,7 +449,7 @@ def proxy_run_query():
 @app.route('/api/nl-to-sql', methods=['POST'])
 def proxy_nl_to_sql():
     """Proxy for the FastAPI natural language to SQL endpoint."""
-    fastapi_url = "http://localhost:8000/api/nl-to-sql"
+    fastapi_url = "http://0.0.0.0:8000/api/nl-to-sql"
     try:
         headers = {key: value for key, value in request.headers if key != 'Host'}
         response = requests.post(
@@ -473,7 +473,7 @@ def proxy_nl_to_sql():
 @app.route('/api/discover-schema')
 def proxy_discover_schema():
     """Proxy for the FastAPI schema discovery endpoint."""
-    fastapi_url = "http://localhost:8000/api/discover-schema"
+    fastapi_url = "http://0.0.0.0:8000/api/discover-schema"
     try:
         # Forward the GET request parameters
         headers = {key: value for key, value in request.headers if key != 'Host'}
@@ -497,7 +497,7 @@ def proxy_discover_schema():
 @app.route('/api/schema-summary')
 def proxy_schema_summary():
     """Proxy for the FastAPI schema summary endpoint."""
-    fastapi_url = "http://localhost:8000/api/schema-summary"
+    fastapi_url = "http://0.0.0.0:8000/api/schema-summary"
     try:
         # Forward the GET request parameters
         headers = {key: value for key, value in request.headers if key != 'Host'}
