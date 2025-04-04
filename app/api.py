@@ -13,7 +13,8 @@ from .models import (
 )
 from .db import (
     get_mssql_connection, get_postgres_connection, 
-    is_safe_query, test_db_connections
+    is_safe_query, test_db_connections,
+    execute_parameterized_query, parse_for_parameters
 )
 from .settings import settings
 
@@ -83,23 +84,13 @@ async def run_sql_query(payload: SQLQuery):
         )
         
     try:
-        results = []
-        if payload.db == "mssql":
-            with get_mssql_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(payload.query)
-                rows = cursor.fetchall()
-                columns = [column[0] for column in cursor.description]
-                results = [dict(zip(columns, row)) for row in rows]
-                
-        elif payload.db == "postgres":
-            with get_postgres_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute(payload.query)
-                    rows = cursor.fetchall()
-                    columns = [desc[0] for desc in cursor.description]
-                    results = [dict(zip(columns, row)) for row in rows]
-                    
+        # Use our new parameterized query execution
+        # For raw queries, we attempt to extract parameters where possible
+        parameterized_query, params = parse_for_parameters(payload.query)
+        
+        # Execute the query with parameters
+        results = execute_parameterized_query(payload.db, parameterized_query, params)
+        
         # Apply result limitation
         total_count = len(results)
         truncated = total_count > settings.MAX_RESULTS
@@ -114,9 +105,11 @@ async def run_sql_query(payload: SQLQuery):
         
     except Exception as e:
         logger.error(f"Database error during query execution: {str(e)}")
+        # Don't expose detailed error messages to the client 
+        # as they might contain sensitive information
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database error: {str(e)}"
+            detail="Database error occurred. Please check your query syntax or contact the administrator."
         )
 
 @router.post(
@@ -160,7 +153,7 @@ async def nl_to_sql(prompt: NLPrompt):
         logger.error(f"Error in NL->SQL processing: {str(e)}")
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error processing natural language query"
+            detail="Error processing natural language query. Please try a different phrasing."
         )
 
 @router.get(
@@ -185,33 +178,25 @@ async def discover_schema(db: str = Query(..., regex="^(mssql|postgres)$")):
     
     try:
         if db == "mssql":
-            with get_mssql_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT 
-                        TABLE_NAME, 
-                        COLUMN_NAME, 
-                        DATA_TYPE 
-                    FROM INFORMATION_SCHEMA.COLUMNS
-                """)
-                rows = cursor.fetchall()
-                columns = [column[0] for column in cursor.description]
-                results = [dict(zip(columns, row)) for row in rows]
+            query = """
+                SELECT 
+                    TABLE_NAME, 
+                    COLUMN_NAME, 
+                    DATA_TYPE 
+                FROM INFORMATION_SCHEMA.COLUMNS
+            """
+            results = execute_parameterized_query(db, query)
                 
         elif db == "postgres":
-            with get_postgres_connection() as conn:
-                with conn.cursor() as cursor:
-                    cursor.execute("""
-                        SELECT 
-                            table_name, 
-                            column_name, 
-                            data_type 
-                        FROM information_schema.columns 
-                        WHERE table_schema = 'public'
-                    """)
-                    rows = cursor.fetchall()
-                    columns = [desc[0] for desc in cursor.description]
-                    results = [dict(zip(columns, row)) for row in rows]
+            query = """
+                SELECT 
+                    table_name, 
+                    column_name, 
+                    data_type 
+                FROM information_schema.columns 
+                WHERE table_schema = 'public'
+            """
+            results = execute_parameterized_query(db, query)
         
         return {"status": "success", "db_schema": results}
         
@@ -219,7 +204,7 @@ async def discover_schema(db: str = Query(..., regex="^(mssql|postgres)$")):
         logger.error(f"Error discovering schema: {str(e)}")
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error retrieving database schema"
+            detail="An error occurred while retrieving the database schema. Please ensure the database is properly configured."
         )
 
 @router.get(
@@ -250,71 +235,71 @@ async def get_schema_summary(
         table_summaries = []
         
         if db == "mssql":
-            with get_mssql_connection() as conn:
-                cursor = conn.cursor()
+            # Get list of tables
+            if prefix:
+                query = """
+                    SELECT DISTINCT TABLE_NAME
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME LIKE ?
+                    ORDER BY TABLE_NAME
+                """
+                tables_results = execute_parameterized_query(db, query, [f"{prefix}%"])
+            else:
+                query = """
+                    SELECT DISTINCT TABLE_NAME
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    ORDER BY TABLE_NAME
+                """
+                tables_results = execute_parameterized_query(db, query)
+            
+            tables = [row["TABLE_NAME"] for row in tables_results]
+            
+            # Get column info for each table
+            for table in tables:
+                query = """
+                    SELECT COLUMN_NAME, DATA_TYPE
+                    FROM INFORMATION_SCHEMA.COLUMNS
+                    WHERE TABLE_NAME = ?
+                    ORDER BY ORDINAL_POSITION
+                """
+                columns_results = execute_parameterized_query(db, query, [table])
                 
-                # Get list of tables
-                if prefix:
-                    cursor.execute("""
-                        SELECT DISTINCT TABLE_NAME
-                        FROM INFORMATION_SCHEMA.COLUMNS
-                        WHERE TABLE_NAME LIKE ?
-                        ORDER BY TABLE_NAME
-                    """, (f"{prefix}%",))
-                else:
-                    cursor.execute("""
-                        SELECT DISTINCT TABLE_NAME
-                        FROM INFORMATION_SCHEMA.COLUMNS
-                        ORDER BY TABLE_NAME
-                    """)
-                
-                tables = [row[0] for row in cursor.fetchall()]
-                
-                # Get column info for each table
-                for table in tables:
-                    cursor.execute("""
-                        SELECT COLUMN_NAME, DATA_TYPE
-                        FROM INFORMATION_SCHEMA.COLUMNS
-                        WHERE TABLE_NAME = ?
-                        ORDER BY ORDINAL_POSITION
-                    """, (table,))
-                    
-                    columns = [f"{row[0]} ({row[1]})" for row in cursor.fetchall()]
-                    table_summaries.append(f"{table}: {', '.join(columns)}")
-                
+                columns = [f"{row['COLUMN_NAME']} ({row['DATA_TYPE']})" for row in columns_results]
+                table_summaries.append(f"{table}: {', '.join(columns)}")
+            
         elif db == "postgres":
-            with get_postgres_connection() as conn:
-                with conn.cursor() as cursor:
-                    
-                    # Get list of tables
-                    if prefix:
-                        cursor.execute("""
-                            SELECT DISTINCT table_name
-                            FROM information_schema.columns
-                            WHERE table_schema = 'public' AND table_name LIKE %s
-                            ORDER BY table_name
-                        """, (f"{prefix}%",))
-                    else:
-                        cursor.execute("""
-                            SELECT DISTINCT table_name
-                            FROM information_schema.columns
-                            WHERE table_schema = 'public'
-                            ORDER BY table_name
-                        """)
-                    
-                    tables = [row[0] for row in cursor.fetchall()]
-                    
-                    # Get column info for each table
-                    for table in tables:
-                        cursor.execute("""
-                            SELECT column_name, data_type
-                            FROM information_schema.columns
-                            WHERE table_schema = 'public' AND table_name = %s
-                            ORDER BY ordinal_position
-                        """, (table,))
-                        
-                        columns = [f"{row[0]} ({row[1]})" for row in cursor.fetchall()]
-                        table_summaries.append(f"{table}: {', '.join(columns)}")
+            # Get list of tables
+            if prefix:
+                query = """
+                    SELECT DISTINCT table_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name LIKE %s
+                    ORDER BY table_name
+                """
+                tables_results = execute_parameterized_query(db, query, [f"{prefix}%"])
+            else:
+                query = """
+                    SELECT DISTINCT table_name
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                    ORDER BY table_name
+                """
+                tables_results = execute_parameterized_query(db, query)
+            
+            tables = [row["table_name"] for row in tables_results]
+            
+            # Get column info for each table
+            for table in tables:
+                query = """
+                    SELECT column_name, data_type
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public' AND table_name = %s
+                    ORDER BY ordinal_position
+                """
+                columns_results = execute_parameterized_query(db, query, [table])
+                
+                columns = [f"{row['column_name']} ({row['data_type']})" for row in columns_results]
+                table_summaries.append(f"{table}: {', '.join(columns)}")
         
         return {"status": "success", "summary": table_summaries}
         
@@ -322,5 +307,5 @@ async def get_schema_summary(
         logger.error(f"Error getting schema summary: {str(e)}")
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error retrieving database schema summary"
+            detail="An error occurred while retrieving the database schema summary. Please check your connection and try again."
         )

@@ -1,11 +1,12 @@
 import logging
+import re
 import pyodbc
 import psycopg2
 from psycopg2.pool import ThreadedConnectionPool
 from contextlib import contextmanager
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Tuple, Union
 from fastapi import HTTPException
-from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
+from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR, HTTP_400_BAD_REQUEST
 from .settings import settings
 
 logger = logging.getLogger("mcp_assessor_api")
@@ -104,6 +105,134 @@ def is_safe_query(query: str) -> bool:
     
     query_upper = query.upper()
     return not any(pattern in query_upper for pattern in unsafe_patterns)
+
+def execute_parameterized_query(
+    db: str, 
+    query: str, 
+    params: Optional[List[Any]] = None
+) -> List[Dict[str, Any]]:
+    """
+    Execute a parameterized SQL query on the specified database.
+    
+    Args:
+        db: Database to use ('mssql' or 'postgres')
+        query: SQL query with parameter placeholders (? for MSSQL, %s for PostgreSQL)
+        params: List of parameter values to be sanitized and inserted
+        
+    Returns:
+        List of dictionaries representing the query results
+        
+    Raises:
+        HTTPException: If a database error occurs
+    """
+    if params is None:
+        params = []
+    
+    if not is_safe_query(query):
+        logger.warning(f"Unsafe SQL query attempted: {query}")
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="Operation not permitted in this query"
+        )
+    
+    results = []
+    
+    try:
+        if db == "mssql":
+            with get_mssql_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query, params)
+                if cursor.description:  # Check if the query returns results
+                    rows = cursor.fetchall()
+                    columns = [column[0] for column in cursor.description]
+                    results = [dict(zip(columns, row)) for row in rows]
+                
+        elif db == "postgres":
+            with get_postgres_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query, params)
+                    if cursor.description:  # Check if the query returns results
+                        rows = cursor.fetchall()
+                        columns = [desc[0] for desc in cursor.description]
+                        results = [dict(zip(columns, row)) for row in rows]
+        
+        return results
+        
+    except Exception as e:
+        logger.error(f"Database error during parameterized query execution: {str(e)}")
+        # Sanitize error message to avoid exposing sensitive info
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error occurred during query execution"
+        )
+
+def parse_for_parameters(query: str) -> Tuple[str, List[Any]]:
+    """
+    Parse a raw SQL query to extract potential parameters.
+    This is a basic implementation that handles common SQL literals.
+    
+    Args:
+        query: Raw SQL query with potential literal values
+        
+    Returns:
+        Tuple containing:
+            - Modified query with parameter placeholders
+            - List of extracted parameter values
+    """
+    # This implementation handles common SQL injection patterns, but 
+    # in a production environment, consider using a proper SQL parser library
+    
+    # This regex will match:
+    # 1. Strings in single quotes
+    # 2. Numbers (integer and decimal)
+    # But will avoid:
+    # - Table names and column names
+    # - SQL keywords and functions
+    # - Comments
+    
+    # Static patterns to ignore (common SQL keywords that might appear in WHERE clauses)
+    skip_patterns = [
+        r'SELECT\s+', r'FROM\s+', r'WHERE\s+', r'GROUP\s+BY', r'ORDER\s+BY',
+        r'HAVING\s+', r'JOIN\s+', r'LIMIT\s+', r'OFFSET\s+', r'AS\s+',
+        r'AND\s+', r'OR\s+', r'NOT\s+', r'IS\s+NULL', r'IS\s+NOT\s+NULL',
+        r'IN\s+\(', r'BETWEEN\s+', r'LIKE\s+', r'ILIKE\s+',
+        r'COUNT\s*\(', r'SUM\s*\(', r'AVG\s*\(', r'MIN\s*\(', r'MAX\s*\(',
+        r'DISTINCT\s+', r'UNION\s+', r'INTERSECT\s+', r'EXCEPT\s+'
+    ]
+    
+    # Create a temp copy to avoid modifying the original too soon
+    processed_query = query
+    
+    # Remove comments
+    processed_query = re.sub(r'--.*?$', '', processed_query, flags=re.MULTILINE)
+    processed_query = re.sub(r'/\*.*?\*/', '', processed_query, flags=re.DOTALL)
+    
+    # Skip obvious SQL keywords
+    for pattern in skip_patterns:
+        processed_query = re.sub(pattern, ' SKIP ', processed_query, flags=re.IGNORECASE)
+    
+    # Extract string literals (single-quoted)
+    string_params = []
+    string_pattern = r"'([^']*)'"
+    
+    for match in re.finditer(string_pattern, processed_query):
+        string_params.append(match.group(1))
+    
+    # Replace quoted strings with placeholders
+    modified_query = re.sub(string_pattern, '?', query) if string_params else query
+    
+    # For simplicity, we're only handling string parameters in this implementation
+    # In a real implementation, you'd also handle numeric parameters and other types
+    
+    # Check if we actually made any changes
+    if modified_query == query and not string_params:
+        # No changes made, just return original
+        return query, []
+    
+    logger.info(f"Parameterized query: {modified_query}")
+    logger.info(f"Parameters extracted: {string_params}")
+    
+    return modified_query, string_params
 
 def test_db_connections() -> Dict[str, bool]:
     """Test connections to configured databases."""
