@@ -7,6 +7,8 @@ import logging
 import requests
 import datetime
 from flask import render_template, jsonify, request, Blueprint
+from models import Parcel, Property, Sale
+from sqlalchemy import func
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

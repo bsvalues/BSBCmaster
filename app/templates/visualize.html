@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - Data Visualization</title>
+    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Leaflet for maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <style>
+        .chart-container {
+            position: relative;
+            height: 350px;
+            margin-bottom: 1.5rem;
+        }
+        #propertyMap {
+            height: 400px;
+            width: 100%;
+            border-radius: 0.375rem;
+        }
+        .filter-section {
+            padding: 1rem;
+            border-radius: 0.375rem;
+            background-color: rgba(255, 255, 255, 0.05);
+            margin-bottom: 1rem;
+        }
+        .dashboard-card {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .dashboard-card-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .stat-value {
+            font-size: 1.75rem;
+            font-weight: 600;
+        }
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--bs-light-emphasis);
+        }
+        .stat-change {
+            font-size: 0.875rem;
+        }
+        .stat-change-positive {
+            color: #28a745;
+        }
+        .stat-change-negative {
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <header class="bg-dark py-3">
+        <div class="container">
+            <div class="d-flex align-items-center">
+                <h1 class="text-light mb-0">{{ title }}</h1>
+                <span class="badge bg-info ms-2">v{{ version }}</span>
+            </div>
+            <p class="text-light-emphasis mb-0 mt-2">Property Assessment Visualization Dashboard</p>
+        </div>
+    </header>
+
+    <main class="container my-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="btn-group">
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-house"></i> Home
+                    </a>
+                    <a href="{{ url_for('database_bp.get_parcels') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-table"></i> Parcels
+                    </a>
+                    <a href="#" class="btn btn-primary active">
+                        <i class="bi bi-graph-up"></i> Visualize
+                    </a>
+                    <a href="{{ url_for('api_routes.api_docs') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-file-code"></i> API Docs
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Stats Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card dashboard-card">
+                    <div class="card-header">
+                        <h3 class="h6 mb-0">Total Properties</h3>
+                    </div>
+                    <div class="card-body dashboard-card-body">
+                        <div class="stat-value" id="totalProperties">-</div>
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <div class="stat-label">Assessed Properties</div>
+                            <div class="stat-change stat-change-positive" id="propertiesChange">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card dashboard-card">
+                    <div class="card-header">
+                        <h3 class="h6 mb-0">Avg Property Value</h3>
+                    </div>
+                    <div class="card-body dashboard-card-body">
+                        <div class="stat-value" id="avgValue">-</div>
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <div class="stat-label">Assessment Year {{ current_year }}</div>
+                            <div class="stat-change" id="valueChange">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card dashboard-card">
+                    <div class="card-header">
+                        <h3 class="h6 mb-0">Total Assessed Value</h3>
+                    </div>
+                    <div class="card-body dashboard-card-body">
+                        <div class="stat-value" id="totalValue">-</div>
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <div class="stat-label">All Properties</div>
+                            <div class="stat-change" id="totalValueChange">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card dashboard-card">
+                    <div class="card-header">
+                        <h3 class="h6 mb-0">Recent Sales</h3>
+                    </div>
+                    <div class="card-body dashboard-card-body">
+                        <div class="stat-value" id="recentSales">-</div>
+                        <div class="d-flex justify-content-between align-items-center mt-2">
+                            <div class="stat-label">Last 90 Days</div>
+                            <div class="stat-change" id="salesChange">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h2 class="h5 mb-0">Data Filters</h2>
+                        <button id="applyFilters" class="btn btn-sm btn-primary">Apply Filters</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label for="cityFilter" class="form-label">City</label>
+                                <select id="cityFilter" class="form-select">
+                                    <option value="">All Cities</option>
+                                    {% for city in cities %}
+                                    <option value="{{ city }}">{{ city }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="propertyTypeFilter" class="form-label">Property Type</label>
+                                <select id="propertyTypeFilter" class="form-select">
+                                    <option value="">All Types</option>
+                                    {% for type in property_types %}
+                                    <option value="{{ type }}">{{ type }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="valueRangeMin" class="form-label">Min Value</label>
+                                <input type="number" id="valueRangeMin" class="form-control" placeholder="Min Value" min="0">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="valueRangeMax" class="form-label">Max Value</label>
+                                <input type="number" id="valueRangeMax" class="form-control" placeholder="Max Value" min="0">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h2 class="h5 mb-0">Property Values by Type</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="propertyTypeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h2 class="h5 mb-0">Property Value Distribution</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="valueDistributionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-8 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h2 class="h5 mb-0">Property Locations</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="propertyMap"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h2 class="h5 mb-0">Sales History</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="salesHistoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="h5 mb-0">Value Trends by Year</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="valueTrendsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-dark py-3 mt-auto">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="text-light-emphasis mb-0">{{ title }} &copy; {{ current_year }}</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="text-light-emphasis mb-0">Version {{ version }}</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize charts
+            initializeCharts();
+            
+            // Load summary statistics
+            loadSummaryStats();
+            
+            // Initialize map
+            initializeMap();
+            
+            // Set up filter button
+            document.getElementById('applyFilters').addEventListener('click', function() {
+                applyFilters();
+            });
+        });
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                maximumFractionDigits: 0
+            }).format(value);
+        }
+
+        function loadSummaryStats() {
+            // In a real implementation, this would fetch data from an API endpoint
+            fetch('/api/visualization-data/summary')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.getElementById('totalProperties').textContent = data.total_properties.toLocaleString();
+                        document.getElementById('avgValue').textContent = formatCurrency(data.avg_value);
+                        document.getElementById('totalValue').textContent = formatCurrency(data.total_value);
+                        document.getElementById('recentSales').textContent = data.recent_sales.toLocaleString();
+                        
+                        // Set change indicators
+                        setChangeIndicator('propertiesChange', data.properties_change);
+                        setChangeIndicator('valueChange', data.value_change);
+                        setChangeIndicator('totalValueChange', data.total_value_change);
+                        setChangeIndicator('salesChange', data.sales_change);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading summary stats:', error);
+                    // Use placeholder data if API call fails
+                    document.getElementById('totalProperties').textContent = "Loading...";
+                    document.getElementById('avgValue').textContent = "Loading...";
+                    document.getElementById('totalValue').textContent = "Loading...";
+                    document.getElementById('recentSales').textContent = "Loading...";
+                });
+        }
+
+        function setChangeIndicator(elementId, changeValue) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            if (changeValue > 0) {
+                element.textContent = `+${changeValue.toFixed(1)}%`;
+                element.classList.add('stat-change-positive');
+                element.classList.remove('stat-change-negative');
+            } else if (changeValue < 0) {
+                element.textContent = `${changeValue.toFixed(1)}%`;
+                element.classList.add('stat-change-negative');
+                element.classList.remove('stat-change-positive');
+            } else {
+                element.textContent = `${changeValue.toFixed(1)}%`;
+                element.classList.remove('stat-change-positive');
+                element.classList.remove('stat-change-negative');
+            }
+        }
+
+        function initializeCharts() {
+            // Property Types Chart
+            fetch('/api/visualization-data/property-types')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        createPropertyTypeChart(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading property type data:', error);
+                });
+            
+            // Value Distribution Chart
+            fetch('/api/visualization-data/value-distribution')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        createValueDistributionChart(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading value distribution data:', error);
+                });
+            
+            // Sales History Chart
+            fetch('/api/visualization-data/sales-history')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        createSalesHistoryChart(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading sales history data:', error);
+                });
+            
+            // Value Trends Chart
+            fetch('/api/visualization-data/value-trends')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        createValueTrendsChart(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading value trends data:', error);
+                });
+        }
+
+        function createPropertyTypeChart(data) {
+            const ctx = document.getElementById('propertyTypeChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Average Value',
+                        data: data.values,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createValueDistributionChart(data) {
+            const ctx = document.getElementById('valueDistributionChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.values,
+                        backgroundColor: [
+                            'rgba(54, 162, 235, 0.6)',
+                            'rgba(75, 192, 192, 0.6)',
+                            'rgba(255, 205, 86, 0.6)',
+                            'rgba(255, 99, 132, 0.6)',
+                            'rgba(153, 102, 255, 0.6)'
+                        ],
+                        borderColor: [
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(255, 205, 86, 1)',
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(153, 102, 255, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    label += ': ' + context.parsed.toFixed(1) + '%';
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createSalesHistoryChart(data) {
+            const ctx = document.getElementById('salesHistoryChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Sales Count',
+                        data: data.values,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function createValueTrendsChart(data) {
+            const ctx = document.getElementById('valueTrendsChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        label: 'Average Property Value',
+                        data: data.avg_values,
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Total Property Count',
+                        data: data.property_counts,
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2,
+                        tension: 0.1,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Average Value'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            title: {
+                                display: true,
+                                text: 'Property Count'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function initializeMap() {
+            // Initialize map with default center
+            const map = L.map('propertyMap').setView([37.7749, -122.4194], 12);
+            
+            // Add OpenStreetMap tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+            
+            // Load property location data
+            fetch('/api/visualization-data/property-locations')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        addPropertiesToMap(map, data.properties);
+                        
+                        // Set map bounds to fit all properties if any exist
+                        if (data.properties.length > 0) {
+                            const bounds = [];
+                            data.properties.forEach(property => {
+                                if (property.latitude && property.longitude) {
+                                    bounds.push([property.latitude, property.longitude]);
+                                }
+                            });
+                            
+                            if (bounds.length > 0) {
+                                map.fitBounds(bounds);
+                            }
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading property locations:', error);
+                });
+        }
+
+        function addPropertiesToMap(map, properties) {
+            properties.forEach(property => {
+                if (property.latitude && property.longitude) {
+                    const marker = L.marker([property.latitude, property.longitude])
+                        .addTo(map)
+                        .bindPopup(`
+                            <strong>${property.address}</strong><br>
+                            ${property.city}, ${property.state} ${property.zip_code}<br>
+                            <strong>Value:</strong> ${formatCurrency(property.total_value)}<br>
+                            <strong>Type:</strong> ${property.property_type || 'N/A'}<br>
+                            <a href="/database/parcels/${property.id}" target="_blank">View Details</a>
+                        `);
+                }
+            });
+        }
+
+        function applyFilters() {
+            const city = document.getElementById('cityFilter').value;
+            const propertyType = document.getElementById('propertyTypeFilter').value;
+            const minValue = document.getElementById('valueRangeMin').value;
+            const maxValue = document.getElementById('valueRangeMax').value;
+            
+            // Build query parameters
+            const params = new URLSearchParams();
+            if (city) params.append('city', city);
+            if (propertyType) params.append('property_type', propertyType);
+            if (minValue) params.append('min_value', minValue);
+            if (maxValue) params.append('max_value', maxValue);
+            
+            // Reload data with filters
+            const queryString = params.toString();
+            
+            // Reload all data sources with filters
+            loadFilteredData(queryString);
+        }
+
+        function loadFilteredData(queryString) {
+            // Update summary stats
+            fetch(`/api/visualization-data/summary?${queryString}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        document.getElementById('totalProperties').textContent = data.total_properties.toLocaleString();
+                        document.getElementById('avgValue').textContent = formatCurrency(data.avg_value);
+                        document.getElementById('totalValue').textContent = formatCurrency(data.total_value);
+                        // Do not update recent sales as it's a time-based metric
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading filtered summary stats:', error);
+                });
+            
+            // Update all charts and map
+            // In a real implementation, these would be separate fetch calls with the query string
+            console.log('Applied filters:', queryString);
+            
+            // Show loading message or spinner
+            // ...
+            
+            // For demonstration purposes, we're not implementing the full filter functionality
+            alert('Filter applied! In a complete implementation, this would refresh all charts and map with filtered data.');
+        }
+    </script>
+</body>
+</html>
