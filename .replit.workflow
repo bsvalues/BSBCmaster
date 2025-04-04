@@ -1,1 +1,1 @@
-run = "./start_both.sh"
+run = ["bash", "./start_both.sh"]

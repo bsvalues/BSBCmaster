@@ -66,7 +66,7 @@ def start_fastapi_service():
     try:
         logger.info("Starting FastAPI service on port 8000")
         process = subprocess.Popen(
-            ["python", "-m", "uvicorn", "asgi:app", "--host", "0.0.0.0", "--port", "8000"],
+            ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"], 
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             universal_newlines=True,
@@ -80,6 +80,16 @@ def start_fastapi_service():
                     logger.info(f"[FastAPI] {line.strip()}")
         
         threading.Thread(target=log_fastapi_output, daemon=True).start()
+        
+        # Wait a moment to ensure it starts correctly
+        time.sleep(3)
+        
+        # Check if the process is still running
+        if process.poll() is not None:
+            logger.error(f"FastAPI failed to start (exit code {process.returncode})")
+            return None
+            
+        logger.info("FastAPI service started successfully on port 8000")
         return process
     except Exception as e:
         logger.error(f"Error starting FastAPI service: {e}")
