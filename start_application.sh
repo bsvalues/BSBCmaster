@@ -1,26 +1,11 @@
 #!/bin/bash
 
-# This script starts the MCP Assessor Agent API application with both Flask and FastAPI services
+# This script starts the MCP Assessor Agent API
+# - Flask documentation on port 5000
+# - FastAPI service on port 8000
 
-# Load environment variables from .env file if it exists
-if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs)
-fi
+echo "Starting MCP Assessor Agent API..."
 
-# Set the environment variables (overriding .env if needed)
-export FLASK_PORT=5000
-export FASTAPI_PORT=8000
-export FASTAPI_URL=http://localhost:8000
-
-# Set API_KEY if not already set
-if [ -z "$API_KEY" ]; then
-    export API_KEY=b6212a0ff43102f608553e842293eba0ec013ff6926459f96fba31d0fabacd2e
-fi
-
-# Check if the database needs to be seeded
-echo "Checking database setup..."
-python seed_database.py
-
-# Start the workflow manager to run both services
-echo "Starting MCP Assessor Agent API services..."
-python workflow.py
+# Use the configured workflow to start the application
+echo "Starting both services using Replit workflow..."
+./start_services.sh

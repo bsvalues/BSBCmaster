@@ -1,7 +1,7 @@
 [project]
 name = "repl-nix-workspace"
 version = "0.1.0"
-description = "Add your description here"
+description = "MCP Assessor Agent API"
 requires-python = ">=3.11"
 dependencies = [
     "email-validator>=2.2.0",
@@ -24,5 +24,4 @@ dependencies = [
     "python-dotenv>=1.1.0",
     "faker>=37.1.0",
     "sqlalchemy>=2.0.40",
-    "dotenv>=0.9.9",
 ]
