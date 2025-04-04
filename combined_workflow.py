@@ -52,7 +52,7 @@ def start_fastapi():
         except Exception:
             pass
         
-        # Start FastAPI service using uvicorn
+        # Start FastAPI service using uvicorn with specific parameters
         cmd = ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
         logger.info(f"Starting FastAPI service: {' '.join(cmd)}")
         

@@ -164,7 +164,8 @@ def start_fastapi():
                 pass
             
             # Start FastAPI with uvicorn
-            cmd = ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+            # Fix the command to use a different import path
+            cmd = ["python", "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
             logger.info(f"Starting FastAPI service with command: {' '.join(cmd)}")
             
             fastapi_process = subprocess.Popen(
