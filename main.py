@@ -55,9 +55,42 @@ def index():
                           base_url=base_url,
                           current_year=datetime.now().year)
 
+def validate_api_key():
+    """Validate the API key provided in the request header."""
+    from app.settings import settings
+    from flask import request
+    import secrets
+    
+    # Get the API key from request headers
+    api_key_header = request.headers.get(settings.API_KEY_HEADER_NAME)
+    
+    # Log the attempt (but not the key itself)
+    request_id = secrets.token_hex(6)  # Generate a unique ID for this request
+    
+    if not api_key_header:
+        # Use a generic 401 Unauthorized response for missing key
+        return {
+            "valid": False,
+            "error": "API key is missing in request headers",
+            "status_code": 401
+        }
+    
+    # Test the provided key against our stored key
+    if api_key_header != settings.API_KEY:
+        # Use a 403 Forbidden response for invalid keys
+        return {
+            "valid": False,
+            "error": "Invalid API key provided",
+            "status_code": 403
+        }
+    
+    # API key is valid
+    return {"valid": True}
+
 @app.route('/api/health')
 def health_check():
     """Check the health of the API and its database connections."""
+    # API health checks are public and don't require authentication
     db_status = test_db_connections()
     
     return jsonify({
@@ -74,12 +107,15 @@ def api_docs():
     db_status = test_db_connections()
     
     # Create API documentation
+    from app.settings import settings
+    
     api_endpoints = [
         {
             "path": "/api/health",
             "method": "GET",
             "description": "Check API health and database connections",
             "parameters": [],
+            "auth_required": False,
             "responses": {
                 "200": {
                     "description": "API health status",
@@ -103,6 +139,8 @@ def api_docs():
             "path": "/api/run-query",
             "method": "POST",
             "description": "Execute SQL query against specified database with pagination",
+            "auth_required": True,
+            "auth_header": settings.API_KEY_HEADER_NAME,
             "parameters": {
                 "db": {"type": "string", "required": True, "description": "Database type (mssql or postgres)"},
                 "query": {"type": "string", "required": True, "description": "SQL query to execute"},
@@ -112,6 +150,8 @@ def api_docs():
             "responses": {
                 "200": {"description": "Query results with pagination metadata"},
                 "400": {"description": "Bad request - invalid query or parameters"},
+                "401": {"description": "Unauthorized - Missing API key"},
+                "403": {"description": "Forbidden - Invalid API key"},
                 "500": {"description": "Database error"}
             }
         },
@@ -119,6 +159,8 @@ def api_docs():
             "path": "/api/nl-to-sql",
             "method": "POST",
             "description": "Convert natural language to SQL query",
+            "auth_required": True,
+            "auth_header": settings.API_KEY_HEADER_NAME,
             "parameters": {
                 "db": {"type": "string", "required": True, "description": "Database type (mssql or postgres)"},
                 "prompt": {"type": "string", "required": True, "description": "Natural language prompt to convert to SQL"}
@@ -126,6 +168,8 @@ def api_docs():
             "responses": {
                 "200": {"description": "Translated SQL query"},
                 "400": {"description": "Bad request - missing parameters"},
+                "401": {"description": "Unauthorized - Missing API key"},
+                "403": {"description": "Forbidden - Invalid API key"},
                 "500": {"description": "Translation error"}
             }
         },
@@ -133,12 +177,16 @@ def api_docs():
             "path": "/api/discover-schema",
             "method": "GET",
             "description": "Discover database schema",
+            "auth_required": True,
+            "auth_header": settings.API_KEY_HEADER_NAME,
             "parameters": {
                 "db": {"type": "string", "required": True, "description": "Database type (mssql or postgres)"}
             },
             "responses": {
                 "200": {"description": "Database schema information"},
                 "400": {"description": "Bad request - invalid parameters"},
+                "401": {"description": "Unauthorized - Missing API key"},
+                "403": {"description": "Forbidden - Invalid API key"},
                 "500": {"description": "Schema discovery error"}
             }
         },
@@ -146,6 +194,8 @@ def api_docs():
             "path": "/api/schema-summary",
             "method": "GET",
             "description": "Get a summarized view of the database schema",
+            "auth_required": True,
+            "auth_header": settings.API_KEY_HEADER_NAME,
             "parameters": {
                 "db": {"type": "string", "required": True, "description": "Database type (mssql or postgres)"},
                 "prefix": {"type": "string", "required": False, "description": "Optional table name prefix to filter by"}
@@ -153,6 +203,8 @@ def api_docs():
             "responses": {
                 "200": {"description": "Schema summary information"},
                 "400": {"description": "Bad request - invalid parameters"},
+                "401": {"description": "Unauthorized - Missing API key"},
+                "403": {"description": "Forbidden - Invalid API key"},
                 "500": {"description": "Schema summary error"}
             }
         }
@@ -162,6 +214,11 @@ def api_docs():
         "title": "MCP Assessor Agent API",
         "version": "1.1.0",
         "description": "API for executing SQL queries and exploring database schemas with robust security",
+        "authentication": {
+            "type": "API Key",
+            "header": settings.API_KEY_HEADER_NAME,
+            "description": "Most endpoints require API key authentication. Include the API key in the request header."
+        },
         "endpoints": api_endpoints,
         "status": "ok",
         "db_connections": db_status
@@ -172,6 +229,14 @@ def api_docs():
 def run_sql_query():
     from app.db import get_postgres_connection, is_safe_query
     from flask import request
+    
+    # Validate API key
+    auth_result = validate_api_key()
+    if not auth_result.get("valid"):
+        return jsonify({
+            "status": "error",
+            "detail": auth_result.get("error")
+        }), auth_result.get("status_code")
     
     # Get JSON data from request
     data = request.get_json()
@@ -251,6 +316,14 @@ def run_sql_query():
 def nl_to_sql():
     from flask import request
     
+    # Validate API key
+    auth_result = validate_api_key()
+    if not auth_result.get("valid"):
+        return jsonify({
+            "status": "error",
+            "detail": auth_result.get("error")
+        }), auth_result.get("status_code")
+    
     # Get JSON data from request
     data = request.get_json()
     if not data or 'db' not in data or 'prompt' not in data:
@@ -285,6 +358,14 @@ def nl_to_sql():
 def discover_schema():
     from app.db import get_postgres_connection
     from flask import request
+    
+    # Validate API key
+    auth_result = validate_api_key()
+    if not auth_result.get("valid"):
+        return jsonify({
+            "status": "error",
+            "detail": auth_result.get("error")
+        }), auth_result.get("status_code")
     
     db = request.args.get('db')
     if not db or db not in ['mssql', 'postgres']:
@@ -351,6 +432,14 @@ def discover_schema():
 def schema_summary():
     from app.db import get_postgres_connection
     from flask import request
+    
+    # Validate API key
+    auth_result = validate_api_key()
+    if not auth_result.get("valid"):
+        return jsonify({
+            "status": "error",
+            "detail": auth_result.get("error")
+        }), auth_result.get("status_code")
     
     db = request.args.get('db')
     prefix = request.args.get('prefix', '')
