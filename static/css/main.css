@@ -1,104 +1,239 @@
-/**
- * MCP Assessor Agent API - Custom CSS
- */
+/* Main CSS styles for MCP Assessor Agent API */
 
-/* Pre-formatted code blocks */
+/* Global styles */
+:root {
+    --primary-color: #0d6efd;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+    --light-color: #f8f9fa;
+    --dark-color: #212529;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+main {
+    flex: 1;
+}
+
+/* Header and navigation */
+.navbar-brand img {
+    height: 30px;
+    margin-right: 10px;
+}
+
+/* Card customizations */
+.card {
+    margin-bottom: 1.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.card-header {
+    background-color: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Button customizations */
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon svg {
+    margin-right: 0.5rem;
+}
+
+/* API documentation styles */
+.endpoint-method {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-weight: bold;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    min-width: 60px;
+    text-align: center;
+}
+
+.endpoint-method-get {
+    background-color: var(--success-color);
+    color: white;
+}
+
+.endpoint-method-post {
+    background-color: var(--warning-color);
+    color: black;
+}
+
+.endpoint-method-put {
+    background-color: var(--info-color);
+    color: white;
+}
+
+.endpoint-method-delete {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+/* Code highlighting */
 pre {
-  background-color: var(--bs-dark);
-  border-radius: 0.375rem;
-  padding: 1rem;
-  margin-bottom: 1rem;
-  overflow-x: auto;
-  font-size: 0.875rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    overflow-x: auto;
 }
 
-pre code {
-  color: var(--bs-light);
-  display: block;
-  line-height: 1.5;
+code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.875rem;
 }
 
-/* API Key highlighting */
-.api-key-header {
-  color: var(--bs-info);
-  font-weight: bold;
+/* Table styling */
+.table-responsive {
+    margin-bottom: 1.5rem;
 }
 
-/* Status indicators */
-.status-indicator {
-  display: inline-flex;
-  align-items: center;
+.table th {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
-.status-indicator i {
-  margin-right: 0.375rem;
+.table td {
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Tab content for code examples */
-.code-tab-content {
-  border: 1px solid var(--bs-border-color);
-  border-top: none;
-  border-radius: 0 0 0.375rem 0.375rem;
-  padding: 1rem;
-  background-color: var(--bs-dark);
+/* Visualization specific styles */
+.chart-container {
+    position: relative;
+    height: 350px;
+    margin-bottom: 1.5rem;
 }
 
-.nav-tabs .nav-link.active {
-  background-color: var(--bs-gray-800);
-  border-color: var(--bs-border-color) var(--bs-border-color) var(--bs-gray-800);
-  color: var(--bs-light);
+.property-map {
+    height: 400px;
+    width: 100%;
+    border-radius: 0.375rem;
 }
 
-.nav-tabs .nav-link:not(.active) {
-  color: var(--bs-secondary);
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 600;
 }
 
-/* Authentication badge */
-.auth-badge {
-  display: inline-flex;
-  align-items: center;
+.stat-label {
+    font-size: 0.875rem;
+    color: var(--bs-light-emphasis);
 }
 
-.auth-badge i {
-  margin-right: 0.25rem;
+.stat-change {
+    font-size: 0.875rem;
 }
 
-/* Additional spacing utilities */
-.mt-6 {
-  margin-top: 4rem;
+.stat-change-positive {
+    color: var(--success-color);
 }
 
-.mb-6 {
-  margin-bottom: 4rem;
+.stat-change-negative {
+    color: var(--danger-color);
 }
 
-/* Cards with equal height in a row */
-.card-deck .card {
-  height: 100%;
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .chart-container {
+        height: 250px;
+    }
+    
+    .property-map {
+        height: 300px;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+    }
 }
 
-/* Endpoint cards */
-.endpoint-card {
-  transition: transform 0.2s ease;
+/* Loading indicators */
+.loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
 }
 
-.endpoint-card:hover {
-  transform: translateY(-5px);
+.loading-spinner {
+    width: 3rem;
+    height: 3rem;
 }
 
-/* API Method badges */
-.badge-get {
-  background-color: var(--bs-success);
+/* Filters section */
+.filter-section {
+    padding: 1rem;
+    border-radius: 0.375rem;
+    background-color: rgba(255, 255, 255, 0.05);
+    margin-bottom: 1rem;
 }
 
-.badge-post {
-  background-color: var(--bs-primary);
+/* Badge styling */
+.badge-count {
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: 9999px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
 }
 
-.badge-put {
-  background-color: var(--bs-warning);
+/* Tooltip styling */
+.tooltip-inner {
+    max-width: 300px;
+    background-color: var(--dark-color);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.2);
 }
 
-.badge-delete {
-  background-color: var(--bs-danger);
+/* Form styling */
+.form-control, .form-select {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--bs-body-color);
+}
+
+.form-control:focus, .form-select:focus {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Accordion customization */
+.accordion-item {
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.accordion-button {
+    background-color: rgba(255, 255, 255, 0.03);
+}
+
+.accordion-button:not(.collapsed) {
+    background-color: rgba(13, 110, 253, 0.1);
+    color: var(--primary-color);
+}
+
+/* List group customization */
+.list-group-item {
+    background-color: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.05);
+}
+
+.list-group-item-action:hover {
+    background-color: rgba(255, 255, 255, 0.08);
 }

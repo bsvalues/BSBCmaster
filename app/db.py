@@ -115,6 +115,26 @@ def get_postgres_connection():
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Database connection error: {str(e)}",
         )
+        
+def get_pg_connection():
+    """
+    Alias for get_postgres_connection for consistency with query_executor module.
+    """
+    return get_postgres_connection()
+    
+def close_pg_connection(conn):
+    """
+    Return a PostgreSQL connection to the connection pool.
+    
+    Args:
+        conn: The PostgreSQL connection to return to the pool
+    """
+    global pg_pool
+    if conn and pg_pool:
+        try:
+            pg_pool.putconn(conn)
+        except Exception as e:
+            logger.error(f"Error returning PostgreSQL connection to pool: {str(e)}")
 
 def is_safe_query(query: str) -> bool:
     """

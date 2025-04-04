@@ -169,13 +169,18 @@ async def run_parameterized_query(
                     detail=f"Parameter count mismatch: {placeholder_count} placeholders, {len(params)} values"
                 )
         
-        # Execute the query
+        # Execute the query using the enhanced query executor if available
         try:
+            # Import the enhanced query executor
             from app.query_executor import execute_parameterized_query as exec_query
+            
+            # Use the enhanced executor with advanced features
             result = await exec_query(payload, allow_write=False)
             return result
-        except ImportError:
-            # Fallback to the db module function if query_executor isn't available
+        except ImportError as ie:
+            logger.warning(f"Enhanced query executor not available: {str(ie)}. Falling back to basic executor.")
+            
+            # Fallback to the db module function if enhanced executor isn't available
             if param_style == "named":
                 # For named parameters, pass as dict
                 result = execute_parameterized_query(
