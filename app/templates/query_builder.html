@@ -285,53 +285,182 @@
     
     <!-- Results Panel -->
     <div id="results-panel" class="row mb-4" style="display: none;">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
         <div class="col-md-12">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
             <div class="card bg-dark">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                 <div class="card-header d-flex justify-content-between align-items-center">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                     <span>Query Results</span>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                     <div class="d-flex">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                         <button type="button" id="download-csv-btn" class="btn btn-sm btn-outline-success me-2">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                             <i class="bi bi-download"></i> Download CSV
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                         </button>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                         <button type="button" id="download-json-btn" class="btn btn-sm btn-outline-info">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                             <i class="bi bi-download"></i> Download JSON
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                         </button>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                     </div>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                 </div>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                 <div class="card-body">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                     <div class="d-flex justify-content-between mb-3">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                         <div class="stats-info">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                             <span id="execution-time"></span>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                         </div>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                         <div class="pagination-info">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                             <span id="pagination-summary"></span>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                             <div class="btn-group ms-2" role="group" aria-label="Pagination">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                                 <button type="button" id="prev-page-btn" class="btn btn-sm btn-outline-secondary" disabled>Previous</button>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                                 <button type="button" id="next-page-btn" class="btn btn-sm btn-outline-secondary" disabled>Next</button>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                             </div>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                         </div>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                     </div>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                     
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                     <div id="query-results-container" class="results-container">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                         <table id="results-table" class="table table-dark table-hover results-table mb-0">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                             <thead id="results-thead">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                                 <!-- Headers will be inserted here -->
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                             </thead>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                             <tbody id="results-tbody">
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                                 <!-- Results will be inserted here -->
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                             </tbody>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                         </table>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                     </div>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
                 </div>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
             </div>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
         </div>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
     </div>
+    
+    <!-- Include visualization component -->
+    {% include "query_visualization.html" %}
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/sql/sql.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="/static/js/query_visualization.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize CodeMirror for SQL editor
@@ -617,6 +746,9 @@
         
         // Function to display query results
         function displayResults(data) {
+            // Store results globally for visualization and export
+            window.lastResults = data;
+            
             // Update pagination state
             currentPage = data.pagination.page;
             totalPages = data.pagination.total_pages || data.pagination.pages;
@@ -711,7 +843,12 @@
             const schemaContainer = document.getElementById('schema-container');
             
             // Organize schema by tables
-            const tables = {};
+            const tables = {
+            // Show visualization options if there's data
+            if (data.data && data.data.length > 0) {
+                document.getElementById('visualization-container').style.display = 'flex';
+            }
+};
             
             data.db_schema.forEach(item => {
                 if (!tables[item.table_name]) {
@@ -1076,7 +1213,245 @@
             document.getElementById('sql-panel').insertBefore(alertDiv, document.getElementById('sql-query-form').nextSibling);
         }
         
-        // Function to clear alerts
+        // Function to clea
+        // Visualization code
+        const toggleVizBtn = document.getElementById('toggle-viz-btn');
+        const chartContainer = document.getElementById('chart-container');
+        const visualizationContainer = document.getElementById('visualization-container');
+        
+        if (toggleVizBtn) {
+            toggleVizBtn.addEventListener('click', function() {
+                const isHidden = chartContainer.style.display === 'none';
+                chartContainer.style.display = isHidden ? 'block' : 'none';
+                
+                if (isHidden && window.lastResults && window.lastResults.data) {
+                    updateChartSelectors();
+                    updateChart();
+                }
+            });
+        }
+        
+        // Chart selectors
+        const chartTypeSelect = document.getElementById('chartType');
+        const xAxisSelect = document.getElementById('xAxis');
+        const yAxisSelect = document.getElementById('yAxis');
+        
+        if (chartTypeSelect && xAxisSelect && yAxisSelect) {
+            chartTypeSelect.addEventListener('change', updateChart);
+            xAxisSelect.addEventListener('change', updateChart);
+            yAxisSelect.addEventListener('change', updateChart);
+        }
+        
+        // Update chart selectors
+        function updateChartSelectors() {
+            if (!window.lastResults || !window.lastResults.data || window.lastResults.data.length === 0) {
+                return;
+            }
+            
+            // Clear existing options
+            xAxisSelect.innerHTML = '';
+            yAxisSelect.innerHTML = '';
+            
+            // Get data columns
+            const data = window.lastResults.data;
+            const columns = Object.keys(data[0]);
+            
+            // Get column types
+            const numericColumns = getNumericColumns(data);
+            const dateColumns = getDateColumns(data);
+            const textColumns = getTextColumns(data);
+            
+            // Add options for X-axis (prefer text/date columns first)
+            [...textColumns, ...dateColumns, ...numericColumns, ...columns.filter(c => 
+                !textColumns.includes(c) && !dateColumns.includes(c) && !numericColumns.includes(c)
+            )].forEach(column => {
+                const option = document.createElement('option');
+                option.value = column;
+                option.textContent = column;
+                xAxisSelect.appendChild(option);
+            });
+            
+            // Add options for Y-axis (prefer numeric columns first)
+            [...numericColumns, ...columns.filter(c => !numericColumns.includes(c))].forEach(column => {
+                const option = document.createElement('option');
+                option.value = column;
+                option.textContent = column;
+                yAxisSelect.appendChild(option);
+            });
+            
+            // Set default selections if possible
+            if (textColumns.length > 0 && numericColumns.length > 0) {
+                xAxisSelect.value = textColumns[0];
+                yAxisSelect.value = numericColumns[0];
+            } else if (dateColumns.length > 0 && numericColumns.length > 0) {
+                xAxisSelect.value = dateColumns[0];
+                yAxisSelect.value = numericColumns[0];
+            } else if (columns.length >= 2) {
+                xAxisSelect.value = columns[0];
+                yAxisSelect.value = columns[1];
+            }
+        }
+        
+        // Get numeric columns from data
+        function getNumericColumns(data) {
+            const numericColumns = [];
+            if (!data || data.length === 0) return numericColumns;
+            
+            const firstRow = data[0];
+            for (const column in firstRow) {
+                // Check if all values in this column are numeric
+                const isNumeric = data.every(row => {
+                    const val = row[column];
+                    return val === null || val === undefined || !isNaN(Number(val));
+                });
+                
+                if (isNumeric) numericColumns.push(column);
+            }
+            
+            return numericColumns;
+        }
+        
+        // Get date columns from data
+        function getDateColumns(data) {
+            const dateColumns = [];
+            if (!data || data.length === 0) return dateColumns;
+            
+            const firstRow = data[0];
+            for (const column in firstRow) {
+                // Check if column name suggests a date
+                if (column.toLowerCase().includes('date') || 
+                    column.toLowerCase().includes('time') ||
+                    column.toLowerCase().includes('created') ||
+                    column.toLowerCase().includes('updated')) {
+                    dateColumns.push(column);
+                }
+            }
+            
+            return dateColumns;
+        }
+        
+        // Get text columns from data
+        function getTextColumns(data) {
+            const textColumns = [];
+            if (!data || data.length === 0) return textColumns;
+            
+            const firstRow = data[0];
+            for (const column in firstRow) {
+                // Check if column contains text values
+                const isText = data.some(row => {
+                    const val = row[column];
+                    return val !== null && typeof val === 'string' && isNaN(Number(val));
+                });
+                
+                if (isText) textColumns.push(column);
+            }
+            
+            return textColumns;
+        }
+        
+        // Chart instance
+        let chartInstance = null;
+        
+        // Update chart based on selections
+        function updateChart() {
+            if (!window.lastResults || !window.lastResults.data || window.lastResults.data.length === 0) {
+                return;
+            }
+            
+            // Get chart parameters
+            const chartType = chartTypeSelect.value;
+            const xColumn = xAxisSelect.value;
+            const yColumn = yAxisSelect.value;
+            
+            // Get canvas context
+            const ctx = document.getElementById('resultChart').getContext('2d');
+            
+            // Extract data for chart
+            const data = window.lastResults.data;
+            const labels = data.map(row => row[xColumn]);
+            const values = data.map(row => row[yColumn]);
+            
+            // Check if values are numeric
+            const areValuesNumeric = values.every(val => !isNaN(Number(val)));
+            
+            // Process data based on type
+            let processedLabels, processedData;
+            
+            if (!areValuesNumeric && (chartType === 'bar' || chartType === 'pie')) {
+                // Count occurrences for non-numeric values
+                const countMap = {};
+                values.forEach(val => {
+                    countMap[val] = (countMap[val] || 0) + 1;
+                });
+                
+                processedLabels = Object.keys(countMap);
+                processedData = Object.values(countMap);
+            } else {
+                processedLabels = labels;
+                processedData = values.map(val => isNaN(Number(val)) ? 0 : Number(val));
+            }
+            
+            // Choose colors
+            const backgroundColors = [
+                'rgba(54, 162, 235, 0.5)',
+                'rgba(255, 99, 132, 0.5)',
+                'rgba(255, 206, 86, 0.5)',
+                'rgba(75, 192, 192, 0.5)',
+                'rgba(153, 102, 255, 0.5)',
+                'rgba(255, 159, 64, 0.5)',
+                'rgba(199, 199, 199, 0.5)',
+                'rgba(83, 102, 255, 0.5)',
+                'rgba(40, 159, 64, 0.5)',
+                'rgba(210, 199, 199, 0.5)',
+            ];
+            
+            // Create chart config
+            const chartConfig = {
+                type: chartType,
+                data: {
+                    labels: processedLabels,
+                    datasets: [{
+                        label: yColumn,
+                        data: processedData,
+                        backgroundColor: chartType === 'pie' ? 
+                            backgroundColors.slice(0, processedData.length) : 
+                            backgroundColors[0],
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            };
+            
+            // Remove scales for pie chart
+            if (chartType === 'pie') {
+                delete chartConfig.options.scales;
+            }
+            
+            // Destroy previous chart if exists
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+            
+            // Create new chart
+            chartInstance = new Chart(ctx, chartConfig);
+        }
+        
+        // Show visualization container when results are displayed
+        function showVisualization() {
+            if (window.lastResults && window.lastResults.data && window.lastResults.data.length > 0) {
+                visualizationContainer.style.display = 'flex';
+            }
+        }
+            r alerts
         function clearAlerts() {
             const existingAlert = document.getElementById('query-alert');
             if (existingAlert) {
@@ -1086,3 +1461,44 @@
     });
 </script>
 {% endblock %}
+
+
+<!-- Visualization Component -->
+<div id="visualization-container" class="row mb-4" style="display: none;">
+    <div class="col-md-12">
+        <div class="card bg-dark">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Data Visualization</span>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-outline-info" id="toggle-viz-btn">
+                        <i class="bi bi-bar-chart"></i> Toggle Visualization
+                    </button>
+                </div>
+            </div>
+            <div class="card-body" id="chart-container" style="display: none;">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label for="chartType" class="form-label">Chart Type:</label>
+                        <select id="chartType" class="form-select">
+                            <option value="bar">Bar Chart</option>
+                            <option value="line">Line Chart</option>
+                            <option value="pie">Pie Chart</option>
+                            <option value="scatter">Scatter Plot</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="xAxis" class="form-label">X Axis:</label>
+                        <select id="xAxis" class="form-select"></select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="yAxis" class="form-label">Y Axis:</label>
+                        <select id="yAxis" class="form-select"></select>
+                    </div>
+                </div>
+                <div style="height: 400px;">
+                    <canvas id="resultChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
