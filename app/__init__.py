@@ -134,5 +134,17 @@ async def invalidate_cache_route(
     invalidate_cache(prefix)
     return {"status": "success", "message": f"Cache invalidated for prefix: {prefix if prefix else 'all'}"}
 
+# Add simple root health check
+@app.get("/health")
+async def root_health_check():
+    """Simple root health check endpoint."""
+    uptime = time.time() - start_time
+    return {
+        "status": "healthy",
+        "service": "MCP Assessor Agent API",
+        "uptime_seconds": round(uptime),
+        "time": datetime.utcnow().isoformat()
+    }
+
 # Include API router
 app.include_router(api_router, prefix=settings.API_PREFIX)

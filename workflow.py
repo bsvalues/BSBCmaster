@@ -78,31 +78,32 @@ def wait_for_fastapi():
     """Wait for FastAPI service to be ready."""
     logger.info("Waiting for FastAPI service to initialize...")
     
-    max_attempts = 20
+    max_attempts = 30
     for attempt in range(1, max_attempts + 1):
+        # Try with root health endpoint (we just added this)
         try:
-            # Try to reach the FastAPI service - use /health endpoint
-            response = requests.get(f"{FASTAPI_URL}/api/health", timeout=1)
+            response = requests.get(f"{FASTAPI_URL}/health", timeout=2)
             if response.status_code == 200:
-                logger.info(f"FastAPI service is ready (attempt {attempt}/{max_attempts})")
+                logger.info(f"FastAPI service is ready on root health endpoint (attempt {attempt}/{max_attempts})")
                 return True
         except requests.exceptions.RequestException:
             pass
-        
-        # Try with root health as an alternative
+            
+        # Try to reach the FastAPI service - use /api/health endpoint
         try:
-            response = requests.get(f"{FASTAPI_URL}/health", timeout=1)
+            response = requests.get(f"{FASTAPI_URL}/api/health", timeout=2)
             if response.status_code == 200:
-                logger.info(f"FastAPI service is ready on root health endpoint (attempt {attempt}/{max_attempts})")
+                logger.info(f"FastAPI service is ready on API health endpoint (attempt {attempt}/{max_attempts})")
                 return True
         except requests.exceptions.RequestException:
             pass
         
         if attempt < max_attempts:
             logger.info(f"Waiting for FastAPI to start (attempt {attempt}/{max_attempts})...")
-            time.sleep(1)
+            time.sleep(2)
     
     logger.warning(f"FastAPI service did not become ready after {max_attempts} attempts")
+    # Continue anyway since the Flask service can start independently
     return False
 
 def start_flask():

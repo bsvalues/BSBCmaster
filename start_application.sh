@@ -1,29 +1,26 @@
 #!/bin/bash
 
-# This script starts both the Flask and FastAPI services for the MCP Assessor Agent API
+# This script starts the MCP Assessor Agent API application with both Flask and FastAPI services
 
-# Function to clean up child processes when the script exits
-cleanup() {
-  echo "Cleaning up processes..."
-  # Kill all child processes
-  pkill -P $$
-  exit 0
-}
+# Load environment variables from .env file if it exists
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+fi
 
-# Set up trap to call cleanup function on script exit
-trap cleanup EXIT INT TERM
+# Set the environment variables (overriding .env if needed)
+export FLASK_PORT=5000
+export FASTAPI_PORT=8000
+export FASTAPI_URL=http://localhost:8000
 
-# Start the FastAPI service in the background
-echo "Starting FastAPI service on port 8000..."
-uvicorn asgi:app --host 0.0.0.0 --port 8000 &
-FASTAPI_PID=$!
+# Set API_KEY if not already set
+if [ -z "$API_KEY" ]; then
+    export API_KEY=mcp_assessor_api_default_key_2024_secure_random_token_987654321
+fi
 
-# Wait a moment for FastAPI to start
-sleep 2
+# Check if the database needs to be seeded
+echo "Checking database setup..."
+python seed_database.py
 
-# Start the Flask service - this will run in the foreground
-echo "Starting Flask service on port 5000..."
-gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app
-
-# Keep the script running until killed
-wait
+# Start the workflow manager to run both services
+echo "Starting MCP Assessor Agent API services..."
+python workflow.py
