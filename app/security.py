@@ -1,22 +1,22 @@
-import logging
-import secrets
-from fastapi import Depends, HTTPException
+"""
+This module provides security functionality for the API.
+"""
+
+from fastapi import Depends, HTTPException, Security
 from fastapi.security.api_key import APIKeyHeader
-from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_403_FORBIDDEN
-from .settings import settings
+from starlette.status import HTTP_403_FORBIDDEN
 
-logger = logging.getLogger("mcp_assessor_api")
+from app.settings import Settings
 
-# API key security
-API_KEY_HEADER = APIKeyHeader(name=settings.API_KEY_HEADER_NAME, auto_error=False)
+settings = Settings()
 
-async def get_api_key(api_key_header: str = Depends(API_KEY_HEADER)):
+# Define the API key security scheme
+api_key_header = APIKeyHeader(name=settings.API_KEY_HEADER_NAME, auto_error=False)
+
+
+async def get_api_key(api_key_header: str = Security(api_key_header)):
     """
-    Validate the API key provided in the X-API-Key header.
-    
-    This function serves as a security dependency to protect API endpoints
-    from unauthorized access. It verifies that a valid API key is present
-    in the request headers, matching the configured API key.
+    Validate the API key provided in the request header.
     
     Args:
         api_key_header: The API key from the request header
@@ -25,30 +25,18 @@ async def get_api_key(api_key_header: str = Depends(API_KEY_HEADER)):
         str: The validated API key
         
     Raises:
-        HTTPException: If the API key is missing (401) or invalid (403)
+        HTTPException: If the API key is missing or invalid
     """
-    # Log the attempt (but not the key itself)
-    request_id = secrets.token_hex(6)  # Generate a unique ID for this request for tracing
-
     if not api_key_header:
-        logger.warning(f"API request [{request_id}] missing required authorization header")
-        # Use a generic 401 Unauthorized response
-        raise HTTPException(
-            status_code=HTTP_401_UNAUTHORIZED,
-            detail="API key is missing in request headers",
-            headers={"WWW-Authenticate": "ApiKey"},
-        )
-    
-    # Test the provided key against our stored key using a timing-safe comparison
-    # to prevent timing attacks (although Python's != should be constant time)
-    if api_key_header != settings.API_KEY:
-        logger.warning(f"Invalid API key attempt [{request_id}]")
-        # Use a 403 Forbidden response for invalid keys
         raise HTTPException(
             status_code=HTTP_403_FORBIDDEN,
-            detail="Invalid API key",
+            detail=f"Missing API Key. Please include your API key in the '{settings.API_KEY_HEADER_NAME}' header"
         )
     
-    # API key is valid, log the successful authentication
-    logger.info(f"Successful API authentication [{request_id}]")
+    if api_key_header != settings.API_KEY:
+        raise HTTPException(
+            status_code=HTTP_403_FORBIDDEN,
+            detail=f"Invalid API Key. Please check your API key and try again."
+        )
+    
     return api_key_header

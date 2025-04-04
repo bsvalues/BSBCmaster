@@ -14,11 +14,16 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_recycle": 300,
     "pool_pre_ping": True,
+    "connect_args": {"sslmode": "prefer"},
 }
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Initialize the SQLAlchemy extension
 db = SQLAlchemy(app)
+
+# Import necessary modules for proxying
+import requests
+from flask import jsonify, render_template, request, Response, stream_with_context
 
 # Define routes
 @app.route('/')
@@ -32,6 +37,46 @@ def index():
         'base_url': request.host_url.rstrip('/')
     }
     return render_template('index.html', **context)
+
+# Proxy route to FastAPI for documentation
+@app.route('/api/docs')
+@app.route('/api/docs/')
+def api_docs():
+    """Proxy to FastAPI OpenAPI documentation."""
+    fastapi_url = "http://localhost:8000/api/docs"
+    try:
+        response = requests.get(fastapi_url)
+        return Response(
+            response.content,
+            status=response.status_code,
+            content_type=response.headers.get('Content-Type', 'text/html')
+        )
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": "FastAPI service unavailable", "details": str(e)}), 503
+
+# Proxy route to FastAPI's OpenAPI schema
+@app.route('/api/openapi.json')
+def openapi_schema():
+    """Proxy to FastAPI OpenAPI schema."""
+    fastapi_url = "http://localhost:8000/api/openapi.json"
+    try:
+        response = requests.get(fastapi_url)
+        return Response(
+            response.content,
+            status=response.status_code,
+            content_type=response.headers.get('Content-Type', 'application/json')
+        )
+    except requests.exceptions.RequestException:
+        # If FastAPI isn't available, return a minimal schema
+        return jsonify({
+            "openapi": "3.0.2",
+            "info": {
+                "title": "MCP Assessor Agent API",
+                "version": "1.0.0", 
+                "description": "API service is currently unavailable. Please try again later."
+            },
+            "paths": {}
+        })
 
 @app.route('/api/health')
 def health_check():
@@ -364,6 +409,114 @@ class Sale(db.Model):
     
     def __repr__(self):
         return f"<Sale {self.id} - ${self.sale_price} on {self.sale_date}>"
+
+# Add a general proxy for FastAPI endpoints
+@app.route('/api/run-query', methods=['GET', 'POST'])
+def proxy_run_query():
+    """Proxy for the FastAPI run-query endpoint."""
+    fastapi_url = "http://localhost:8000/api/run-query"
+    try:
+        if request.method == 'POST':
+            # Forward the POST request to FastAPI
+            headers = {key: value for key, value in request.headers if key != 'Host'}
+            response = requests.post(
+                fastapi_url, 
+                json=request.get_json(), 
+                headers=headers
+            )
+        else:
+            # Forward the GET request parameters
+            headers = {key: value for key, value in request.headers if key != 'Host'}
+            response = requests.get(
+                fastapi_url,
+                params=request.args,
+                headers=headers
+            )
+        
+        return Response(
+            response.content,
+            status=response.status_code,
+            content_type=response.headers.get('Content-Type', 'application/json')
+        )
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            "status": "error",
+            "message": "Failed to reach FastAPI service",
+            "details": str(e)
+        }), 503
+
+# Add proxy routes for natural language to SQL translation
+@app.route('/api/nl-to-sql', methods=['POST'])
+def proxy_nl_to_sql():
+    """Proxy for the FastAPI natural language to SQL endpoint."""
+    fastapi_url = "http://localhost:8000/api/nl-to-sql"
+    try:
+        headers = {key: value for key, value in request.headers if key != 'Host'}
+        response = requests.post(
+            fastapi_url, 
+            json=request.get_json(), 
+            headers=headers
+        )
+        return Response(
+            response.content,
+            status=response.status_code,
+            content_type=response.headers.get('Content-Type', 'application/json')
+        )
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            "status": "error",
+            "message": "Failed to reach FastAPI service",
+            "details": str(e)
+        }), 503
+
+# Add proxy routes for schema discovery
+@app.route('/api/discover-schema')
+def proxy_discover_schema():
+    """Proxy for the FastAPI schema discovery endpoint."""
+    fastapi_url = "http://localhost:8000/api/discover-schema"
+    try:
+        # Forward the GET request parameters
+        headers = {key: value for key, value in request.headers if key != 'Host'}
+        response = requests.get(
+            fastapi_url,
+            params=request.args,
+            headers=headers
+        )
+        return Response(
+            response.content,
+            status=response.status_code,
+            content_type=response.headers.get('Content-Type', 'application/json')
+        )
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            "status": "error",
+            "message": "Failed to reach FastAPI service",
+            "details": str(e)
+        }), 503
+
+@app.route('/api/schema-summary')
+def proxy_schema_summary():
+    """Proxy for the FastAPI schema summary endpoint."""
+    fastapi_url = "http://localhost:8000/api/schema-summary"
+    try:
+        # Forward the GET request parameters
+        headers = {key: value for key, value in request.headers if key != 'Host'}
+        response = requests.get(
+            fastapi_url,
+            params=request.args,
+            headers=headers
+        )
+        return Response(
+            response.content,
+            status=response.status_code,
+            content_type=response.headers.get('Content-Type', 'application/json')
+        )
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            "status": "error",
+            "message": "Failed to reach FastAPI service", 
+            "details": str(e)
+        }), 503
 
 # Create the database tables if they don't exist
 with app.app_context():

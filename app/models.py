@@ -1,132 +1,111 @@
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional, Annotated
-from pydantic.functional_validators import BeforeValidator
+"""
+This module defines the Pydantic models for API requests and responses.
+"""
 
-# Request models with validation
-class SQLQuery(BaseModel):
-    """Model for SQL query execution requests."""
-    db: str = Field(
-        ..., 
-        description="Database type (mssql or postgres)",
-        pattern='^(mssql|postgres)$'
-    )
-    query: str = Field(
-        ..., 
-        description="SQL query to execute",
-        min_length=1,
-        max_length=5000
-    )
-    page: Optional[int] = Field(
-        1, 
-        description="Page number for paginated results (starting from 1)",
-        ge=1
-    )
-    page_size: Optional[int] = Field(
-        None, 
-        description="Number of records per page, if None uses settings.MAX_RESULTS",
-        gt=0
-    )
-    
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "db": "postgres",
-                "query": "SELECT id, name FROM parcels",
-                "page": 1,
-                "page_size": 25
-            }
-        }
-    }
+from typing import Dict, List, Optional, Any, Union
+from datetime import datetime
+from pydantic import BaseModel, Field, field_validator
 
-class NLPrompt(BaseModel):
-    """Model for natural language to SQL translation requests."""
-    db: str = Field(
-        ..., 
-        description="Database type (mssql or postgres)",
-        pattern='^(mssql|postgres)$'
-    )
-    prompt: str = Field(
-        ..., 
-        description="Natural language query",
-        min_length=1,
-        max_length=1000
-    )
-    
-    model_config = {
-        "json_schema_extra": {
-            "example": {
-                "db": "postgres",
-                "prompt": "Find all parcels with a total value over $500,000"
-            }
-        }
-    }
 
-class SchemaFilter(BaseModel):
-    """Model for schema filtering options."""
-    prefix: Optional[str] = Field(
-        None, 
-        description="Optional table name prefix filter",
-        max_length=50
+class HealthResponse(BaseModel):
+    """Health check response model."""
+    status: str = Field(..., description="API status: 'success' or 'error'")
+    message: str = Field(..., description="Status message")
+    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    database_status: Dict[str, bool] = Field(
+        ..., 
+        description="Status of database connections: {'postgres': bool, 'mssql': bool}"
     )
 
-# Response models
+
 class PaginationMetadata(BaseModel):
-    """Model for pagination metadata."""
+    """Pagination metadata for query results."""
     page: int = Field(..., description="Current page number")
     page_size: int = Field(..., description="Number of records per page")
-    total_records: int = Field(..., description="Total number of records matching the query")
+    total_items: int = Field(..., description="Total number of items matching the query")
     total_pages: int = Field(..., description="Total number of pages")
     has_next: bool = Field(..., description="Whether there is a next page")
     has_prev: bool = Field(..., description="Whether there is a previous page")
-    next_page: Optional[int] = Field(None, description="Next page number, if available")
-    prev_page: Optional[int] = Field(None, description="Previous page number, if available")
+
 
 class QueryResult(BaseModel):
-    """Model for SQL query execution results."""
-    status: str = Field(..., description="Status of the query execution ('success' or 'error')")
-    data: List[Dict[str, Any]] = Field(..., description="The query results as a list of records")
-    count: int = Field(..., description="Total number of records matching the query")
-    pagination: Optional[PaginationMetadata] = Field(
-        None, 
-        description="Pagination metadata for the query results"
-    )
-    
-class SQLTranslation(BaseModel):
-    """Model for natural language to SQL translation results."""
-    status: str
-    sql: str
-    
-class SchemaResponse(BaseModel):
-    """Model for database schema information."""
-    status: str
-    db_schema: List[Dict[str, Any]]
-    count: int = Field(..., description="Total number of schema items")
-    pagination: Optional[PaginationMetadata] = Field(
-        None, 
-        description="Pagination metadata for the schema results"
-    )
-    
-class SchemaSummary(BaseModel):
-    """Model for summarized schema information."""
-    status: str
-    summary: List[str]
-    count: int = Field(..., description="Total number of tables in summary")
-    pagination: Optional[PaginationMetadata] = Field(
-        None, 
-        description="Pagination metadata for the schema summary results"
-    )
-    
-class HealthResponse(BaseModel):
-    """Model for API health check response."""
-    status: str
-    db_connections: Dict[str, bool]
+    """SQL query result model with pagination."""
+    data: List[Dict[str, Any]] = Field(..., description="Query result data")
+    pagination: PaginationMetadata = Field(..., description="Pagination metadata")
+    columns: List[str] = Field(..., description="Column names in the result set")
+    query: str = Field(..., description="The executed SQL query")
+    execution_time: float = Field(..., description="Query execution time in seconds")
 
-class ErrorResponse(BaseModel):
-    """Model for error responses."""
-    status: str = "error"
-    detail: str
+
+class SQLQuery(BaseModel):
+    """SQL query request model."""
+    db: str = Field(..., description="Database to query: 'postgres' or 'mssql'", pattern="^(postgres|mssql)$")
+    query: str = Field(..., description="SQL query to execute")
+    page: int = Field(1, description="Page number for paginated results (starting from 1)")
+    page_size: Optional[int] = Field(None, description="Number of records per page")
     
-class SuccessResponse(BaseModel):
-    """Model for generic success responses."""
-    status: str = "success"
-    message: str
+
+class NLPrompt(BaseModel):
+    """Natural language to SQL prompt model."""
+    db: str = Field(..., description="Target database type: 'postgres' or 'mssql'", pattern="^(postgres|mssql)$")
+    prompt: str = Field(..., description="Natural language query prompt")
+    
+
+class SQLTranslation(BaseModel):
+    """SQL translation response model."""
+    query: str = Field(..., description="Translated SQL query")
+    explanation: str = Field(..., description="Explanation of the translated query")
+    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    status: str = Field("success", description="Translation status")
+
+
+class SchemaColumnInfo(BaseModel):
+    """Database column information."""
+    name: str = Field(..., description="Column name")
+    type: str = Field(..., description="Data type")
+    is_primary: bool = Field(False, description="Whether the column is a primary key")
+    is_nullable: bool = Field(True, description="Whether the column can be NULL")
+    default: Optional[str] = Field(None, description="Default value, if any")
+    description: Optional[str] = Field(None, description="Column description")
+
+
+class SchemaRelationship(BaseModel):
+    """Relationship between database tables."""
+    table: str = Field(..., description="Referenced table name")
+    from_column: str = Field(..., description="Column in source table")
+    to_column: str = Field(..., description="Column in referenced table")
+    type: str = Field(..., description="Relationship type (e.g., 'one-to-many')")
+
+
+class SchemaTable(BaseModel):
+    """Database table schema information."""
+    name: str = Field(..., description="Table name")
+    schema: str = Field("public", description="Schema name")
+    columns: List[SchemaColumnInfo] = Field(..., description="List of columns")
+    relationships: List[SchemaRelationship] = Field(default_factory=list, description="Table relationships")
+    row_count: Optional[int] = Field(None, description="Approximate row count")
+    description: Optional[str] = Field(None, description="Table description")
+
+
+class SchemaResponse(BaseModel):
+    """Full database schema response."""
+    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    database: str = Field(..., description="Database type ('postgres' or 'mssql')")
+    tables: List[SchemaTable] = Field(..., description="List of tables in the schema")
+
+
+class TableSummary(BaseModel):
+    """Simplified table information for schema summary."""
+    name: str = Field(..., description="Table name")
+    column_count: int = Field(..., description="Number of columns")
+    row_count: Optional[int] = Field(None, description="Approximate row count")
+    description: Optional[str] = Field(None, description="Table description")
+
+
+class SchemaSummary(BaseModel):
+    """Summary of database schema."""
+    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    database: str = Field(..., description="Database type ('postgres' or 'mssql')")
+    table_count: int = Field(..., description="Total number of tables")
+    tables: List[TableSummary] = Field(..., description="List of tables with basic info")
+    filtered: bool = Field(False, description="Whether the results were filtered")

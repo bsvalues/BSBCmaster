@@ -1,22 +1,23 @@
+"""
+This module defines application settings loaded from environment variables.
+"""
+
 import os
-import secrets
-import logging
 from typing import List, Optional
-from pydantic import field_validator
+from pydantic import BaseModel, field_validator
 from pydantic_settings import BaseSettings
 
-logger = logging.getLogger("mcp_assessor_api")
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables with validation."""
     
-    # API configuration
+    # API information
     API_KEY: str = os.getenv("MCP_API_KEY", "devkey_secure_123")  # Default development key for testing
     APP_NAME: str = "MCP Assessor Agent API"
     VERSION: str = "1.1.0"
     MINIMUM_API_KEY_LENGTH: int = int(os.getenv("MINIMUM_API_KEY_LENGTH", "8"))  # Shorter for development
     
-    # Database configuration
+    # Database connection information
     MSSQL_CONN_STR: Optional[str] = os.getenv("MSSQL_CONN_STR")
     POSTGRES_HOST: str = os.getenv("PGHOST", "localhost")
     POSTGRES_PORT: str = os.getenv("PGPORT", "5432")
@@ -24,43 +25,39 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str = os.getenv("PGPASSWORD", "")
     POSTGRES_DB: str = os.getenv("PGDATABASE", "postgres")
     
-    # Build Postgres connection string
+    # OpenAI API settings
+    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+    
     @property
     def POSTGRES_CONN_STR(self) -> Optional[str]:
-        if all([self.POSTGRES_HOST, self.POSTGRES_USER, self.POSTGRES_PASSWORD, self.POSTGRES_DB]):
-            return f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-        return os.getenv("DATABASE_URL")
+        """Construct the PostgreSQL connection string from individual settings."""
+        if any(not val for val in [self.POSTGRES_HOST, self.POSTGRES_USER, self.POSTGRES_DB]):
+            return None
+        password_section = f":{self.POSTGRES_PASSWORD}" if self.POSTGRES_PASSWORD else ""
+        return f"postgresql://{self.POSTGRES_USER}{password_section}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
     
-    # API settings
+    # Application configuration
     MAX_RESULTS: int = int(os.getenv("MAX_RESULTS", "50"))
     ALLOWED_ORIGINS: List[str] = os.getenv("ALLOWED_ORIGINS", "http://localhost:5000").split(",")
     API_KEY_HEADER_NAME: str = os.getenv("API_KEY_HEADER_NAME", "x-api-key")
     PAGINATION_ENABLED: bool = os.getenv("PAGINATION_ENABLED", "True").lower() in ("true", "1", "yes")
     
-    # Validators
     @field_validator("API_KEY")
     def validate_api_key(cls, v):
         """Validate and potentially generate a secure API key."""
-        min_length = 8  # Use a reasonable minimum length for development
-        
-        if not v or len(v) < min_length:
-            if not v:
-                logger.warning(f"No API key defined. Generating a secure random key of length {min_length*1.5} characters.")
-            else:
-                logger.warning(f"API key too short (minimum: {min_length} chars). Generating a secure random key.")
-                logger.info(f"Consider setting a strong API key with the MCP_API_KEY environment variable.")
-            return secrets.token_urlsafe(min_length * 2)  # Extra length for security
+        if not v or len(v) < int(os.getenv("MINIMUM_API_KEY_LENGTH", "8")):
+            import secrets
+            import string
+            # Generate a secure API key if the provided one is too short or missing
+            alphabet = string.ascii_letters + string.digits
+            return ''.join(secrets.choice(alphabet) for _ in range(32))
         return v
     
     @field_validator("ALLOWED_ORIGINS")
     def validate_origins(cls, v):
         """Validate CORS origins."""
-        if not v or v == [""]:
-            logger.warning("No CORS origins specified. Setting to localhost only.")
-            return ["http://localhost:5000"]
-        
-        # Log the allowed origins for security audit
-        logger.info(f"CORS allowed origins: {', '.join(v)}")
+        if not v or not v[0]:
+            return ["http://localhost:5000"]  # Default localhost origin if none provided
         return v
     
     model_config = {
@@ -68,13 +65,3 @@ class Settings(BaseSettings):
         "env_file_encoding": "utf-8",
         "case_sensitive": True
     }
-
-# Create a global settings instance
-settings = Settings()
-
-# Log configuration warnings for missing database connections
-if not settings.MSSQL_CONN_STR:
-    logger.warning("MS SQL connection string not provided")
-    
-if not settings.POSTGRES_CONN_STR:
-    logger.warning("PostgreSQL connection string not provided")

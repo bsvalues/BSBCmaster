@@ -1,23 +1,27 @@
+"""
+This module initializes the FastAPI application with all routes and middleware.
+"""
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.cors import CORSMiddleware
-from .settings import settings
-from .db import initialize_db, close_db_connections
-import logging
 
-logger = logging.getLogger("mcp_assessor_api")
+from app.settings import Settings
+
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    settings = Settings()
     
+    # Create FastAPI app with versioned endpoint prefix
     app = FastAPI(
-        title="MCP Assessor Agent API",
-        description="API for accessing and querying assessment data from MS SQL Server and PostgreSQL databases",
-        version="1.0.0",
+        title=settings.APP_NAME,
+        description="A secure API for efficient database querying with real estate focus.",
+        version=settings.VERSION,
         docs_url="/api/docs",
         redoc_url="/api/redoc",
-        openapi_url="/api/openapi.json",
+        openapi_url="/api/openapi.json"
     )
     
     # Configure CORS
@@ -25,39 +29,26 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.ALLOWED_ORIGINS,
         allow_credentials=True,
-        allow_methods=["GET", "POST"],
+        allow_methods=["*"],
         allow_headers=["*"],
     )
     
-    # Mount static files
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-    
-    # Add database initialization and cleanup events
+    # Connect to databases on startup
     @app.on_event("startup")
     async def startup_db_clients():
+        """Initialize database connections on startup."""
+        from app.db import initialize_db
         await initialize_db()
-        
-        # Initialize OpenAI service
-        try:
-            from .openai_service import openai_service
-            if not openai_service.is_available():
-                logger.warning("OpenAI service not initialized. Natural language to SQL conversion will use simulated responses.")
-                if not openai_service.api_key:
-                    logger.warning("OPENAI_API_KEY environment variable is not set.")
-                    logger.info("Set OPENAI_API_KEY environment variable to enable natural language to SQL functionality.")
-            else:
-                logger.info("OpenAI service initialized successfully")
-        except ImportError as e:
-            logger.warning(f"Failed to import OpenAI service: {e}")
-        except Exception as e:
-            logger.warning(f"Error initializing OpenAI service: {e}")
     
+    # Close database connections on shutdown
     @app.on_event("shutdown")
     async def shutdown_db_clients():
+        """Close database connections on shutdown."""
+        from app.db import close_db_connections
         await close_db_connections()
     
     # Import and include API routes
-    from .api import router
-    app.include_router(router)
+    from app.api import router as api_router
+    app.include_router(api_router)
     
     return app

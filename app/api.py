@@ -1,46 +1,32 @@
-import logging
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Dict, Any, List
+"""
+This module defines the API routes and handlers.
+"""
+
+from datetime import datetime
+from typing import Dict, List, Optional, Any
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
-from starlette.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
-from fastapi.requests import Request
+from starlette.responses import JSONResponse
 
-from .security import get_api_key
-from .models import (
-    SQLQuery, NLPrompt, QueryResult, SQLTranslation, 
-    SchemaResponse, SchemaSummary, HealthResponse
+from app.db import execute_parameterized_query, parse_for_parameters, test_db_connections
+from app.models import (
+    HealthResponse, 
+    NLPrompt, 
+    SQLQuery, 
+    SQLTranslation,
+    SchemaResponse,
+    SchemaSummary
 )
-from .db import (
-    get_mssql_connection, get_postgres_connection, 
-    is_safe_query, test_db_connections,
-    execute_parameterized_query, parse_for_parameters
-)
-from .settings import settings
+from app.security import get_api_key
+from app.settings import Settings
 
-logger = logging.getLogger("mcp_assessor_api")
-router = APIRouter()
+settings = Settings()
 
-# Initialize templates
-templates = Jinja2Templates(directory="app/templates")
+# Create API router
+router = APIRouter(prefix="/api")
 
-@router.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    """Render the index page with API documentation."""
-    from datetime import datetime
-    # Get base URL for API endpoints
-    base_url = str(request.base_url).rstrip('/')
-    
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "title": settings.APP_NAME,
-        "version": "1.0.0",
-        "description": "API service for accessing and querying assessment data",
-        "base_url": base_url,
-        "current_year": datetime.now().year
-    })
 
-@router.get("/health", response_model=HealthResponse)
+@router.get("/health", response_model=HealthResponse, tags=["System"])
 async def health_check():
     """
     Check the health of the API and its database connections.
@@ -48,19 +34,22 @@ async def health_check():
     Returns:
         HealthResponse: The health status of the API and its database connections
     """
+    # Test database connections
     db_status = test_db_connections()
     
     return {
-        "status": "ok", 
-        "db_connections": db_status
+        "status": "success",
+        "message": "API is operational",
+        "timestamp": datetime.utcnow().isoformat(),
+        "database_status": db_status
     }
 
-@router.post(
-    "/run-query", 
-    response_model=QueryResult,
-    dependencies=[Depends(get_api_key)]
-)
-async def run_sql_query(payload: SQLQuery):
+
+@router.post("/run-query", tags=["Query"])
+async def run_sql_query(
+    payload: SQLQuery,
+    api_key: str = Depends(get_api_key)
+):
     """
     Execute a SQL query against the specified database with pagination.
     
@@ -74,55 +63,40 @@ async def run_sql_query(payload: SQLQuery):
     Raises:
         HTTPException: If the query is unsafe or if a database error occurs
     """
-    logger.info(f"Running SQL query on {payload.db} (page {payload.page}, size {payload.page_size})")
-    
-    # Validate query for safety
-    if not is_safe_query(payload.query):
-        logger.warning(f"Unsafe SQL query attempted: {payload.query}")
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail="Operation not permitted in this query"
-        )
-        
     try:
-        # Parse and extract parameters from the raw query
-        parameterized_query, params = parse_for_parameters(payload.query)
+        # Parse the query to extract parameters
+        parsed_query, params = parse_for_parameters(payload.query)
         
-        # Execute the query with parameters and pagination
-        # Ensure page is always an integer (default to 1 if None)
-        page = payload.page if payload.page is not None else 1
-        
+        # Execute the parameterized query
         result = execute_parameterized_query(
-            db=payload.db, 
-            query=parameterized_query, 
+            db=payload.db,
+            query=parsed_query,
             params=params,
-            page=page,
+            page=payload.page,
             page_size=payload.page_size
         )
         
-        # Return the result with pagination metadata
-        return {
-            "status": "success", 
-            "data": result["data"],
-            "count": result["count"],
-            "pagination": result["pagination"]
-        }
-        
+        return result
     except Exception as e:
-        logger.error(f"Database error during query execution: {str(e)}")
-        # Don't expose detailed error messages to the client 
-        # as they might contain sensitive information
+        # Log the error
+        print(f"Error executing query: {e}")
+        
+        # If this is already an HTTPException, re-raise it
+        if isinstance(e, HTTPException):
+            raise
+        
+        # Otherwise, wrap it in an appropriate HTTP error
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database error occurred. Please check your query syntax or contact the administrator."
+            detail=f"Error executing query: {str(e)}"
         )
 
-@router.post(
-    "/nl-to-sql", 
-    response_model=SQLTranslation,
-    dependencies=[Depends(get_api_key)]
-)
-async def nl_to_sql(prompt: NLPrompt):
+
+@router.post("/nl-to-sql", response_model=SQLTranslation, tags=["Natural Language"])
+async def nl_to_sql(
+    prompt: NLPrompt,
+    api_key: str = Depends(get_api_key)
+):
     """
     Convert natural language prompt to SQL query.
     
@@ -135,107 +109,58 @@ async def nl_to_sql(prompt: NLPrompt):
     Raises:
         HTTPException: If an error occurs during translation
     """
-    logger.info(f"Processing NL->SQL request: {prompt.prompt}")
-    
     try:
-        # Import OpenAI service
-        from .openai_service import openai_service
-        
-        # Check if OpenAI service is available
-        if not openai_service.is_available():
-            logger.warning("OpenAI service not available, falling back to simulated response")
-            # Fallback to simulated response
-            if prompt.db == "postgres":
-                if "parcel" in prompt.prompt.lower() and "value" in prompt.prompt.lower():
-                    simulated_sql = "SELECT * FROM parcels WHERE total_value > 500000 LIMIT 100"
-                else:
-                    simulated_sql = f"SELECT * FROM properties LIMIT 50"
-            else:
-                simulated_sql = f"SELECT TOP 50 * FROM properties"
-            
-            return {
-                "status": "success", 
-                "sql": simulated_sql
-            }
-        
-        # Get schema information to help OpenAI generate better SQL
-        schema_info = {}
-        try:
-            # Fetch schema information for the specified database
-            if prompt.db == "postgres":
-                query = """
-                    SELECT table_name, column_name, data_type 
-                    FROM information_schema.columns 
-                    WHERE table_schema = 'public'
-                """
-                schema_result = execute_parameterized_query(prompt.db, query, page=1, page_size=1000)
-                
-                # Organize schema by table
-                tables = {}
-                for row in schema_result["data"]:
-                    table_name = row["table_name"]
-                    if table_name not in tables:
-                        tables[table_name] = []
-                    tables[table_name].append({
-                        "column_name": row["column_name"],
-                        "data_type": row["data_type"]
-                    })
-                schema_info["tables"] = tables
-            
-            elif prompt.db == "mssql":
-                query = """
-                    SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE 
-                    FROM INFORMATION_SCHEMA.COLUMNS
-                """
-                schema_result = execute_parameterized_query(prompt.db, query, page=1, page_size=1000)
-                
-                # Organize schema by table
-                tables = {}
-                for row in schema_result["data"]:
-                    table_name = row["TABLE_NAME"]
-                    if table_name not in tables:
-                        tables[table_name] = []
-                    tables[table_name].append({
-                        "column_name": row["COLUMN_NAME"],
-                        "data_type": row["DATA_TYPE"]
-                    })
-                schema_info["tables"] = tables
-                
-        except Exception as e:
-            logger.warning(f"Failed to fetch schema for NL to SQL: {str(e)}")
-            # Continue without schema information
-        
-        # Call OpenAI service to translate natural language to SQL
-        sql_query = openai_service.nl_to_sql(prompt.prompt, prompt.db, schema_info)
-        
-        if sql_query:
-            return {
-                "status": "success", 
-                "sql": sql_query
-            }
-        else:
-            # If translation failed, return error
+        # Check if OpenAI API key is available
+        if not settings.OPENAI_API_KEY:
             raise HTTPException(
-                status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to translate natural language to SQL. Please try rephrasing your question."
+                status_code=HTTP_400_BAD_REQUEST,
+                detail="OpenAI API key not configured. Please set the OPENAI_API_KEY environment variable."
             )
         
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
+        # Import here to avoid circular imports
+        from app.openai_service import translate_nl_to_sql
+        
+        # Get database schema to provide context for translation
+        schema_info = "Sample schema information for real estate property data:"
+        
+        if prompt.db.lower() == 'postgres':
+            schema_info += """
+            Tables:
+            - parcels: Contains property assessment records with columns like parcel_id, address, city, state, zip_code, land_value, improvement_value, total_value, assessment_year, latitude, longitude
+            - properties: Contains physical property characteristics with columns like property_type, year_built, square_footage, bedrooms, bathrooms, lot_size, lot_size_unit, stories, condition, quality, tax_district, zoning
+            - sales: Contains property sale history with columns like sale_date, sale_price, sale_type, transaction_id, buyer_name, seller_name, financing_type
+            
+            Relationships:
+            - properties.parcel_id references parcels.id
+            - sales.parcel_id references parcels.id
+            """
+        
+        # Call OpenAI to translate the prompt
+        translation_result = await translate_nl_to_sql(prompt.prompt, prompt.db, schema_info)
+        
+        return {
+            "query": translation_result["query"],
+            "explanation": translation_result["explanation"],
+            "timestamp": datetime.utcnow().isoformat(),
+            "status": "success"
+        }
     except Exception as e:
-        logger.error(f"Error in NL->SQL processing: {str(e)}")
+        # If this is already an HTTPException, re-raise it
+        if isinstance(e, HTTPException):
+            raise
+        
+        # Otherwise, wrap it in an appropriate HTTP error
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error processing natural language query. Please try a different phrasing."
+            detail=f"Error translating natural language to SQL: {str(e)}"
         )
 
-@router.get(
-    "/discover-schema", 
-    response_model=SchemaResponse,
-    dependencies=[Depends(get_api_key)]
-)
-async def discover_schema(db: str = Query(..., regex="^(mssql|postgres)$")):
+
+@router.get("/discover-schema", response_model=SchemaResponse, tags=["Schema"])
+async def discover_schema(
+    db: str = Query(..., regex="^(mssql|postgres)$"),
+    api_key: str = Depends(get_api_key)
+):
     """
     Discover and return the database schema.
     
@@ -248,75 +173,156 @@ async def discover_schema(db: str = Query(..., regex="^(mssql|postgres)$")):
     Raises:
         HTTPException: If a database error occurs
     """
-    logger.info(f"Discovering schema for {db}")
-    
     try:
-        result = None  # Initialize the result variable
-        
-        if db == "mssql":
-            query = """
-                SELECT 
-                    TABLE_NAME, 
-                    COLUMN_NAME, 
-                    DATA_TYPE 
-                FROM INFORMATION_SCHEMA.COLUMNS
+        if db.lower() == 'postgres':
+            # PostgreSQL schema query - get tables, columns, constraints
+            schema_query = """
+            SELECT 
+                t.table_name,
+                t.table_schema,
+                c.column_name,
+                c.data_type,
+                c.is_nullable,
+                c.column_default,
+                CASE WHEN pk.constraint_name IS NOT NULL THEN TRUE ELSE FALSE END as is_primary,
+                pgd.description as column_description
+            FROM 
+                information_schema.tables t
+            JOIN 
+                information_schema.columns c ON t.table_name = c.table_name AND t.table_schema = c.table_schema
+            LEFT JOIN 
+                (
+                    SELECT tc.constraint_name, tc.table_name, kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name
+                    WHERE tc.constraint_type = 'PRIMARY KEY'
+                ) pk ON t.table_name = pk.table_name AND c.column_name = pk.column_name
+            LEFT JOIN 
+                pg_catalog.pg_statio_all_tables st ON t.table_schema = st.schemaname AND t.table_name = st.relname
+            LEFT JOIN 
+                pg_catalog.pg_description pgd ON pgd.objoid = st.relid AND pgd.objsubid = c.ordinal_position
+            WHERE 
+                t.table_schema = 'public'
+            ORDER BY 
+                t.table_name, c.ordinal_position;
             """
-            # Using a large page_size to retrieve all records
-            result = execute_parameterized_query(db, query, page=1, page_size=1000)
+            
+            # Get relationship information
+            fk_query = """
+            SELECT
+                tc.table_schema, 
+                tc.constraint_name, 
+                tc.table_name, 
+                kcu.column_name, 
+                ccu.table_schema AS foreign_table_schema,
+                ccu.table_name AS foreign_table_name,
+                ccu.column_name AS foreign_column_name
+            FROM 
+                information_schema.table_constraints AS tc 
+            JOIN 
+                information_schema.key_column_usage AS kcu
+                ON tc.constraint_name = kcu.constraint_name
+                AND tc.table_schema = kcu.table_schema
+            JOIN 
+                information_schema.constraint_column_usage AS ccu
+                ON ccu.constraint_name = tc.constraint_name
+                AND ccu.table_schema = tc.table_schema
+            WHERE 
+                tc.constraint_type = 'FOREIGN KEY'
+                AND tc.table_schema = 'public';
+            """
+            
+            # Get row counts
+            row_count_query = """
+            SELECT 
+                relname as table_name, 
+                n_live_tup as row_count
+            FROM 
+                pg_stat_user_tables
+            WHERE 
+                schemaname = 'public';
+            """
+            
+            # Execute queries
+            schema_data = execute_parameterized_query(db, schema_query)
+            fk_data = execute_parameterized_query(db, fk_query)
+            row_count_data = execute_parameterized_query(db, row_count_query)
+            
+            # Process the results
+            tables = {}
+            
+            # First process column info
+            for row in schema_data['data']:
+                table_name = row['table_name']
+                schema_name = row['table_schema']
                 
-        elif db == "postgres":
-            query = """
-                SELECT 
-                    table_name, 
-                    column_name, 
-                    data_type 
-                FROM information_schema.columns 
-                WHERE table_schema = 'public'
-            """
-            # Using a large page_size to retrieve all records
-            result = execute_parameterized_query(db, query, page=1, page_size=1000)
-        
-        if result:  # Check if result exists before accessing it
+                if table_name not in tables:
+                    tables[table_name] = {
+                        'name': table_name,
+                        'schema': schema_name,
+                        'columns': [],
+                        'relationships': [],
+                        'row_count': None,
+                        'description': None
+                    }
+                
+                # Add column info
+                tables[table_name]['columns'].append({
+                    'name': row['column_name'],
+                    'type': row['data_type'],
+                    'is_primary': row['is_primary'],
+                    'is_nullable': row['is_nullable'] == 'YES',
+                    'default': row['column_default'],
+                    'description': row['column_description']
+                })
+            
+            # Add row counts
+            for row in row_count_data['data']:
+                table_name = row['table_name']
+                if table_name in tables:
+                    tables[table_name]['row_count'] = row['row_count']
+            
+            # Process relationships
+            for row in fk_data['data']:
+                table_name = row['table_name']
+                if table_name in tables:
+                    tables[table_name]['relationships'].append({
+                        'table': row['foreign_table_name'],
+                        'from_column': row['column_name'],
+                        'to_column': row['foreign_column_name'],
+                        'type': 'many-to-one'  # Default relationship type
+                    })
+            
+            # Construct the final response
             return {
-                "status": "success", 
-                "db_schema": result["data"],
-                "count": result["count"],
-                "pagination": result["pagination"]
+                'timestamp': datetime.utcnow().isoformat(),
+                'database': db,
+                'tables': list(tables.values())
             }
+        
         else:
-            # If no result, return an empty schema with pagination
-            empty_pagination = {
-                "page": 1,
-                "page_size": 0,
-                "total_records": 0,
-                "total_pages": 0,
-                "has_next": False,
-                "has_prev": False,
-                "next_page": None,
-                "prev_page": None
-            }
-            return {
-                "status": "error", 
-                "db_schema": [],
-                "count": 0,
-                "pagination": empty_pagination
-            }
-        
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported database type: {db}"
+            )
+    
     except Exception as e:
-        logger.error(f"Error discovering schema: {str(e)}")
+        # If this is already an HTTPException, re-raise it
+        if isinstance(e, HTTPException):
+            raise
+        
+        # Otherwise, wrap it in an appropriate HTTP error
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while retrieving the database schema. Please ensure the database is properly configured."
+            detail=f"Error discovering database schema: {str(e)}"
         )
 
-@router.get(
-    "/schema-summary", 
-    response_model=SchemaSummary,
-    dependencies=[Depends(get_api_key)]
-)
+
+@router.get("/schema-summary", response_model=SchemaSummary, tags=["Schema"])
 async def get_schema_summary(
     db: str = Query(..., regex="^(mssql|postgres)$"),
-    prefix: str = Query("", max_length=50)
+    prefix: str = Query("", max_length=50),
+    api_key: str = Depends(get_api_key)
 ):
     """
     Get a summarized view of the database schema.
@@ -331,109 +337,69 @@ async def get_schema_summary(
     Raises:
         HTTPException: If a database error occurs
     """
-    logger.info(f"Getting schema summary for {db} with prefix '{prefix}'")
-    
     try:
-        table_summaries = []
-        
-        if db == "mssql":
-            # Get list of tables
+        if db.lower() == 'postgres':
+            # Build the query with optional filtering
+            where_clause = "WHERE t.table_schema = 'public'"
+            params = []
+            
             if prefix:
-                query = """
-                    SELECT DISTINCT TABLE_NAME
-                    FROM INFORMATION_SCHEMA.COLUMNS
-                    WHERE TABLE_NAME LIKE ?
-                    ORDER BY TABLE_NAME
-                """
-                # Using a large page_size to retrieve all records
-                tables_result = execute_parameterized_query(db, query, [f"{prefix}%"], page=1, page_size=1000)
-            else:
-                query = """
-                    SELECT DISTINCT TABLE_NAME
-                    FROM INFORMATION_SCHEMA.COLUMNS
-                    ORDER BY TABLE_NAME
-                """
-                # Using a large page_size to retrieve all records
-                tables_result = execute_parameterized_query(db, query, page=1, page_size=1000)
+                where_clause += " AND t.table_name LIKE %s"
+                params.append(f"{prefix}%")
             
-            tables = [row["TABLE_NAME"] for row in tables_result["data"]]
+            # PostgreSQL schema summary query
+            summary_query = f"""
+            SELECT 
+                t.table_name,
+                COUNT(c.column_name) as column_count,
+                obj_description(QUOTE_IDENT(t.table_name)::regclass::oid) as description,
+                (SELECT n_live_tup FROM pg_stat_user_tables WHERE relname = t.table_name) as row_count
+            FROM 
+                information_schema.tables t
+            JOIN 
+                information_schema.columns c ON t.table_name = c.table_name AND t.table_schema = c.table_schema
+            {where_clause}
+            GROUP BY 
+                t.table_name
+            ORDER BY 
+                t.table_name;
+            """
             
-            # Get column info for each table
-            for table in tables:
-                query = """
-                    SELECT COLUMN_NAME, DATA_TYPE
-                    FROM INFORMATION_SCHEMA.COLUMNS
-                    WHERE TABLE_NAME = ?
-                    ORDER BY ORDINAL_POSITION
-                """
-                # Using a large page_size to retrieve all records
-                columns_result = execute_parameterized_query(db, query, [table], page=1, page_size=1000)
-                
-                columns = [f"{row['COLUMN_NAME']} ({row['DATA_TYPE']})" for row in columns_result["data"]]
-                table_summaries.append(f"{table}: {', '.join(columns)}")
+            # Execute query
+            result = execute_parameterized_query(db, summary_query, params)
             
-        elif db == "postgres":
-            # Get list of tables
-            if prefix:
-                query = """
-                    SELECT DISTINCT table_name
-                    FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name LIKE %s
-                    ORDER BY table_name
-                """
-                # Using a large page_size to retrieve all records
-                tables_result = execute_parameterized_query(db, query, [f"{prefix}%"], page=1, page_size=1000)
-            else:
-                query = """
-                    SELECT DISTINCT table_name
-                    FROM information_schema.columns
-                    WHERE table_schema = 'public'
-                    ORDER BY table_name
-                """
-                # Using a large page_size to retrieve all records
-                tables_result = execute_parameterized_query(db, query, page=1, page_size=1000)
+            # Construct the table summaries
+            tables = []
+            for row in result['data']:
+                tables.append({
+                    'name': row['table_name'],
+                    'column_count': row['column_count'],
+                    'row_count': row['row_count'],
+                    'description': row['description']
+                })
             
-            tables = [row["table_name"] for row in tables_result["data"]]
-            
-            # Get column info for each table
-            for table in tables:
-                query = """
-                    SELECT column_name, data_type
-                    FROM information_schema.columns
-                    WHERE table_schema = 'public' AND table_name = %s
-                    ORDER BY ordinal_position
-                """
-                # Using a large page_size to retrieve all records
-                columns_result = execute_parameterized_query(db, query, [table], page=1, page_size=1000)
-                
-                columns = [f"{row['column_name']} ({row['data_type']})" for row in columns_result["data"]]
-                table_summaries.append(f"{table}: {', '.join(columns)}")
+            # Construct the final response
+            return {
+                'timestamp': datetime.utcnow().isoformat(),
+                'database': db,
+                'table_count': len(tables),
+                'tables': tables,
+                'filtered': bool(prefix)
+            }
         
-        # Add pagination metadata for consistency
-        total_count = len(table_summaries)
-        
-        # Create pagination metadata
-        pagination = {
-            "page": 1,
-            "page_size": total_count,
-            "total_records": total_count,
-            "total_pages": 1,
-            "has_next": False,
-            "has_prev": False,
-            "next_page": None,
-            "prev_page": None
-        }
-        
-        return {
-            "status": "success", 
-            "summary": table_summaries,
-            "count": total_count,
-            "pagination": pagination
-        }
-        
+        else:
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported database type: {db}"
+            )
+    
     except Exception as e:
-        logger.error(f"Error getting schema summary: {str(e)}")
+        # If this is already an HTTPException, re-raise it
+        if isinstance(e, HTTPException):
+            raise
+        
+        # Otherwise, wrap it in an appropriate HTTP error
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while retrieving the database schema summary. Please check your connection and try again."
+            detail=f"Error getting schema summary: {str(e)}"
         )

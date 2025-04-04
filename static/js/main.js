@@ -28,7 +28,7 @@ function updateDatabaseStatus() {
         .then(data => {
             // Update overall status
             const statusBadge = document.getElementById('status-badge');
-            if (data.status === 'ok') {
+            if (data.status === 'success') {
                 statusBadge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Healthy';
                 statusBadge.className = 'badge bg-success';
             } else {
@@ -38,7 +38,7 @@ function updateDatabaseStatus() {
             
             // Update database connection statuses
             const postgresStatus = document.getElementById('postgres-status');
-            if (data.db_connections.postgres) {
+            if (data.database_status && data.database_status.postgres) {
                 postgresStatus.innerHTML = '<i class="bi bi-database-check me-1"></i>Connected';
                 postgresStatus.className = 'badge bg-success';
             } else {
@@ -47,7 +47,7 @@ function updateDatabaseStatus() {
             }
             
             const mssqlStatus = document.getElementById('mssql-status');
-            if (data.db_connections.mssql) {
+            if (data.database_status && data.database_status.mssql) {
                 mssqlStatus.innerHTML = '<i class="bi bi-database-check me-1"></i>Connected';
                 mssqlStatus.className = 'badge bg-success';
             } else {
@@ -132,11 +132,11 @@ function loadApiDocumentation() {
  */
 function updateDatabaseStatusFromData(data) {
     // Only update if the health data is available
-    if (data.status && data.db_connections) {
+    if (data.status && data.database_status) {
         // Update overall status
         const statusBadge = document.getElementById('status-badge');
         if (statusBadge) {
-            if (data.status === 'ok') {
+            if (data.status === 'success') {
                 statusBadge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>Healthy';
                 statusBadge.className = 'badge bg-success';
             } else {
@@ -147,8 +147,8 @@ function updateDatabaseStatusFromData(data) {
         
         // Update database connection statuses
         const postgresStatus = document.getElementById('postgres-status');
-        if (postgresStatus && data.db_connections.postgres !== undefined) {
-            if (data.db_connections.postgres) {
+        if (postgresStatus && data.database_status.postgres !== undefined) {
+            if (data.database_status.postgres) {
                 postgresStatus.innerHTML = '<i class="bi bi-database-check me-1"></i>Connected';
                 postgresStatus.className = 'badge bg-success';
             } else {
@@ -158,8 +158,8 @@ function updateDatabaseStatusFromData(data) {
         }
         
         const mssqlStatus = document.getElementById('mssql-status');
-        if (mssqlStatus && data.db_connections.mssql !== undefined) {
-            if (data.db_connections.mssql) {
+        if (mssqlStatus && data.database_status.mssql !== undefined) {
+            if (data.database_status.mssql) {
                 mssqlStatus.innerHTML = '<i class="bi bi-database-check me-1"></i>Connected';
                 mssqlStatus.className = 'badge bg-success';
             } else {
