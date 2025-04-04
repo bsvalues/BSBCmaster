@@ -1,20 +1,20 @@
 """
-This script runs the FastAPI server component of the MCP Assessor Agent API.
-It should run in parallel with the Flask application.
+This file provides a runner for the FastAPI application.
+It allows running the FastAPI application with uvicorn.
 """
 
 import os
 import uvicorn
-from app import create_app
+
+# Define port for the FastAPI application
+API_PORT = int(os.environ.get("API_PORT", 8000))
 
 if __name__ == "__main__":
-    # Create and configure the FastAPI app
-    app = create_app()
-    
-    # Run with uvicorn
+    # Run FastAPI application
     uvicorn.run(
-        app,
+        "app:app",
         host="0.0.0.0",
-        port=8000,
+        port=API_PORT,
+        reload=True,
         log_level="info"
     )

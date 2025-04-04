@@ -1,5 +1,6 @@
 """
 This file provides a Flask application for documentation of the MCP Assessor Agent API.
+It serves as the main entry point for the hybrid Flask-FastAPI application.
 """
 
 import os
@@ -26,6 +27,15 @@ CORS(app)
 with app.app_context():
     db.create_all()
     
+    # Log database initialization
+    logging.info("Database tables initialized")
+    logging.info(f"Database URL: {app.config['SQLALCHEMY_DATABASE_URI']}")
+    
 # This is the main entry point for the application
+# The Flask app serves the main documentation UI at port 5000
+# The FastAPI app serves the API endpoints at port 8000 (in run_api.py)
 if __name__ == "__main__":
+    logging.info("Starting Flask application for documentation UI")
+    logging.info("Documentation will be available at http://localhost:5000")
+    logging.info("API will be available at http://localhost:8000/api")
     app.run(host="0.0.0.0", port=5000, debug=True)

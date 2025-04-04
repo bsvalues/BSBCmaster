@@ -1,138 +1,105 @@
-#!/usr/bin/env python3
 """
-Test script for the enhanced SQL parameterization and execution functions.
-This script tests the functionality of the parse_for_parameters and execute_parameterized_query functions.
+This script tests the parameterized query extraction functionality.
 """
 
-import requests
 import json
-import logging
-from typing import Dict, Any, List, Tuple
-import sys
+from app.db import parse_for_parameters
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("test_parameterized_queries")
-
-# Test API endpoint
-API_URL = "http://localhost:5000/api/run-query"
-
-def test_string_parameters() -> None:
-    """Test SQL parameter extraction and execution with string values."""
-    logger.info("Testing string parameter extraction...")
+def test_parameter_extraction():
+    """Test extraction of parameters from SQL queries."""
     
-    # Test standard string parameter
-    query = """SELECT * FROM parcels WHERE owner_name = 'Jane Smith' LIMIT 5"""
-    response = execute_query("postgres", query)
-    
-    if not response.get("data"):
-        logger.error("Failed to execute string parameter query")
-        return
-    
-    logger.info(f"Found {len(response.get('data', []))} results for string parameter query")
-    
-    # Test multiple string parameters
-    query = """SELECT * FROM parcels WHERE owner_name = 'Jane Smith' AND address LIKE '%Main%'"""
-    response = execute_query("postgres", query)
-    
-    logger.info(f"Found {len(response.get('data', []))} results for multiple string parameters query")
-    
-def test_numeric_parameters() -> None:
-    """Test SQL parameter extraction and execution with numeric values."""
-    logger.info("Testing numeric parameter extraction...")
-    
-    # Test numeric parameter
-    query = """SELECT * FROM parcels WHERE total_value > 500000 LIMIT 5"""
-    response = execute_query("postgres", query)
-    
-    if not response.get("data"):
-        logger.error("Failed to execute numeric parameter query")
-        return
-    
-    logger.info(f"Found {len(response.get('data', []))} results for numeric parameter query")
-    
-    # Test float parameter
-    query = """SELECT * FROM parcels WHERE land_value > 200000.00 LIMIT 5"""
-    response = execute_query("postgres", query)
-    
-    logger.info(f"Found {len(response.get('data', []))} results for float parameter query")
-    
-def test_mixed_parameters() -> None:
-    """Test SQL parameter extraction and execution with mixed parameter types."""
-    logger.info("Testing mixed parameter extraction...")
-    
-    # Test mixed parameters
-    query = """
-    SELECT * FROM parcels 
-    WHERE owner_name = 'John Doe' 
-      AND total_value > 500000 
-      AND address LIKE '%Oak%'
-    LIMIT 5
-    """
-    response = execute_query("postgres", query)
-    
-    logger.info(f"Found {len(response.get('data', []))} results for mixed parameters query")
-    
-    # Test parameters in complex query
-    query = """
-    SELECT p.* 
-    FROM parcels p
-    JOIN properties pr ON p.parcel_id = pr.parcel_id  
-    WHERE p.total_value BETWEEN 400000 AND 800000
-      AND p.zone_code = 'R2'
-      AND pr.bedrooms >= 3
-    LIMIT 5
-    """
-    response = execute_query("postgres", query)
-    
-    logger.info(f"Found {len(response.get('data', []))} results for complex query with parameters")
-
-def execute_query(db_type: str, query: str) -> Dict[str, Any]:
-    """
-    Execute a query through the API and return the response.
-    
-    Args:
-        db_type: Database type (postgres or mssql)
-        query: SQL query to execute
-        
-    Returns:
-        Dict containing the API response
-    """
-    try:
-        # Build the request payload
-        payload = {
-            "db": db_type,
-            "query": query
+    # Test cases with different types of parameters
+    test_cases = [
+        # Basic string parameters
+        {
+            "query": "SELECT * FROM parcels WHERE city = 'Springfield'",
+            "expected_params": ["Springfield"],
+            "expected_query": "SELECT * FROM parcels WHERE city = %s"
+        },
+        # Multiple string parameters
+        {
+            "query": "SELECT * FROM parcels WHERE city = 'Springfield' AND state = 'IL'",
+            "expected_params": ["Springfield", "IL"],
+            "expected_query": "SELECT * FROM parcels WHERE city = %s AND state = %s"
+        },
+        # Numeric parameters
+        {
+            "query": "SELECT * FROM properties WHERE year_built > 2000 AND square_footage > 1500",
+            "expected_params": [2000, 1500],
+            "expected_query": "SELECT * FROM properties WHERE year_built > %s AND square_footage > %s"
+        },
+        # Mixed parameter types
+        {
+            "query": "SELECT * FROM parcels WHERE city = 'Springfield' AND total_value > 250000",
+            "expected_params": ["Springfield", 250000],
+            "expected_query": "SELECT * FROM parcels WHERE city = %s AND total_value > %s"
+        },
+        # Complex query with joins
+        {
+            "query": """
+            SELECT p.parcel_id, p.address, s.sale_price, s.sale_date 
+            FROM parcels p
+            JOIN sales s ON p.id = s.parcel_id
+            WHERE p.city = 'Springfield' AND s.sale_price > 300000
+            ORDER BY s.sale_date DESC
+            """,
+            "expected_params": ["Springfield", 300000],
+            "expected_query": """
+            SELECT p.parcel_id, p.address, s.sale_price, s.sale_date 
+            FROM parcels p
+            JOIN sales s ON p.id = s.parcel_id
+            WHERE p.city = %s AND s.sale_price > %s
+            ORDER BY s.sale_date DESC
+            """
+        },
+        # Query with decimal numbers
+        {
+            "query": "SELECT * FROM sales WHERE sale_price BETWEEN 250000.50 AND 500000.75",
+            "expected_params": [250000.50, 500000.75],
+            "expected_query": "SELECT * FROM sales WHERE sale_price BETWEEN %s AND %s"
         }
+    ]
+    
+    # Run tests
+    for i, test in enumerate(test_cases):
+        print(f"\nTest case {i+1}:")
+        print(f"Original query: {test['query']}")
         
-        # Make the API request
-        response = requests.post(
-            API_URL,
-            json=payload,
-            headers={"Content-Type": "application/json"}
-        )
+        # Extract parameters
+        parsed_query, params = parse_for_parameters(test["query"])
         
-        # Check if the request was successful
-        if response.status_code == 200:
-            result = response.json()
-            return result
+        print(f"Parsed query: {parsed_query}")
+        print(f"Extracted parameters: {params}")
+        
+        # Validate parameter count
+        if len(params) == len(test["expected_params"]):
+            print(f"✓ Parameter count matches ({len(params)})")
         else:
-            logger.error(f"API request failed with status code {response.status_code}: {response.text}")
-            return {"status": "error", "data": [], "count": 0, "truncated": False}
+            print(f"✗ Parameter count mismatch. Expected {len(test['expected_params'])}, got {len(params)}")
+        
+        # Validate parameter values (types can vary but values should match)
+        for j, (expected, actual) in enumerate(zip(test["expected_params"], params)):
+            expected_type = type(expected).__name__
+            actual_type = type(actual).__name__
             
-    except Exception as e:
-        logger.error(f"Error executing query: {str(e)}")
-        return {"status": "error", "data": [], "count": 0, "truncated": False}
-
-def run_all_tests() -> None:
-    """Run all parameterized query tests."""
-    logger.info("Starting parameterized query tests...")
-    
-    test_string_parameters()
-    test_numeric_parameters()
-    test_mixed_parameters()
-    
-    logger.info("All parameterized query tests completed")
+            # Note: Numeric types might differ (int vs float), that's acceptable
+            if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
+                if abs(expected - actual) < 0.001:
+                    print(f"✓ Parameter {j+1}: {actual} ({actual_type}) - value matches")
+                else:
+                    print(f"✗ Parameter {j+1}: {actual} ({actual_type}) - value mismatch, expected {expected}")
+            else:
+                if expected == actual:
+                    print(f"✓ Parameter {j+1}: {actual} ({actual_type}) - value matches")
+                else:
+                    print(f"✗ Parameter {j+1}: {actual} ({actual_type}) - value mismatch, expected {expected}")
+        
+        # Check query format
+        if parsed_query.strip() == test["expected_query"].strip():
+            print("✓ Query transformation is correct")
+        else:
+            print("✗ Query transformation mismatch")
+            print(f"Expected: {test['expected_query']}")
 
 if __name__ == "__main__":
-    run_all_tests()
+    test_parameter_extraction()

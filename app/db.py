@@ -2,73 +2,67 @@
 This module handles database connections and SQL query execution.
 """
 
-import time
+import logging
 import re
-from typing import Dict, List, Any, Optional, Tuple
+import time
+from typing import Any, Dict, List, Optional, Tuple
+
 import psycopg2
-import psycopg2.pool
-from psycopg2.extras import RealDictCursor
+import psycopg2.extras
 from fastapi import HTTPException
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 
-from app.settings import Settings
+from app.settings import settings
 
-settings = Settings()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Create connection pools
-postgres_pool = None
-mssql_pool = None
-
+# Global connection pools
+pg_pool = None
 
 async def initialize_db():
     """Initialize database connection pools on application startup."""
-    global postgres_pool
-    
-    # Initialize PostgreSQL connection pool if settings are provided
-    if settings.POSTGRES_CONN_STR:
-        try:
-            postgres_pool = psycopg2.pool.ThreadedConnectionPool(
-                minconn=1,
-                maxconn=10,
-                dsn=settings.POSTGRES_CONN_STR
+    global pg_pool
+    try:
+        # Initialize PostgreSQL connection pool
+        if settings.DB_POSTGRES_URL:
+            import psycopg2.pool
+            pg_pool = psycopg2.pool.SimpleConnectionPool(
+                1, 10, settings.DB_POSTGRES_URL
             )
-            print(f"PostgreSQL connection pool initialized successfully")
-        except Exception as e:
-            print(f"Error initializing PostgreSQL connection pool: {e}")
-            postgres_pool = None
-    else:
-        print("PostgreSQL connection string not provided, skipping initialization")
-
+            logger.info("PostgreSQL connection pool initialized")
+        else:
+            logger.warning("PostgreSQL connection URL not provided")
+    except Exception as e:
+        logger.error(f"Error initializing database connections: {str(e)}")
+        raise
 
 async def close_db_connections():
     """Close database connections on application shutdown."""
-    global postgres_pool
-    
-    # Close PostgreSQL connection pool
-    if postgres_pool:
-        postgres_pool.closeall()
-        print("PostgreSQL connection pool closed")
-
+    global pg_pool
+    if pg_pool:
+        pg_pool.closeall()
+        logger.info("PostgreSQL connection pool closed")
 
 def get_postgres_connection():
     """Get a connection from the PostgreSQL connection pool."""
-    global postgres_pool
-    
-    if not postgres_pool:
+    global pg_pool
+    if not pg_pool:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="PostgreSQL database not configured"
+            detail="Database connection not initialized",
         )
     
-    conn = postgres_pool.getconn()
-    if not conn:
+    try:
+        conn = pg_pool.getconn()
+        return conn
+    except Exception as e:
+        logger.error(f"Error getting PostgreSQL connection: {str(e)}")
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get PostgreSQL connection from pool"
+            detail=f"Database connection error: {str(e)}",
         )
-    
-    return conn
-
 
 def is_safe_query(query: str) -> bool:
     """
@@ -80,51 +74,36 @@ def is_safe_query(query: str) -> bool:
     Returns:
         bool: True if the query appears safe, False otherwise
     """
-    # Remove comments to prevent comment-based SQL injection
-    query = re.sub(r"--.*?$", "", query, flags=re.MULTILINE)
-    query = re.sub(r"/\*.*?\*/", "", query, flags=re.DOTALL)
+    # Normalize the query - lowercase, remove extra whitespace
+    normalized_query = ' '.join(query.lower().split())
     
-    # Normalize whitespace
-    query = " ".join(query.split()).strip().lower()
-    
-    # Check for potentially harmful operations
+    # Check for potentially harmful SQL operations
     unsafe_patterns = [
-        # Data modification
-        r"\s*drop\s+", 
-        r"\s*truncate\s+",
-        r"\s*alter\s+",
-        r"\s*create\s+",
-        r"\s*rename\s+",
-        
-        # Database modification
-        r"\s*grant\s+",
-        r"\s*revoke\s+",
-        
-        # Execution
-        r"\s*execute\s+",
-        r"\s*exec\s+",
-        
-        # System commands
-        r"xp_cmdshell",
-        r"sp_execute_external_script",
-        
-        # Multiple statements
-        r";\s*\w+",  # Catch multiple statements (e.g., "SELECT 1; DROP TABLE")
+        r'\bdrop\s+(?:table|database|schema|view|index|user)\b',
+        r'\btruncate\s+(?:table)\b',
+        r'\bdelete\s+(?:from\b|[^;]+;)',  # Only block full DELETE operations
+        r'\balter\s+(?:table|database|schema|system)\b',
+        r'\bcreate\s+(?:table|database|schema|view|user)\b',
+        r'\binsert\s+into\b',
+        r'\bupdate\s+(?:[^;]+set)\b',
+        r'\bgrant\b',
+        r'\brevoke\b',
+        r'\bcopy\b',
+        r'(?:--|#|\/\*).*',  # SQL comments that might hide code
+        r';\s*(?:\w+)',      # Multiple statements
+        r'(?:exec|execute|call|xp_cmdshell)',  # Execute commands
+        r'(?:union\s+(?:all\s+)?select)',  # UNION-based injection
+        r'(?:into\s+(?:outfile|dumpfile))',  # File operations
+        r'(?:load_file|benchmark|sleep)',  # Functions used in injection
     ]
     
+    # Check for unsafe patterns
     for pattern in unsafe_patterns:
-        if re.search(pattern, query):
+        if re.search(pattern, normalized_query):
             return False
     
-    # Check for balanced quotes to detect quote escaping attempts
-    single_quotes = query.count("'")
-    double_quotes = query.count('"')
-    
-    if single_quotes % 2 != 0 or double_quotes % 2 != 0:
-        return False
-    
+    # If no unsafe patterns were found, consider it safe
     return True
-
 
 def execute_parameterized_query(
     db: str, 
@@ -152,33 +131,47 @@ def execute_parameterized_query(
     Raises:
         HTTPException: If a database error occurs
     """
-    if not is_safe_query(query):
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail="Potentially unsafe query detected. Please review your query and try again."
-        )
-    
-    # Set default page size if not provided
+    # Set default page size from settings if not provided
     if page_size is None:
         page_size = settings.MAX_RESULTS
     
-    # Ensure valid pagination parameters
+    # Validate inputs
     if page < 1:
         page = 1
-    if page_size < 1:
+    if page_size < 1 or page_size > settings.MAX_RESULTS:
         page_size = settings.MAX_RESULTS
     
-    # Track execution time
+    # Safety check
+    if not is_safe_query(query):
+        logger.warning(f"Unsafe query detected: {query}")
+        raise HTTPException(
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="Query contains potentially unsafe operations and was rejected.",
+        )
+    
+    # Start timing for performance measurement
     start_time = time.time()
     
+    # If params is None, use empty list for consistency
+    if params is None:
+        params = []
+    
+    # Execute query based on database type
     if db.lower() == 'postgres':
-        return execute_postgres_query(query, params, page, page_size, start_time)
+        try:
+            result = execute_postgres_query(query, params, page, page_size, start_time)
+            return result
+        except Exception as e:
+            logger.error(f"PostgreSQL query error: {str(e)}, Query: {query}, Params: {params}")
+            raise HTTPException(
+                status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Database error: {str(e)}",
+            )
     else:
         raise HTTPException(
             status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported database type: {db}"
+            detail=f"Unsupported database type: {db}",
         )
-
 
 def execute_postgres_query(
     query: str, 
@@ -189,79 +182,60 @@ def execute_postgres_query(
 ) -> Dict[str, Any]:
     """Execute a query on PostgreSQL with pagination."""
     conn = None
-    cursor = None
     try:
+        # Get connection from pool
         conn = get_postgres_connection()
         
-        # First get the total count of rows for pagination
-        # This approach is not perfect but provides a reasonable estimate
-        cursor = conn.cursor()
-        
-        # Use a subquery to get an accurate count
-        count_query = f"SELECT COUNT(*) FROM ({query}) AS count_query"
-        cursor.execute(count_query, params)
-        total_items = cursor.fetchone()[0]
-        
-        # Close the count cursor and create a new one for the main query
-        cursor.close()
-        
-        # Add pagination to the query
-        offset = (page - 1) * page_size
-        paginated_query = f"{query} LIMIT {page_size} OFFSET {offset}"
-        
-        # Execute the paginated query with dictionary cursor
-        cursor = conn.cursor(cursor_factory=RealDictCursor)
-        cursor.execute(paginated_query, params)
-        
-        # Get column names
-        column_names = [desc[0] for desc in cursor.description]
-        
-        # Fetch the results
-        results = cursor.fetchall()
-        
-        # Calculate total pages
-        total_pages = (total_items + page_size - 1) // page_size
-        
-        # Calculate has_next and has_prev
-        has_next = page < total_pages
-        has_prev = page > 1
-        
-        # Calculate execution time
-        execution_time = time.time() - start_time
-        
-        # Create pagination metadata
-        pagination = {
-            "page": page,
-            "page_size": page_size,
-            "total_items": total_items,
-            "total_pages": total_pages,
-            "has_next": has_next,
-            "has_prev": has_prev
-        }
-        
-        return {
-            "data": [dict(row) for row in results],  
-            "pagination": pagination,
-            "columns": column_names,
-            "query": query,
-            "execution_time": execution_time
-        }
-    except psycopg2.Error as e:
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Database error: {str(e)}"
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unexpected error: {str(e)}"
-        )
+        # Create cursor with dictionary results
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            # Set query timeout
+            cursor.execute(f"SET statement_timeout TO {settings.TIMEOUT_SECONDS * 1000}")
+            
+            # Execute count query first (for pagination metadata)
+            count_query = f"SELECT COUNT(*) AS total FROM ({query}) AS subquery"
+            cursor.execute(count_query, params)
+            count_result = cursor.fetchone()
+            total_count = count_result["total"] if count_result else 0
+            
+            # Calculate pagination
+            offset = (page - 1) * page_size
+            paginated_query = f"{query} LIMIT {page_size} OFFSET {offset}"
+            
+            # Execute main query with pagination
+            cursor.execute(paginated_query, params)
+            results = cursor.fetchall()
+            
+            # Calculate pagination metadata
+            total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
+            has_next = page < total_pages
+            has_prev = page > 1
+            
+            # Create pagination info
+            pagination = {
+                "page": page,
+                "pages": total_pages,
+                "page_size": page_size,
+                "total": total_count,
+                "has_next": has_next,
+                "has_prev": has_prev,
+            }
+            
+            # Format results as list of dictionaries
+            formatted_results = [dict(row) for row in results]
+            
+            # Calculate query execution time
+            execution_time = time.time() - start_time
+            
+            return {
+                "status": "success",
+                "data": formatted_results,
+                "execution_time": execution_time,
+                "pagination": pagination
+            }
     finally:
-        if cursor:
-            cursor.close()
+        # Return connection to pool
         if conn:
-            postgres_pool.putconn(conn)
-
+            pg_pool.putconn(conn)
 
 def parse_for_parameters(query: str) -> Tuple[str, List[Any]]:
     """
@@ -276,59 +250,55 @@ def parse_for_parameters(query: str) -> Tuple[str, List[Any]]:
             - Modified query with parameter placeholders
             - List of extracted parameter values
     """
+    # Initialize parameters list
     params = []
     
-    # Function to replace string literals with placeholders
+    # First, handle string literals (quoted values)
     def replace_string_literals(match):
-        # Extract the string content without quotes
-        value = match.group(1)
-        params.append(value)
-        return "%s"  # PostgreSQL placeholders
+        # Extract the string content (without quotes)
+        string_content = match.group(1)
+        params.append(string_content)
+        return "%s"  # PostgreSQL parameter placeholder
     
-    # Function to replace numeric literals with placeholders
+    # Handle single-quoted strings
+    query = re.sub(r"'([^']*)'", replace_string_literals, query)
+    
+    # Handle numeric literals
     def replace_numeric_literals(match):
-        value = match.group(0)
-        # Handle floating point or integer
-        if '.' in value:
-            params.append(float(value))
+        # Extract the numeric value
+        numeric_value = match.group(1)
+        # Convert to appropriate numeric type
+        if '.' in numeric_value:
+            value = float(numeric_value)
         else:
-            params.append(int(value))
-        return "%s"  # PostgreSQL placeholders
+            value = int(numeric_value)
+        params.append(value)
+        return "%s"  # PostgreSQL parameter placeholder
     
-    # Replace string literals (handles both single and double quotes)
-    pattern_single_quote = r"'((?:[^'\\]|\\.)*?)'(?!')(?!\w)"  # Handles escaped quotes
-    pattern_double_quote = r'"((?:[^"\\]|\\.)*?)"(?!")(?!\w)'  # Handles escaped quotes
-    
-    # Apply string replacements
-    query = re.sub(pattern_single_quote, replace_string_literals, query)
-    query = re.sub(pattern_double_quote, replace_string_literals, query)
-    
-    # Replace numeric literals, avoiding table/column names
-    # This pattern matches numbers that are not part of identifiers
-    numeric_pattern = r'(?<!\w)(\d+\.\d+|\d+)(?!\w|\.\w)'
-    query = re.sub(numeric_pattern, replace_numeric_literals, query)
+    # Replace numeric literals, but skip parameter placeholders
+    query = re.sub(r'(?<![%\w])([-+]?\d+(\.\d+)?)', replace_numeric_literals, query)
     
     return query, params
 
-
 def test_db_connections() -> Dict[str, bool]:
     """Test connections to configured databases."""
-    status = {"postgres": False}
+    results = {
+        "postgres": False,
+        "mssql": False
+    }
     
     # Test PostgreSQL connection
-    if settings.POSTGRES_CONN_STR:
+    if settings.DB_POSTGRES_URL:
         try:
-            conn = None
-            if postgres_pool:
-                conn = postgres_pool.getconn()
-                cursor = conn.cursor()
+            conn = get_postgres_connection()
+            with conn.cursor() as cursor:
                 cursor.execute("SELECT 1")
-                cursor.close()
-                status["postgres"] = True
+                cursor.fetchone()
+            pg_pool.putconn(conn)
+            results["postgres"] = True
         except Exception as e:
-            print(f"PostgreSQL connection test failed: {e}")
-        finally:
-            if conn:
-                postgres_pool.putconn(conn)
+            logger.error(f"PostgreSQL connection test failed: {str(e)}")
     
-    return status
+    # MSSQL connection would be tested here if implemented
+    
+    return results

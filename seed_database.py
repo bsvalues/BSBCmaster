@@ -1,192 +1,250 @@
 """
-This script populates the database with sample data for the MCP Assessor Agent API.
+This script seeds the database with sample data for testing purposes.
 """
 
-from datetime import datetime, date
+import os
+import logging
 import random
+import datetime
+from decimal import Decimal
+
+from flask import Flask
 from database import app, db, Parcel, Property, Sale
 
-# Sample data for parcels
-SAMPLE_PARCELS = [
-    {
-        "parcel_id": "ABC-12345",
-        "address": "123 Main St",
-        "city": "Springfield",
-        "state": "IL",
-        "zip_code": "62701",
-        "land_value": 120000.00,
-        "improvement_value": 230000.00,
-        "total_value": 350000.00,
-        "assessment_year": 2024,
-        "latitude": 39.799999,
-        "longitude": -89.650002
-    },
-    {
-        "parcel_id": "XYZ-67890",
-        "address": "456 Oak Ave",
-        "city": "Springfield",
-        "state": "IL",
-        "zip_code": "62702",
-        "land_value": 150000.00,
-        "improvement_value": 400000.00,
-        "total_value": 550000.00,
-        "assessment_year": 2024,
-        "latitude": 39.781467,
-        "longitude": -89.644661
-    },
-    {
-        "parcel_id": "DEF-54321",
-        "address": "789 Pine Rd",
-        "city": "Springfield",
-        "state": "IL",
-        "zip_code": "62703",
-        "land_value": 95000.00,
-        "improvement_value": 185000.00,
-        "total_value": 280000.00,
-        "assessment_year": 2024,
-        "latitude": 39.767365,
-        "longitude": -89.692307
-    },
-    {
-        "parcel_id": "GHI-13579",
-        "address": "101 Cedar Ln",
-        "city": "Springfield",
-        "state": "IL",
-        "zip_code": "62704",
-        "land_value": 200000.00,
-        "improvement_value": 550000.00,
-        "total_value": 750000.00,
-        "assessment_year": 2024,
-        "latitude": 39.807877,
-        "longitude": -89.702125
-    },
-    {
-        "parcel_id": "JKL-24680",
-        "address": "222 Maple Blvd",
-        "city": "Springfield",
-        "state": "IL",
-        "zip_code": "62704",
-        "land_value": 180000.00,
-        "improvement_value": 320000.00,
-        "total_value": 500000.00,
-        "assessment_year": 2024,
-        "latitude": 39.815208,
-        "longitude": -89.673439
-    }
-]
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
-# Sample property types and conditions
-PROPERTY_TYPES = ["Single Family", "Multi-Family", "Condominium", "Commercial", "Vacant Land"]
-PROPERTY_CONDITIONS = ["Excellent", "Good", "Average", "Fair", "Poor"]
-PROPERTY_QUALITIES = ["Luxury", "High", "Above Average", "Average", "Below Average", "Low"]
-ZONING_TYPES = ["R-1", "R-2", "R-3", "C-1", "C-2", "I-1", "AGR"]
+def create_sample_parcels(count=10):
+    """Create sample parcel records."""
+    logger.info(f"Creating {count} sample parcels")
+    
+    # Lists for generating sample data
+    cities = ["Springfield", "Riverside", "Oakridge", "Maplewood", "Pine Valley", "Cedar Hills"]
+    states = ["CA", "NY", "TX", "FL", "WA", "IL"]
+    street_types = ["St", "Ave", "Blvd", "Dr", "Ln", "Rd", "Way", "Pl"]
+    
+    parcels = []
+    for i in range(1, count + 1):
+        street_number = random.randint(100, 9999)
+        street_name = random.choice(["Main", "Oak", "Pine", "Maple", "Cedar", "Elm", "Washington", "Park", "Lake", "River"])
+        street_type = random.choice(street_types)
+        address = f"{street_number} {street_name} {street_type}"
+        
+        city = random.choice(cities)
+        state = random.choice(states)
+        zip_code = f"{random.randint(10000, 99999)}"
+        
+        land_value = Decimal(random.randint(5000, 500000))
+        improvement_value = Decimal(random.randint(10000, 1000000))
+        total_value = land_value + improvement_value
+        
+        assessment_year = random.choice([2022, 2023, 2024])
+        
+        # Generate a unique parcel ID
+        parcel_id = f"{state[:2]}-{city[:3]}-{zip_code[:5]}-{i:03d}"
+        
+        # Create latitude and longitude (simplified for demo)
+        latitude = 37.0 + (random.random() * 5)
+        longitude = -122.0 - (random.random() * 5)
+        
+        # Create the parcel record
+        parcel = Parcel(
+            parcel_id=parcel_id,
+            address=address,
+            city=city,
+            state=state,
+            zip_code=zip_code,
+            land_value=land_value,
+            improvement_value=improvement_value,
+            total_value=total_value,
+            assessment_year=assessment_year,
+            latitude=latitude,
+            longitude=longitude
+        )
+        
+        parcels.append(parcel)
+    
+    # Add all parcels to the database
+    db.session.add_all(parcels)
+    db.session.commit()
+    
+    return parcels
 
-# Sample sale types and financing
-SALE_TYPES = ["Standard", "Foreclosure", "Short Sale", "New Construction", "Estate Sale"]
-FINANCING_TYPES = ["Conventional", "FHA", "VA", "Cash", "Owner Financing"]
+def create_sample_properties(parcels):
+    """Create sample property records for the given parcels."""
+    logger.info(f"Creating properties for {len(parcels)} parcels")
+    
+    property_types = ["Single Family", "Multi-Family", "Condominium", "Townhouse", "Commercial", "Industrial", "Vacant Land"]
+    conditions = ["Excellent", "Good", "Average", "Fair", "Poor"]
+    qualities = ["Luxury", "High", "Average", "Low", "Very Low"]
+    tax_districts = ["Central", "North", "South", "East", "West"]
+    zoning_types = ["Residential", "Commercial", "Industrial", "Agricultural", "Mixed-Use"]
+    
+    properties = []
+    for parcel in parcels:
+        # Determine property type
+        property_type = random.choice(property_types)
+        
+        # Generate property attributes based on type
+        if property_type == "Vacant Land":
+            year_built = None
+            square_footage = None
+            bedrooms = None
+            bathrooms = None
+            stories = None
+        else:
+            current_year = datetime.datetime.now().year
+            year_built = random.randint(1950, current_year - 1)
+            
+            if property_type in ["Single Family", "Multi-Family", "Condominium", "Townhouse"]:
+                square_footage = random.randint(800, 5000)
+                bedrooms = random.randint(1, 6)
+                bathrooms = random.choice([1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])
+                stories = random.choice([1.0, 1.5, 2.0, 2.5, 3.0])
+            else:  # Commercial or Industrial
+                square_footage = random.randint(2000, 50000)
+                bedrooms = None
+                bathrooms = random.randint(1, 10)
+                stories = random.randint(1, 5)
+        
+        # Common attributes
+        lot_size = random.uniform(0.1, 10.0)
+        lot_size_unit = "acres"
+        condition = random.choice(conditions)
+        quality = random.choice(qualities)
+        tax_district = random.choice(tax_districts)
+        zoning = random.choice(zoning_types)
+        
+        # Create the property record
+        property_record = Property(
+            parcel_id=parcel.id,
+            property_type=property_type,
+            year_built=year_built,
+            square_footage=square_footage,
+            bedrooms=bedrooms,
+            bathrooms=bathrooms,
+            lot_size=lot_size,
+            lot_size_unit=lot_size_unit,
+            stories=stories,
+            condition=condition,
+            quality=quality,
+            tax_district=tax_district,
+            zoning=zoning
+        )
+        
+        properties.append(property_record)
+    
+    # Add all properties to the database
+    db.session.add_all(properties)
+    db.session.commit()
+    
+    return properties
 
+def create_sample_sales(parcels):
+    """Create sample sale records for the given parcels."""
+    logger.info(f"Creating sales history for {len(parcels)} parcels")
+    
+    sale_types = ["Standard", "Foreclosure", "Short Sale", "Auction", "New Construction"]
+    financing_types = ["Conventional", "FHA", "VA", "Cash", "Seller Financing", "USDA", "Other"]
+    
+    sales = []
+    for parcel in parcels:
+        # Generate 1-3 sales per parcel
+        num_sales = random.randint(1, 3)
+        
+        # Start with a base sale date 5-15 years ago
+        current_date = datetime.datetime.now().date()
+        years_back = random.randint(5, 15)
+        base_sale_date = current_date.replace(year=current_date.year - years_back)
+        
+        for i in range(num_sales):
+            # For multiple sales, each subsequent sale happens 2-5 years after the previous
+            if i > 0:
+                years_forward = random.randint(2, 5)
+                base_sale_date = base_sale_date.replace(year=base_sale_date.year + years_forward)
+                
+                # Don't create future sales
+                if base_sale_date > current_date:
+                    break
+            
+            # Adjust the sale date by a random number of days
+            days_adjustment = random.randint(-180, 180)
+            sale_date = base_sale_date + datetime.timedelta(days=days_adjustment)
+            
+            # Make sure the sale date isn't in the future
+            if sale_date > current_date:
+                sale_date = current_date - datetime.timedelta(days=random.randint(1, 30))
+            
+            # Generate sale price (related to the total value but with some variance)
+            base_price = float(parcel.total_value)
+            variance_factor = random.uniform(0.8, 1.2)  # 80% to 120% of the assessed value
+            sale_price = Decimal(base_price * variance_factor).quantize(Decimal('0.01'))
+            
+            # Set other sale attributes
+            sale_type = random.choice(sale_types)
+            transaction_id = f"TX-{parcel.parcel_id}-{sale_date.year}{sale_date.month:02d}{sale_date.day:02d}"
+            
+            # Generate random names for buyer and seller
+            first_names = ["John", "Jane", "Michael", "Emily", "David", "Sarah", "James", "Jennifer", "Robert", "Linda"]
+            last_names = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Wilson", "Taylor", "Anderson"]
+            
+            buyer_name = f"{random.choice(first_names)} {random.choice(last_names)}"
+            seller_name = f"{random.choice(first_names)} {random.choice(last_names)}"
+            
+            # Ensure buyer and seller are different
+            while seller_name == buyer_name:
+                seller_name = f"{random.choice(first_names)} {random.choice(last_names)}"
+            
+            financing_type = random.choice(financing_types)
+            
+            # Create the sale record
+            sale = Sale(
+                parcel_id=parcel.id,
+                sale_date=sale_date,
+                sale_price=sale_price,
+                sale_type=sale_type,
+                transaction_id=transaction_id,
+                buyer_name=buyer_name,
+                seller_name=seller_name,
+                financing_type=financing_type
+            )
+            
+            sales.append(sale)
+    
+    # Add all sales to the database
+    db.session.add_all(sales)
+    db.session.commit()
+    
+    return sales
 
-def seed_database(force=False):
-    """Seed the database with sample data."""
+def seed_database():
+    """Main function to seed the database."""
     with app.app_context():
-        # Check if we already have data
-        if Parcel.query.count() > 0 and not force:
-            print("Database already has data. Skipping seed.")
-            return
+        try:
+            # Check if database is already seeded
+            existing_count = Parcel.query.count()
+            if existing_count > 0:
+                logger.info(f"Database already contains {existing_count} parcels")
+                user_input = input("Do you want to add more sample data? (y/n): ")
+                if user_input.lower() != 'y':
+                    logger.info("Database seeding cancelled")
+                    return
             
-        # Clear existing data if force is True and data exists
-        if force and Parcel.query.count() > 0:
-            print("Forcing reseed. Clearing existing data...")
-            db.session.query(Sale).delete()
-            db.session.query(Property).delete()
-            db.session.query(Parcel).delete()
-            db.session.commit()
-        
-        print("Seeding database with sample data...")
-        
-        # Create parcels
-        parcels = []
-        for parcel_data in SAMPLE_PARCELS:
-            parcel = Parcel(**parcel_data)
-            db.session.add(parcel)
-            parcels.append(parcel)
-        
-        # Commit to get IDs
-        db.session.commit()
-        
-        # Create properties for each parcel
-        for parcel in parcels:
-            property_data = {
-                "parcel_id": parcel.id,
-                "property_type": random.choice(PROPERTY_TYPES),
-                "year_built": random.randint(1950, 2023),
-                "square_footage": random.randint(1000, 5000),
-                "bedrooms": random.randint(2, 5),
-                "bathrooms": random.choice([1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0]),
-                "lot_size": round(random.uniform(0.1, 2.0), 2),
-                "lot_size_unit": "acres",
-                "stories": random.choice([1.0, 1.5, 2.0, 2.5, 3.0]),
-                "condition": random.choice(PROPERTY_CONDITIONS),
-                "quality": random.choice(PROPERTY_QUALITIES),
-                "tax_district": f"District {random.randint(1, 5)}",
-                "zoning": random.choice(ZONING_TYPES)
-            }
+            # Create sample data - adjust counts as needed
+            parcels = create_sample_parcels(count=20)
+            properties = create_sample_properties(parcels)
+            sales = create_sample_sales(parcels)
             
-            # Skip bedrooms/bathrooms for vacant land
-            if property_data["property_type"] == "Vacant Land":
-                property_data["bedrooms"] = None
-                property_data["bathrooms"] = None
-                property_data["square_footage"] = None
-                property_data["stories"] = None
+            logger.info(f"Created {len(parcels)} parcels")
+            logger.info(f"Created {len(properties)} properties")
+            logger.info(f"Created {len(sales)} sales")
             
-            property_instance = Property(**property_data)
-            db.session.add(property_instance)
-        
-        # Commit to get IDs
-        db.session.commit()
-        
-        # Create sales history for each parcel
-        for parcel in parcels:
-            # Generate 1-3 sales per parcel
-            for _ in range(random.randint(1, 3)):
-                # Generate a random date in the past 10 years
-                years_ago = random.randint(0, 10)
-                months_ago = random.randint(0, 11)
-                day = random.randint(1, 28)  # Avoid month boundary issues
-                sale_date = date(2024 - years_ago, 12 - months_ago, day)
-                
-                # Adjust price based on age of sale
-                price_factor = 1.0 - (years_ago * 0.02) - (months_ago * 0.001)  # Prices decrease with age
-                
-                # Convert Decimal to float for operations and then back to Decimal for database
-                total_value = float(parcel.total_value)
-                adjusted_price = total_value * price_factor * random.uniform(0.9, 1.1)
-                
-                sale_data = {
-                    "parcel_id": parcel.id,
-                    "sale_date": sale_date,
-                    "sale_price": round(adjusted_price, 2),
-                    "sale_type": random.choice(SALE_TYPES),
-                    "transaction_id": f"TX-{random.randint(10000, 99999)}",
-                    "buyer_name": f"Buyer {random.randint(100, 999)}",
-                    "seller_name": f"Seller {random.randint(100, 999)}",
-                    "financing_type": random.choice(FINANCING_TYPES)
-                }
-                
-                sale = Sale(**sale_data)
-                db.session.add(sale)
-        
-        # Final commit
-        db.session.commit()
-        
-        # Report counts
-        print(f"Created {len(parcels)} parcels")
-        print(f"Created {Property.query.count()} property records")
-        print(f"Created {Sale.query.count()} sale records")
-        print("Database seeding complete!")
-
+            logger.info("Database seeding completed successfully")
+            
+        except Exception as e:
+            logger.error(f"Error seeding database: {str(e)}")
+            db.session.rollback()
 
 if __name__ == "__main__":
-    import sys
-    force = len(sys.argv) > 1 and sys.argv[1] == "--force"
-    seed_database(force=force)
+    seed_database()
