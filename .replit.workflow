@@ -22,7 +22,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python combined_workflow.py"
+args = "python server.py"
 waitForPort = 5000
 
 [[ports]]
