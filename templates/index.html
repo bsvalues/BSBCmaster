@@ -7,7 +7,7 @@
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="/static/css/main.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Chart.js is loaded at the bottom of the file -->
 </head>
 <body>
     <div class="container py-4">
@@ -457,6 +457,93 @@ else:
         console.error('Error:', error);
         return null;
     }
+}</code></pre>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Data Visualization Examples -->
+                            <div class="tab-pane fade code-tab-content" id="visualization-code" role="tabpanel" aria-labelledby="visualization-tab">
+                                <ul class="nav nav-pills mb-3" id="visualizationLanguageTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="visualization-javascript-tab" data-bs-toggle="pill" data-bs-target="#visualization-javascript" type="button" role="tab" aria-controls="visualization-javascript" aria-selected="true">JavaScript</button>
+                                    </li>
+                                </ul>
+                                <div class="tab-content" id="visualizationLanguageTabsContent">
+                                    <div class="tab-pane fade show active" id="visualization-javascript" role="tabpanel" aria-labelledby="visualization-javascript-tab">
+                                        <pre><code>// Step 1: Execute a SQL query to get data
+async function getVisualizationData() {
+    const apiKey = document.getElementById('apiKey').value;
+    const query = "SELECT parcel_id, total_value FROM parcels ORDER BY total_value DESC LIMIT 10";
+    
+    const response = await fetch("{{ base_url }}/api/run-query", {
+        method: 'POST',
+        headers: {
+            "{{ api_key_header }}": apiKey,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            db: "postgres",
+            query: query
+        })
+    });
+    
+    const data = await response.json();
+    return data.data;
+}
+
+// Step 2: Create a bar chart with Chart.js
+async function createBarChart() {
+    // Get the data
+    const queryData = await getVisualizationData();
+    
+    // Extract labels (parcel_ids) and values
+    const labels = queryData.map(row => row.parcel_id);
+    const values = queryData.map(row => row.total_value);
+    
+    // Create a canvas element
+    const canvas = document.createElement('canvas');
+    canvas.id = 'propertyValueChart';
+    document.getElementById('chartContainer').appendChild(canvas);
+    
+    // Create the chart
+    new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Property Values',
+                data: values,
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Property Value ($)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Parcel ID'
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Top 10 Property Values'
+                }
+            }
+        }
+    });
 }</code></pre>
                                     </div>
                                 </div>
