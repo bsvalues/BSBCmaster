@@ -330,14 +330,32 @@
     <!-- Include visualization component -->
     {% include "query_visualization.html" %}
 </div>
+
+<!-- Parameter Template (Hidden) -->
+<template id="param-template">
+    <div class="param-field row g-2">
+        <div class="col-md-5">
+            <input type="text" class="form-control param-name-input" placeholder="Parameter Name">
+        </div>
+        <div class="col-md-6">
+            <input type="text" class="form-control param-input" placeholder="Parameter Value">
+        </div>
+        <div class="col-md-1 d-flex align-items-center">
+            <button type="button" class="btn-close param-remove" aria-label="Remove"></button>
+        </div>
+    </div>
+</template>
 {% endblock %}
 
-{% block scripts %}
+{% block extra_js %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/sql/sql.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="/static/js/query_visualization.js"></script>
-<script src="/static/js/enhanced_visualizations.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/show-hint.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/addon/hint/sql-hint.min.js"></script>
+<script src="{{ url_for('static', filename='js/enhanced_visualizations.js') }}"></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize CodeMirror for SQL editor
@@ -438,7 +456,6 @@
         document.getElementById('prev-page-btn').addEventListener('click', function() {
             if (currentPage > 1) {
                 currentPage--;
-                document.getElementById('pageNumber').value = currentPage;
                 runSqlQuery();
             }
         });
@@ -446,7 +463,6 @@
         document.getElementById('next-page-btn').addEventListener('click', function() {
             if (currentPage < totalPages) {
                 currentPage++;
-                document.getElementById('pageNumber').value = currentPage;
                 runSqlQuery();
             }
         });
@@ -494,23 +510,22 @@
         
         // Function to add a parameter
         function addParameter(name = '', value = '') {
-            const paramField = document.createElement('div');
-            paramField.className = 'param-field row g-2';
-            paramField.innerHTML = `
-                <div class="col-md-5">
-                    <input type="text" class="form-control param-name-input" placeholder="Parameter Name" value="${name}">
-                </div>
-                <div class="col-md-6">
-                    <input type="text" class="form-control param-input" placeholder="Parameter Value" value="${value}">
-                </div>
-                <div class="col-md-1 d-flex align-items-center">
-                    <button type="button" class="btn-close param-remove" aria-label="Remove"></button>
-                </div>
-            `;
+            const template = document.getElementById('param-template');
+            const paramField = template.content.cloneNode(true);
             
-            // Add event listener to the remove button
-            paramField.querySelector('.param-remove').addEventListener('click', function() {
-                paramField.remove();
+            paramIdCounter++;
+            
+            const paramNameInput = paramField.querySelector('.param-name-input');
+            paramNameInput.value = name;
+            paramNameInput.id = `param-name-${paramIdCounter}`;
+            
+            const paramValueInput = paramField.querySelector('.param-input');
+            paramValueInput.value = value;
+            paramValueInput.id = `param-value-${paramIdCounter}`;
+            
+            const removeButton = paramField.querySelector('.param-remove');
+            removeButton.addEventListener('click', function() {
+                this.closest('.param-field').remove();
             });
             
             document.getElementById('parameters-container').appendChild(paramField);
@@ -523,7 +538,7 @@
             for (let i = 0; i < existingParams.length; i++) {
                 if (existingParams[i].value === name) {
                     // Parameter already exists, focus on its value input
-                    existingParams[i].closest('.param-field').querySelector('.param-input').focus();
+                    existingParams[i].parentNode.nextElementSibling.querySelector('.param-input').focus();
                     return;
                 }
             }
@@ -552,12 +567,14 @@
             currentPageSize = parseInt(document.getElementById('pageSize').value) || 25;
             
             // Collect parameters
-            const paramFields = document.querySelectorAll('.param-field');
+            const paramInputs = document.querySelectorAll('.param-input');
+            const paramNameInputs = document.querySelectorAll('.param-name-input');
+            
             queryParams = {};
             
-            for (let i = 0; i < paramFields.length; i++) {
-                const name = paramFields[i].querySelector('.param-name-input').value;
-                const value = paramFields[i].querySelector('.param-input').value;
+            for (let i = 0; i < paramInputs.length; i++) {
+                const name = paramNameInputs[i].value;
+                const value = paramInputs[i].value;
                 
                 if (name && value) {
                     queryParams[name] = value;
@@ -565,7 +582,7 @@
             }
             
             // Show loading indicator
-            showAlert('Executing query...', 'info');
+            showLoading(true);
             
             // Prepare request payload
             const payload = {
@@ -595,13 +612,13 @@
                 return response.json();
             })
             .then(data => {
-                clearAlerts();
+                showLoading(false);
                 displayResults(data);
                 // Save results for download
                 window.lastResults = data;
             })
             .catch(error => {
-                clearAlerts();
+                showLoading(false);
                 showAlert(error.message, 'danger');
                 console.error(error);
             });
@@ -975,6 +992,16 @@
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             }, 100);
+        }
+        
+        // Function to show loading indicator
+        function showLoading(show) {
+            // Implementation depends on your UI
+            if (show) {
+                showAlert('Executing query...', 'info');
+            } else {
+                clearAlerts();
+            }
         }
         
         // Function to show alert message
