@@ -1,8 +1,6 @@
 """
-MCP Assessor Agent API - Integrated Services Runner
-
-This script starts both the Flask documentation interface (port 5000) and 
-the FastAPI service (port 8000) with proper coordination and error handling.
+This script is a simplified version of run_dual_app.py specifically for the workflow.
+It starts both the FastAPI service and Flask documentation.
 """
 
 import os
@@ -83,47 +81,6 @@ def start_fastapi():
         logger.error(f"Error starting FastAPI: {str(e)}")
         return False
 
-def start_flask():
-    """Start the Flask documentation application."""
-    logger.info("Starting Flask documentation on port 5000...")
-    # Run Flask using gunicorn
-    flask_cmd = [
-        "gunicorn", "--bind", "0.0.0.0:5000", 
-        "--reload", "main:app"
-    ]
-    
-    try:
-        process = subprocess.Popen(
-            flask_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            bufsize=1,
-            universal_newlines=False
-        )
-        processes.append(process)
-        
-        # Start a thread to monitor and log output
-        threading.Thread(
-            target=log_output,
-            args=(process, "Flask"),
-            daemon=True
-        ).start()
-        
-        # Wait for service to start
-        logger.info("Waiting for Flask to initialize...")
-        time.sleep(3)
-        
-        # Check if process is still running
-        if process.poll() is not None:
-            logger.error(f"Flask failed to start (exit code {process.returncode})")
-            return False
-        
-        logger.info("Flask documentation started successfully")
-        return True
-    except Exception as e:
-        logger.error(f"Error starting Flask: {str(e)}")
-        return False
-
 def cleanup(signum=None, frame=None):
     """Clean up processes on exit."""
     logger.info("Cleaning up services...")
@@ -139,7 +96,7 @@ def cleanup(signum=None, frame=None):
     sys.exit(0)
 
 def main():
-    """Main function to run both services."""
+    """Main function to start FastAPI before gunicorn starts Flask."""
     # Load environment variables
     load_dotenv()
     
@@ -154,13 +111,10 @@ def main():
         logger.error("Failed to start FastAPI service")
         cleanup()
         
-    # Start Flask documentation
-    if not start_flask():
-        logger.error("Failed to start Flask documentation")
-        cleanup()
+    logger.info("Waiting for Flask to start via gunicorn...")
     
-    logger.info("All services started successfully")
-    
+    # In workflow, Flask will be started by gunicorn separately
+    # We just need to keep this script running
     try:
         # Keep script running
         while True:
@@ -168,7 +122,7 @@ def main():
             # Check if any process has exited
             for process in processes:
                 if process.poll() is not None:
-                    logger.error(f"A service has exited unexpectedly with code {process.returncode}")
+                    logger.error(f"FastAPI has exited unexpectedly with code {process.returncode}")
                     cleanup()
     except KeyboardInterrupt:
         logger.info("Received interrupt signal")

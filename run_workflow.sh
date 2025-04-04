@@ -1,17 +1,8 @@
 #!/bin/bash
+# Start both FastAPI and Flask via gunicorn
 
-# Set environment variable for Flask-FastAPI communication
-export FASTAPI_URL="http://127.0.0.1:8000"
+# Start the combined_workflow.py script in the background to handle FastAPI
+python combined_workflow.py &
 
-# Start FastAPI service in background
-echo "Starting FastAPI service..."
-python -m uvicorn asgi:app --host 0.0.0.0 --port 8000 --log-level info > fastapi.log 2>&1 &
-FASTAPI_PID=$!
-
-# Give FastAPI time to initialize
-sleep 5
-echo "FastAPI started on port 8000"
-
-# Start Flask service in foreground
-echo "Starting Flask application on port 5000..."
+# Then start gunicorn for Flask
 exec gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app
