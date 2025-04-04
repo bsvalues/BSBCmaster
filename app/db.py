@@ -21,7 +21,20 @@ async def initialize_db():
     # Initialize PostgreSQL connection pool if configured
     if settings.POSTGRES_CONN_STR:
         try:
-            postgres_pool = ThreadedConnectionPool(1, 10, settings.POSTGRES_CONN_STR)
+            # Close existing pool if it exists
+            if postgres_pool:
+                try:
+                    postgres_pool.closeall()
+                    logger.info("Closed existing PostgreSQL connection pool")
+                except Exception as e:
+                    logger.error(f"Error closing existing pool: {e}")
+            
+            # Create new connection pool with explicit connection parameters
+            postgres_pool = ThreadedConnectionPool(
+                minconn=1, 
+                maxconn=10, 
+                dsn=settings.POSTGRES_CONN_STR
+            )
             logger.info("PostgreSQL connection pool initialized")
         except psycopg2.Error as e:
             logger.error(f"Failed to initialize PostgreSQL pool: {e}")
@@ -73,19 +86,27 @@ def get_postgres_connection():
     
     conn = None
     try:
-        conn = postgres_pool.getconn()
+        # Get connection with a specific key to prevent the "unkeyed connection" error
+        conn = postgres_pool.getconn(key=None)
         yield conn
     except (psycopg2.Error, AttributeError) as e:
         logger.error(f"PostgreSQL connection error: {e}")
         if conn and postgres_pool:
-            postgres_pool.putconn(conn)
+            try:
+                postgres_pool.putconn(conn, key=None)
+            except Exception as e:
+                logger.error(f"Error returning connection to pool: {e}")
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database connection error"
         )
     finally:
         if conn and postgres_pool:
-            postgres_pool.putconn(conn)
+            try:
+                postgres_pool.putconn(conn, key=None)
+            except Exception as e:
+                logger.error(f"Error returning connection to pool in finally block: {e}")
+                # Don't re-raise the exception here to avoid masking original errors
 
 def is_safe_query(query: str) -> bool:
     """
