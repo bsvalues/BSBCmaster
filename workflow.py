@@ -52,17 +52,25 @@ def start_fastapi():
     # Add process to the list for later cleanup
     processes.append(("fastapi", fastapi_process))
     
-    # Start the log reader in a separate process
-    logger.info("Starting FastAPI log reader...")
+    # Start the log reader in a background thread
+    import threading
     
     def read_logs():
         """Read logs from FastAPI process."""
+        if fastapi_process.stdout is None:
+            logger.error("FastAPI process has no stdout")
+            return
+            
         for line in iter(fastapi_process.stdout.readline, ''):
             sys.stdout.write(f"FastAPI: {line}")
             sys.stdout.flush()
     
-    # Start log reader
-    read_logs()
+    # Start log reader in a separate thread
+    log_thread = threading.Thread(target=read_logs, daemon=True)
+    log_thread.start()
+    
+    # Wait for the service to start
+    time.sleep(2)
     
     return fastapi_process
 
@@ -73,10 +81,19 @@ def wait_for_fastapi():
     max_attempts = 20
     for attempt in range(1, max_attempts + 1):
         try:
-            # Try to reach the FastAPI service
-            response = requests.get(f"{FASTAPI_URL}/api/v1/health", timeout=1)
+            # Try to reach the FastAPI service - use /health endpoint
+            response = requests.get(f"{FASTAPI_URL}/health", timeout=1)
             if response.status_code == 200:
                 logger.info(f"FastAPI service is ready (attempt {attempt}/{max_attempts})")
+                return True
+        except requests.exceptions.RequestException:
+            pass
+        
+        # Try with API prefix as an alternative
+        try:
+            response = requests.get(f"{FASTAPI_URL}/api/health", timeout=1)
+            if response.status_code == 200:
+                logger.info(f"FastAPI service is ready with API prefix (attempt {attempt}/{max_attempts})")
                 return True
         except requests.exceptions.RequestException:
             pass
@@ -116,9 +133,23 @@ def start_flask():
 
 def log_flask_output(flask_process):
     """Log output from Flask process."""
-    for line in iter(flask_process.stdout.readline, ''):
-        sys.stdout.write(f"Flask: {line}")
-        sys.stdout.flush()
+    import threading
+    
+    def read_logs():
+        """Read logs from Flask process."""
+        if flask_process.stdout is None:
+            logger.error("Flask process has no stdout")
+            return
+            
+        for line in iter(flask_process.stdout.readline, ''):
+            sys.stdout.write(f"Flask: {line}")
+            sys.stdout.flush()
+    
+    # Start log reader in a separate thread
+    log_thread = threading.Thread(target=read_logs, daemon=True)
+    log_thread.start()
+    
+    return log_thread
 
 def cleanup(signum=None, frame=None):
     """Clean up processes on exit."""

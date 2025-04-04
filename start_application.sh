@@ -20,6 +20,13 @@ if [ -z "$API_KEY" ]; then
   export API_KEY="mcp_assessor_api_default_key_2024_secure_random_token_987654321"
 fi
 
+# Check if OpenAI API key is set
+if [ -z "$OPENAI_API_KEY" ]; then
+  echo "WARNING: OPENAI_API_KEY environment variable is not set. Natural language to SQL translation will use fallback mode."
+else
+  echo "OpenAI API key is set. Natural language to SQL translation will be available."
+fi
+
 # Set service URLs and ports
 export FLASK_PORT=5000
 export FASTAPI_PORT=8000
