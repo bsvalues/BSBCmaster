@@ -109,25 +109,38 @@ def is_safe_query(query: str) -> bool:
 def execute_parameterized_query(
     db: str, 
     query: str, 
-    params: Optional[List[Any]] = None
-) -> List[Dict[str, Any]]:
+    params: Optional[List[Any]] = None,
+    page: int = 1,
+    page_size: Optional[int] = None
+) -> Dict[str, Any]:
     """
-    Execute a parameterized SQL query on the specified database.
+    Execute a parameterized SQL query on the specified database with pagination support.
     
     Args:
         db: Database to use ('mssql' or 'postgres')
         query: SQL query with parameter placeholders (? for MSSQL, %s for PostgreSQL)
         params: List of parameter values to be sanitized and inserted
+        page: Page number for paginated results (starting from 1)
+        page_size: Number of records per page, if None uses settings.MAX_RESULTS
         
     Returns:
-        List of dictionaries representing the query results
-        
+        Dictionary containing:
+            - data: List of dictionaries representing the query results
+            - pagination: Dictionary with pagination metadata
+            - count: Total number of records matching the query
+            
     Raises:
         HTTPException: If a database error occurs
     """
     if params is None:
         params = []
     
+    if page_size is None:
+        page_size = settings.MAX_RESULTS
+    
+    if page < 1:
+        page = 1
+        
     # Safety check for query content
     if not is_safe_query(query):
         logger.warning(f"Unsafe SQL query attempted: {query}")
@@ -137,6 +150,7 @@ def execute_parameterized_query(
         )
     
     results = []
+    total_count = 0
     
     try:
         # Convert query placeholders based on database type
@@ -152,42 +166,108 @@ def execute_parameterized_query(
             logger.debug(f"Converted placeholders for MSSQL: {ms_query}")
             query = ms_query
         
+        # Calculate pagination 
+        offset = (page - 1) * page_size
+        
+        # For non-DML statements, we need to get the total count and apply pagination
+        is_select_query = query.strip().upper().startswith("SELECT")
+        
         # Execute the query with parameters based on database type
         if db == "mssql":
             with get_mssql_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(query, params)
+                
+                if is_select_query:
+                    # Execute count query to get total records
+                    count_query = f"SELECT COUNT(*) FROM ({query}) as count_query"
+                    cursor.execute(count_query, params)
+                    total_count = cursor.fetchone()[0]
+                    
+                    # Add pagination to the original query if not already present
+                    # This is SQL Server specific pagination (2012+)
+                    if not re.search(r'OFFSET\s+\d+\s+ROWS', query, re.IGNORECASE):
+                        paginated_query = f"{query} OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
+                        cursor.execute(paginated_query, params)
+                    else:
+                        cursor.execute(query, params)
+                else:
+                    # For non-SELECT queries
+                    cursor.execute(query, params)
+                
                 if cursor.description:  # Check if the query returns results
                     rows = cursor.fetchall()
                     columns = [column[0] for column in cursor.description]
                     results = [dict(zip(columns, row)) for row in rows]
                     
-                    # For INSERT/UPDATE/DELETE that doesn't return rows but has an impact
-                    if not results and cursor.rowcount > 0:
-                        results = [{"affected_rows": cursor.rowcount}]
+                    # For non-SELECT queries that return results, use actual count
+                    if not is_select_query:
+                        total_count = len(results)
+                
+                # For INSERT/UPDATE/DELETE that doesn't return rows but has an impact
+                if not results and cursor.rowcount > 0:
+                    results = [{"affected_rows": cursor.rowcount}]
+                    total_count = cursor.rowcount
                 
         elif db == "postgres":
             with get_postgres_connection() as conn:
                 with conn.cursor() as cursor:
-                    # For PostgreSQL with parameters as a list (not tuple)
-                    cursor.execute(query, params)
+                    if is_select_query:
+                        # Execute count query to get total records
+                        count_query = f"SELECT COUNT(*) FROM ({query}) as count_query"
+                        cursor.execute(count_query, params)
+                        total_count = cursor.fetchone()[0]
+                        
+                        # Add pagination to the original query if not already present
+                        if not re.search(r'LIMIT\s+\d+\s+OFFSET\s+\d+', query, re.IGNORECASE):
+                            paginated_query = f"{query} LIMIT {page_size} OFFSET {offset}"
+                            cursor.execute(paginated_query, params)
+                        else:
+                            cursor.execute(query, params)
+                    else:
+                        # For non-SELECT queries
+                        cursor.execute(query, params)
                     
                     # Check if the query returns results
                     if cursor.description:  
                         rows = cursor.fetchall()
                         columns = [desc[0] for desc in cursor.description]
                         results = [dict(zip(columns, row)) for row in rows]
+                        
+                        # For non-SELECT queries that return results, use actual count
+                        if not is_select_query:
+                            total_count = len(results)
                     
                     # For INSERT/UPDATE/DELETE that doesn't return rows but has an impact
                     elif cursor.rowcount > 0:
                         results = [{"affected_rows": cursor.rowcount}]
+                        total_count = cursor.rowcount
                         
                 # Commit changes if this is a modification operation
-                if not query.strip().upper().startswith("SELECT"):
+                if not is_select_query:
                     conn.commit()
                     logger.info(f"Changes committed to PostgreSQL database")
         
-        return results
+        # Calculate pagination metadata
+        total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
+        has_next = page < total_pages
+        has_prev = page > 1
+        
+        pagination = {
+            "page": page,
+            "page_size": page_size,
+            "total_records": total_count,
+            "total_pages": total_pages,
+            "has_next": has_next,
+            "has_prev": has_prev,
+            "next_page": page + 1 if has_next else None,
+            "prev_page": page - 1 if has_prev else None
+        }
+        
+        return {
+            "data": results,
+            "pagination": pagination,
+            "count": total_count
+        }
         
     except Exception as e:
         logger.error(f"Database error during parameterized query execution: {str(e)}")

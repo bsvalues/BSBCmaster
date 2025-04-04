@@ -98,14 +98,39 @@ def run_sql_query():
                         results = []
             
             total_count = len(results)
-            truncated = total_count > 50
-            limited_results = results[:50]
+            
+            # Implement pagination
+            page = data.get('page', 1)
+            page_size = data.get('page_size', 50)
+            
+            # Calculate offset and limit
+            offset = (page - 1) * page_size
+            end = offset + page_size
+            
+            # Get paginated results
+            paginated_results = results[offset:end]
+            
+            # Calculate pagination metadata
+            total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
+            has_next = page < total_pages
+            has_prev = page > 1
+            
+            pagination = {
+                "page": page,
+                "page_size": page_size,
+                "total_records": total_count,
+                "total_pages": total_pages,
+                "has_next": has_next,
+                "has_prev": has_prev,
+                "next_page": page + 1 if has_next else None,
+                "prev_page": page - 1 if has_prev else None
+            }
             
             return jsonify({
                 "status": "success", 
-                "data": limited_results,
+                "data": paginated_results,
                 "count": total_count,
-                "truncated": truncated
+                "pagination": pagination
             })
         else:
             return jsonify({
@@ -180,7 +205,33 @@ def discover_schema():
                     columns = [desc[0] for desc in cursor.description]
                     results = [dict(zip(columns, row)) for row in rows]
             
-            return jsonify({"status": "success", "db_schema": results})
+            # Add pagination metadata for consistency
+            total_count = len(results)
+            
+            # Use default pagination values
+            page = 1
+            page_size = total_count  # Show all results by default
+            
+            # Calculate pagination metadata
+            total_pages = 1
+            
+            pagination = {
+                "page": page,
+                "page_size": page_size,
+                "total_records": total_count,
+                "total_pages": total_pages,
+                "has_next": False,
+                "has_prev": False,
+                "next_page": None,
+                "prev_page": None
+            }
+            
+            return jsonify({
+                "status": "success", 
+                "db_schema": results,
+                "count": total_count,
+                "pagination": pagination
+            })
         else:
             return jsonify({
                 "status": "error",
@@ -242,7 +293,33 @@ def schema_summary():
                         columns = [f"{row[0]} ({row[1]})" for row in cursor.fetchall()]
                         table_summaries.append(f"{table}: {', '.join(columns)}")
             
-            return jsonify({"status": "success", "summary": table_summaries})
+            # Add pagination metadata for consistency
+            total_count = len(table_summaries)
+            
+            # Use default pagination values
+            page = 1
+            page_size = total_count  # Show all results by default
+            
+            # Calculate pagination metadata
+            total_pages = 1
+            
+            pagination = {
+                "page": page,
+                "page_size": page_size,
+                "total_records": total_count,
+                "total_pages": total_pages,
+                "has_next": False,
+                "has_prev": False,
+                "next_page": None,
+                "prev_page": None
+            }
+            
+            return jsonify({
+                "status": "success", 
+                "summary": table_summaries,
+                "count": total_count,
+                "pagination": pagination
+            })
         else:
             return jsonify({
                 "status": "error",

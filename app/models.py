@@ -16,12 +16,24 @@ class SQLQuery(BaseModel):
         min_length=1,
         max_length=5000
     )
+    page: Optional[int] = Field(
+        1, 
+        description="Page number for paginated results (starting from 1)",
+        ge=1
+    )
+    page_size: Optional[int] = Field(
+        None, 
+        description="Number of records per page, if None uses settings.MAX_RESULTS",
+        gt=0
+    )
     
     model_config = {
         "json_schema_extra": {
             "example": {
                 "db": "postgres",
-                "query": "SELECT id, name FROM parcels LIMIT 10"
+                "query": "SELECT id, name FROM parcels",
+                "page": 1,
+                "page_size": 25
             }
         }
     }
@@ -58,12 +70,26 @@ class SchemaFilter(BaseModel):
     )
 
 # Response models
+class PaginationMetadata(BaseModel):
+    """Model for pagination metadata."""
+    page: int = Field(..., description="Current page number")
+    page_size: int = Field(..., description="Number of records per page")
+    total_records: int = Field(..., description="Total number of records matching the query")
+    total_pages: int = Field(..., description="Total number of pages")
+    has_next: bool = Field(..., description="Whether there is a next page")
+    has_prev: bool = Field(..., description="Whether there is a previous page")
+    next_page: Optional[int] = Field(None, description="Next page number, if available")
+    prev_page: Optional[int] = Field(None, description="Previous page number, if available")
+
 class QueryResult(BaseModel):
     """Model for SQL query execution results."""
-    status: str
-    data: List[Dict[str, Any]]
-    count: int
-    truncated: bool
+    status: str = Field(..., description="Status of the query execution ('success' or 'error')")
+    data: List[Dict[str, Any]] = Field(..., description="The query results as a list of records")
+    count: int = Field(..., description="Total number of records matching the query")
+    pagination: Optional[PaginationMetadata] = Field(
+        None, 
+        description="Pagination metadata for the query results"
+    )
     
 class SQLTranslation(BaseModel):
     """Model for natural language to SQL translation results."""
@@ -74,11 +100,21 @@ class SchemaResponse(BaseModel):
     """Model for database schema information."""
     status: str
     db_schema: List[Dict[str, Any]]
+    count: int = Field(..., description="Total number of schema items")
+    pagination: Optional[PaginationMetadata] = Field(
+        None, 
+        description="Pagination metadata for the schema results"
+    )
     
 class SchemaSummary(BaseModel):
     """Model for summarized schema information."""
     status: str
     summary: List[str]
+    count: int = Field(..., description="Total number of tables in summary")
+    pagination: Optional[PaginationMetadata] = Field(
+        None, 
+        description="Pagination metadata for the schema summary results"
+    )
     
 class HealthResponse(BaseModel):
     """Model for API health check response."""

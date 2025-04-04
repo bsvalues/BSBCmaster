@@ -62,18 +62,19 @@ async def health_check():
 )
 async def run_sql_query(payload: SQLQuery):
     """
-    Execute a SQL query against the specified database.
+    Execute a SQL query against the specified database with pagination.
     
     Args:
-        payload: The SQL query to execute with the target database
+        payload: Contains the database type, SQL query to execute, and optional
+                pagination parameters (page, page_size)
         
     Returns:
-        QueryResult: The results of the SQL query
+        QueryResult: The results of the SQL query with pagination metadata
         
     Raises:
         HTTPException: If the query is unsafe or if a database error occurs
     """
-    logger.info(f"Running SQL query on {payload.db}")
+    logger.info(f"Running SQL query on {payload.db} (page {payload.page}, size {payload.page_size})")
     
     # Validate query for safety
     if not is_safe_query(payload.query):
@@ -84,23 +85,27 @@ async def run_sql_query(payload: SQLQuery):
         )
         
     try:
-        # Use our new parameterized query execution
-        # For raw queries, we attempt to extract parameters where possible
+        # Parse and extract parameters from the raw query
         parameterized_query, params = parse_for_parameters(payload.query)
         
-        # Execute the query with parameters
-        results = execute_parameterized_query(payload.db, parameterized_query, params)
+        # Execute the query with parameters and pagination
+        # Ensure page is always an integer (default to 1 if None)
+        page = payload.page if payload.page is not None else 1
         
-        # Apply result limitation
-        total_count = len(results)
-        truncated = total_count > settings.MAX_RESULTS
-        limited_results = results[:settings.MAX_RESULTS]
+        result = execute_parameterized_query(
+            db=payload.db, 
+            query=parameterized_query, 
+            params=params,
+            page=page,
+            page_size=payload.page_size
+        )
         
+        # Return the result with pagination metadata
         return {
             "status": "success", 
-            "data": limited_results,
-            "count": total_count,
-            "truncated": truncated
+            "data": result["data"],
+            "count": result["count"],
+            "pagination": result["pagination"]
         }
         
     except Exception as e:
@@ -177,6 +182,8 @@ async def discover_schema(db: str = Query(..., regex="^(mssql|postgres)$")):
     logger.info(f"Discovering schema for {db}")
     
     try:
+        result = None  # Initialize the result variable
+        
         if db == "mssql":
             query = """
                 SELECT 
@@ -185,7 +192,8 @@ async def discover_schema(db: str = Query(..., regex="^(mssql|postgres)$")):
                     DATA_TYPE 
                 FROM INFORMATION_SCHEMA.COLUMNS
             """
-            results = execute_parameterized_query(db, query)
+            # Using a large page_size to retrieve all records
+            result = execute_parameterized_query(db, query, page=1, page_size=1000)
                 
         elif db == "postgres":
             query = """
@@ -196,9 +204,34 @@ async def discover_schema(db: str = Query(..., regex="^(mssql|postgres)$")):
                 FROM information_schema.columns 
                 WHERE table_schema = 'public'
             """
-            results = execute_parameterized_query(db, query)
+            # Using a large page_size to retrieve all records
+            result = execute_parameterized_query(db, query, page=1, page_size=1000)
         
-        return {"status": "success", "db_schema": results}
+        if result:  # Check if result exists before accessing it
+            return {
+                "status": "success", 
+                "db_schema": result["data"],
+                "count": result["count"],
+                "pagination": result["pagination"]
+            }
+        else:
+            # If no result, return an empty schema with pagination
+            empty_pagination = {
+                "page": 1,
+                "page_size": 0,
+                "total_records": 0,
+                "total_pages": 0,
+                "has_next": False,
+                "has_prev": False,
+                "next_page": None,
+                "prev_page": None
+            }
+            return {
+                "status": "error", 
+                "db_schema": [],
+                "count": 0,
+                "pagination": empty_pagination
+            }
         
     except Exception as e:
         logger.error(f"Error discovering schema: {str(e)}")
@@ -243,16 +276,18 @@ async def get_schema_summary(
                     WHERE TABLE_NAME LIKE ?
                     ORDER BY TABLE_NAME
                 """
-                tables_results = execute_parameterized_query(db, query, [f"{prefix}%"])
+                # Using a large page_size to retrieve all records
+                tables_result = execute_parameterized_query(db, query, [f"{prefix}%"], page=1, page_size=1000)
             else:
                 query = """
                     SELECT DISTINCT TABLE_NAME
                     FROM INFORMATION_SCHEMA.COLUMNS
                     ORDER BY TABLE_NAME
                 """
-                tables_results = execute_parameterized_query(db, query)
+                # Using a large page_size to retrieve all records
+                tables_result = execute_parameterized_query(db, query, page=1, page_size=1000)
             
-            tables = [row["TABLE_NAME"] for row in tables_results]
+            tables = [row["TABLE_NAME"] for row in tables_result["data"]]
             
             # Get column info for each table
             for table in tables:
@@ -262,9 +297,10 @@ async def get_schema_summary(
                     WHERE TABLE_NAME = ?
                     ORDER BY ORDINAL_POSITION
                 """
-                columns_results = execute_parameterized_query(db, query, [table])
+                # Using a large page_size to retrieve all records
+                columns_result = execute_parameterized_query(db, query, [table], page=1, page_size=1000)
                 
-                columns = [f"{row['COLUMN_NAME']} ({row['DATA_TYPE']})" for row in columns_results]
+                columns = [f"{row['COLUMN_NAME']} ({row['DATA_TYPE']})" for row in columns_result["data"]]
                 table_summaries.append(f"{table}: {', '.join(columns)}")
             
         elif db == "postgres":
@@ -276,7 +312,8 @@ async def get_schema_summary(
                     WHERE table_schema = 'public' AND table_name LIKE %s
                     ORDER BY table_name
                 """
-                tables_results = execute_parameterized_query(db, query, [f"{prefix}%"])
+                # Using a large page_size to retrieve all records
+                tables_result = execute_parameterized_query(db, query, [f"{prefix}%"], page=1, page_size=1000)
             else:
                 query = """
                     SELECT DISTINCT table_name
@@ -284,9 +321,10 @@ async def get_schema_summary(
                     WHERE table_schema = 'public'
                     ORDER BY table_name
                 """
-                tables_results = execute_parameterized_query(db, query)
+                # Using a large page_size to retrieve all records
+                tables_result = execute_parameterized_query(db, query, page=1, page_size=1000)
             
-            tables = [row["table_name"] for row in tables_results]
+            tables = [row["table_name"] for row in tables_result["data"]]
             
             # Get column info for each table
             for table in tables:
@@ -296,12 +334,33 @@ async def get_schema_summary(
                     WHERE table_schema = 'public' AND table_name = %s
                     ORDER BY ordinal_position
                 """
-                columns_results = execute_parameterized_query(db, query, [table])
+                # Using a large page_size to retrieve all records
+                columns_result = execute_parameterized_query(db, query, [table], page=1, page_size=1000)
                 
-                columns = [f"{row['column_name']} ({row['data_type']})" for row in columns_results]
+                columns = [f"{row['column_name']} ({row['data_type']})" for row in columns_result["data"]]
                 table_summaries.append(f"{table}: {', '.join(columns)}")
         
-        return {"status": "success", "summary": table_summaries}
+        # Add pagination metadata for consistency
+        total_count = len(table_summaries)
+        
+        # Create pagination metadata
+        pagination = {
+            "page": 1,
+            "page_size": total_count,
+            "total_records": total_count,
+            "total_pages": 1,
+            "has_next": False,
+            "has_prev": False,
+            "next_page": None,
+            "prev_page": None
+        }
+        
+        return {
+            "status": "success", 
+            "summary": table_summaries,
+            "count": total_count,
+            "pagination": pagination
+        }
         
     except Exception as e:
         logger.error(f"Error getting schema summary: {str(e)}")
