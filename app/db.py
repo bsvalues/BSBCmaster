@@ -70,6 +70,33 @@ async def close_db_connections():
         pg_pool.closeall()
         logger.info("PostgreSQL connection pool closed")
 
+async def get_db_pool(db_type):
+    """
+    Get the appropriate database connection pool.
+    
+    Args:
+        db_type: The database type (postgres, mssql)
+        
+    Returns:
+        Database connection pool or None if unavailable
+    """
+    global pg_pool
+    
+    # Initialize the pool if needed
+    if not pg_pool:
+        try:
+            await initialize_db()
+        except Exception as e:
+            logger.error(f"Failed to initialize database pool: {str(e)}")
+            return None
+    
+    # Return the appropriate pool based on database type
+    if db_type == "postgres" or getattr(db_type, "value", "") == "postgres":
+        return pg_pool
+    else:
+        logger.warning(f"Unsupported database type: {db_type}")
+        return None
+
 def get_postgres_connection():
     """Get a connection from the PostgreSQL connection pool."""
     global pg_pool

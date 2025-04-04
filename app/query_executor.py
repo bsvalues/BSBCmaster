@@ -5,6 +5,7 @@ This module provides utilities for executing database queries with proper parame
 import asyncio
 import json
 import logging
+import re
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -14,6 +15,7 @@ import psycopg2.extras
 import psycopg2.pool
 
 from app.cache import cache
+# Import get_db_pool directly from db module
 from app.db import get_db_pool
 from app.models import DatabaseType, ParamStyle, ParameterizedSQLQuery, QueryResult
 from app.security import verify_sql_query
@@ -98,20 +100,68 @@ async def execute_parameterized_query(
             query += f" LIMIT {page_size} OFFSET {offset}"
         
         # Execute query with parameters
-        conn = await db_pool.acquire()
+        conn = db_pool.getconn()
         try:
-            async with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            # Synchronous cursor for SimpleConnectionPool
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 # Execute the query with parameters
                 if query_request.param_style == ParamStyle.NAMED:
                     # Use named parameters (:param_name)
-                    await cursor.execute(query, query_request.params or {})
+                    cursor.execute(query, query_request.params or {})
+                elif query_request.param_style == ParamStyle.QMARK:
+                    # Convert dict to ordered list for positional parameters (?)
+                    if isinstance(query_request.params, dict):
+                        # Count placeholder occurrences in the query
+                        placeholders = query.count('?')
+                        if placeholders > 0:
+                            logger.info(f"Query has {placeholders} placeholders, params: {query_request.params}")
+                            # Extract all parameter values in the correct order
+                            params_list = list(query_request.params.values())
+                            if len(params_list) != placeholders:
+                                logger.warning(f"Parameter count mismatch: {placeholders} placeholders, {len(params_list)} params")
+                            cursor.execute(query, params_list)
+                        else:
+                            cursor.execute(query, [])
+                    else:
+                        # Already a list or tuple
+                        cursor.execute(query, query_request.params or [])
+                elif query_request.param_style == ParamStyle.FORMAT:
+                    # PostgreSQL uses %s for format style
+                    if isinstance(query_request.params, dict):
+                        # Extract values in the correct order
+                        params_list = list(query_request.params.values())
+                        cursor.execute(query, params_list)
+                    else:
+                        cursor.execute(query, query_request.params or [])
+                elif query_request.param_style == ParamStyle.NUMERIC:
+                    # Convert :1, :2, etc. to %s and create ordered list
+                    # Count numeric placeholders and extract their indices
+                    placeholder_indices = sorted([int(m.group(1)) for m in re.finditer(r':(\d+)', query)])
+                    
+                    if placeholder_indices:
+                        # Replace :n with %s for PostgreSQL
+                        for idx in placeholder_indices:
+                            query = query.replace(f":{idx}", "%s")
+                        
+                        # Create ordered parameter list
+                        params_list = []
+                        if isinstance(query_request.params, dict):
+                            # If params are a dict with numeric keys as strings
+                            for idx in placeholder_indices:
+                                params_list.append(query_request.params.get(str(idx), None))
+                        else:
+                            # If params is already a list
+                            params_list = query_request.params
+                            
+                        cursor.execute(query, params_list)
+                    else:
+                        cursor.execute(query, [])
                 else:
-                    # Convert to appropriate parameter style
-                    # This would need to be implemented based on the specific param_style
-                    await cursor.execute(query, query_request.params or {})
+                    # Default behavior
+                    cursor.execute(query, query_request.params or {})
                 
                 # Fetch results
-                rows = await cursor.fetchall()
+                rows = cursor.fetchall()
                 
                 # Get column types
                 column_types = {}
@@ -128,17 +178,63 @@ async def execute_parameterized_query(
                 if query.strip().upper().startswith("SELECT"):
                     # Try to extract the count from the query for pagination
                     try:
+                        # Extract base query without LIMIT and OFFSET
+                        base_query = query
+                        if "LIMIT" in base_query.upper():
+                            base_query = base_query.split("LIMIT")[0]
+                        if "OFFSET" in base_query.upper():
+                            base_query = base_query.split("OFFSET")[0]
+                            
                         # Create a count query
-                        count_query = f"SELECT COUNT(*) FROM ({query.split('LIMIT')[0]}) AS subquery"
-                        await cursor.execute(count_query, query_request.params or {})
-                        count_result = await cursor.fetchone()
+                        count_query = f"SELECT COUNT(*) FROM ({base_query}) AS subquery"
+                        
+                        # Execute with the same parameters as the original query
+                        if query_request.param_style == ParamStyle.NAMED:
+                            cursor.execute(count_query, query_request.params or {})
+                        elif query_request.param_style == ParamStyle.QMARK:
+                            if isinstance(query_request.params, dict):
+                                params_list = list(query_request.params.values())
+                                cursor.execute(count_query, params_list)
+                            else:
+                                cursor.execute(count_query, query_request.params or [])
+                        elif query_request.param_style == ParamStyle.FORMAT:
+                            if isinstance(query_request.params, dict):
+                                params_list = list(query_request.params.values())
+                                cursor.execute(count_query, params_list)
+                            else:
+                                cursor.execute(count_query, query_request.params or [])
+                        elif query_request.param_style == ParamStyle.NUMERIC:
+                            # Handle numeric style
+                            formatted_count_query = count_query
+                            placeholder_indices = sorted([int(m.group(1)) for m in re.finditer(r':(\d+)', count_query)])
+                            
+                            if placeholder_indices:
+                                for idx in placeholder_indices:
+                                    formatted_count_query = formatted_count_query.replace(f":{idx}", "%s")
+                                
+                                params_list = []
+                                if isinstance(query_request.params, dict):
+                                    for idx in placeholder_indices:
+                                        params_list.append(query_request.params.get(str(idx), None))
+                                else:
+                                    params_list = query_request.params
+                                    
+                                cursor.execute(formatted_count_query, params_list)
+                            else:
+                                cursor.execute(formatted_count_query, [])
+                        else:
+                            # Default
+                            cursor.execute(count_query, query_request.params or {})
+                            
+                        count_result = cursor.fetchone()
                         if count_result and "count" in count_result:
                             total_items = int(count_result["count"])
                             total_pages = (total_items + page_size - 1) // page_size
                     except Exception as e:
                         logger.warning(f"Could not get total count: {str(e)}")
         finally:
-            await db_pool.release(conn)
+            if conn and db_pool:
+                db_pool.putconn(conn)
         
         # Convert rows to list of dictionaries
         data = [dict(row) for row in rows]
@@ -206,7 +302,7 @@ async def get_database_schema(db_type: DatabaseType) -> Dict[str, Any]:
                 "execution_time": time.time() - start_time
             }
         
-        conn = await db_pool.acquire()
+        conn = db_pool.getconn()
         try:
             # Define schema query based on database type
             if db_type == DatabaseType.POSTGRES:
@@ -278,10 +374,10 @@ async def get_database_schema(db_type: DatabaseType) -> Dict[str, Any]:
                     table_name, ordinal_position;
                 """
             
-            async with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
                 # Execute schema query
-                await cursor.execute(schema_query)
-                rows = await cursor.fetchall()
+                cursor.execute(schema_query)
+                rows = cursor.fetchall()
                 
                 # Convert rows to SchemaItem objects
                 schema_items = []
@@ -333,14 +429,15 @@ async def get_database_schema(db_type: DatabaseType) -> Dict[str, Any]:
                 table_names = list(tables_dict.keys())
                 for table_name in table_names:
                     try:
-                        await cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-                        count_result = await cursor.fetchone()
+                        cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                        count_result = cursor.fetchone()
                         if count_result and "count" in count_result:
                             tables_dict[table_name]["row_count"] = int(count_result["count"])
                     except Exception as e:
                         logger.warning(f"Could not get row count for table {table_name}: {str(e)}")
         finally:
-            await db_pool.release(conn)
+            if conn and db_pool:
+                db_pool.putconn(conn)
         
         # Calculate execution time
         execution_time = time.time() - start_time
