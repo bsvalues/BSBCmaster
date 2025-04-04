@@ -91,10 +91,19 @@ async def translate_nl_to_sql(
     try:
         # Create a system message with the schema information
         system_message = f"""
-        You are an expert SQL translator for {db_type.upper()} databases.
+        You are an expert SQL translator for {db_type.upper()} databases specializing in real estate assessment data.
         Translate natural language queries to SQL based on the following schema:
 
         {schema_info}
+
+        CONTEXT ABOUT REAL ESTATE DATA:
+        - Parcels table contains the main assessment records with unique parcel_id, address, and valuation data
+        - Properties table contains physical characteristics like square_footage, bedrooms, bathrooms
+        - Sales table contains historical sale transactions with sale_date and sale_price
+        - Properties and Sales both link to Parcels via parcel_id foreign key
+        - Recent sales typically means sales from the last year
+        - High-value properties are usually those with total_value > 500000
+        - Standard report periods are current year, last year, or last 5 years
 
         Please follow these guidelines:
         - Generate ONLY {db_type.upper()} SQL syntax
@@ -102,16 +111,20 @@ async def translate_nl_to_sql(
         - Use proper column and table names from the schema
         - Format the SQL query with proper indentation
         - Use parameterized queries with placeholders (like :param) for user input values
-        - Provide a brief explanation of the query
-        - Identify extractable parameters from the query
+        - Provide a brief explanation of the query including business context
+        - Identify extractable parameters from the query with appropriate data types
+        - For date ranges, use proper date functions appropriate for {db_type.upper()}
+        - When calculating averages or totals, handle NULL values appropriately
+        - Include proper ORDER BY clauses for meaningful sorting
+        - For queries expected to return many rows, include LIMIT :limit parameter
         
         Response format:
         {{
             "sql": "Your SQL query here",
-            "explanation": "Brief explanation of what the query does",
+            "explanation": "Detailed explanation of what the query does and business context",
             "parameters": {{
-                "param1": "description of parameter 1",
-                "param2": "description of parameter 2",
+                "param1": "description of parameter 1 with expected data type",
+                "param2": "description of parameter 2 with expected data type",
                 ...
             }}
         }}
@@ -313,19 +326,45 @@ async def generate_schema_summary(schema_info: str) -> Dict[str, Any]:
     
     try:
         system_message = f"""
-        You are a database expert. Analyze the following database schema and provide a summary.
+        You are a database expert specializing in real estate property assessment systems. 
+        Analyze the following database schema and provide a comprehensive summary.
         
         {schema_info}
+        
+        Include the following in your analysis:
+        1. The overall purpose and organization of this database
+        2. Key tables and their business functions in property assessment
+        3. Important relationships between tables
+        4. Key fields that would be useful for queries and reporting
+        5. Suggestions for common query patterns based on this schema
         
         Response format:
         {{
             "summary": "Overall summary of the database in 1-2 sentences",
             "tables": [
-                {{"name": "table_name", "description": "Brief description of purpose", "key_fields": ["field1", "field2"]}},
+                {{
+                    "name": "table_name", 
+                    "description": "Detailed description of purpose and role in property assessment", 
+                    "key_fields": ["field1", "field2"],
+                    "business_purpose": "How this table is used in property assessment workflows"
+                }},
                 ...
             ],
             "relationships": [
-                {{"from": "table_name", "to": "related_table", "type": "one-to-many"}},
+                {{
+                    "from": "table_name", 
+                    "to": "related_table", 
+                    "type": "one-to-many", 
+                    "description": "Business meaning of this relationship"
+                }},
+                ...
+            ],
+            "common_queries": [
+                {{
+                    "purpose": "Description of query purpose",
+                    "tables_involved": ["table1", "table2"],
+                    "typical_fields": ["field1", "field2"]
+                }},
                 ...
             ]
         }}
