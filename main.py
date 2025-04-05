@@ -17,6 +17,7 @@ from sqlalchemy import func, text
 import requests
 from urllib.parse import urlparse
 from flask import jsonify, request, Blueprint, render_template
+import map_module
 
 from app_setup import app, db, create_tables
 from routes import api_routes
