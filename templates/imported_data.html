@@ -923,16 +923,10 @@
 
     // Load the assessment charts script
     document.addEventListener('DOMContentLoaded', function() {
-        // Load assessment charts JS
-        const scriptElement = document.createElement('script');
-        scriptElement.src = "{{ url_for('static', filename='js/assessment_charts.js') }}";
-        document.body.appendChild(scriptElement);
+        // Assessment charts are loaded via the script tag below
     });
 </script>
-    <!-- Main Assessment Charts Script -->
-    <script src="{{ url_for('static', filename='js/assessment_charts.js') }}"></script>
-    
-    <!-- Main Assessment Charts Script -->
+    <!-- Main Assessment Charts Script (only loaded once) -->
     <script src="{{ url_for('static', filename='js/assessment_charts.js') }}"></script>
     
     <!-- Enhanced Visualizations Script -->

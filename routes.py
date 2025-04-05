@@ -130,7 +130,7 @@ def proxy_imported_accounts():
         owner_name = request.args.get('owner_name', '')
         
         # Build query
-        from app import db
+        from app_setup import db
         query = db.session.query(Account)
         
         # Apply filters
@@ -184,7 +184,7 @@ def proxy_imported_account(account_id):
     """Get details for a specific account directly from the database."""
     try:
         # Build query
-        from app import db
+        from app_setup import db
         account = db.session.query(Account).filter(Account.account_id == account_id).first()
         
         if not account:
@@ -235,7 +235,7 @@ def proxy_imported_property_images():
         image_type = request.args.get('image_type', '')
         
         # Build query
-        from app import db
+        from app_setup import db
         query = db.session.query(PropertyImage)
         
         # Apply filters
@@ -293,7 +293,7 @@ def proxy_imported_improvements():
         property_id = request.args.get('property_id', '')
         
         # Build query
-        from app import db
+        from app_setup import db
         # Since we don't have a dedicated Improvement model,
         # we'll query from Property model which has improvement details
         query = db.session.query(Property)
