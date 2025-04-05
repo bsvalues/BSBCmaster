@@ -552,8 +552,8 @@ def get_chart_data():
         # Choose the right model based on dataset
         if dataset == 'accounts':
             model = Account
-            default_dimension = 'property_city'
-            default_measure = 'assessed_value'
+            default_dimension = 'owner_name'  # Changed from property_city since that field is empty
+            default_measure = 'id'  # Changed from assessed_value since that field is empty
         elif dataset == 'improvements':
             from sqlalchemy import text
             default_dimension = 'IMPR_CODE'
@@ -565,8 +565,8 @@ def get_chart_data():
         else:
             # Default to accounts
             model = Account
-            default_dimension = 'property_city'
-            default_measure = 'assessed_value'
+            default_dimension = 'owner_name'  # Changed from property_city
+            default_measure = 'id'  # Changed from assessed_value
             
         # Use defaults if not specified
         dimension = dimension or default_dimension

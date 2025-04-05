@@ -27,6 +27,7 @@ class AssessmentCharts {
         this.fieldMappings = {
             accounts: {
                 dimensions: [
+                    { value: 'owner_name', label: 'Owner Name' },
                     { value: 'assessment_year', label: 'Assessment Year' },
                     { value: 'tax_status', label: 'Tax Status' },
                     { value: 'mailing_city', label: 'Mailing City' },
@@ -34,9 +35,9 @@ class AssessmentCharts {
                     { value: 'property_city', label: 'Property City' }
                 ],
                 measures: [
+                    { value: 'id', label: 'Count' },
                     { value: 'assessed_value', label: 'Assessed Value' },
-                    { value: 'tax_amount', label: 'Tax Amount' },
-                    { value: 'id', label: 'Count' }
+                    { value: 'tax_amount', label: 'Tax Amount' }
                 ]
             },
             property_images: {
