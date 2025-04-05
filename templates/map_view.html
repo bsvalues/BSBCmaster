@@ -1,0 +1,746 @@
+{% extends "base.html" %}
+
+{% block title %}Property Map - MCP Assessor Agent API{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+<style>
+    #map { 
+        height: 650px; 
+        width: 100%;
+        border-radius: 4px;
+    }
+    
+    .map-container {
+        position: relative;
+    }
+    
+    .map-controls {
+        margin-bottom: 1rem;
+    }
+    
+    .property-popup {
+        max-width: 300px;
+    }
+    
+    .property-popup h5 {
+        margin-top: 0;
+        margin-bottom: 0.5rem;
+        font-size: 1.1rem;
+    }
+    
+    .property-popup .address {
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    
+    .property-popup table {
+        width: 100%;
+        font-size: 0.85rem;
+    }
+    
+    .property-popup table th {
+        text-align: left;
+        padding-right: 10px;
+        vertical-align: top;
+    }
+    
+    .property-details {
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        margin-top: 0.5rem;
+    }
+    
+    .filter-panel {
+        padding: 1rem;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+    }
+    
+    .legend {
+        line-height: 18px;
+        color: #555;
+        background-color: white;
+        padding: 10px;
+        border-radius: 4px;
+        box-shadow: 0 0 5px rgba(0,0,0,0.2);
+    }
+    
+    .legend i {
+        width: 18px;
+        height: 18px;
+        float: left;
+        margin-right: 8px;
+        opacity: 0.7;
+    }
+    
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Property Map</h1>
+            <div>
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#helpModal">
+                    <i class="fas fa-question-circle me-1"></i> Help
+                </button>
+            </div>
+        </div>
+        <p class="lead">Visualize property assessment data on an interactive map.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-3">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Map Filters</h5>
+            </div>
+            <div class="card-body">
+                <form id="mapFiltersForm">
+                    <div class="mb-3">
+                        <label for="dataSource" class="form-label">Data Source</label>
+                        <select class="form-select" id="dataSource">
+                            <option value="accounts" selected>Accounts</option>
+                            <option value="properties">Properties</option>
+                            <option value="sales">Sales</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="valueFilter" class="form-label">Assessed Value</label>
+                        <select class="form-select" id="valueFilter">
+                            <option value="all" selected>All</option>
+                            <option value="0-100000">$0 - $100,000</option>
+                            <option value="100000-250000">$100,000 - $250,000</option>
+                            <option value="250000-500000">$250,000 - $500,000</option>
+                            <option value="500000-1000000">$500,000 - $1,000,000</option>
+                            <option value="1000000+">$1,000,000+</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="cityFilter" class="form-label">City</label>
+                        <select class="form-select" id="cityFilter">
+                            <option value="all" selected>All Cities</option>
+                            <!-- Cities will be populated dynamically -->
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="heatmapSwitch">
+                            <label class="form-check-label" for="heatmapSwitch">Enable Value Heatmap</label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Marker Color By</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="colorBy" id="colorByValue" value="value" checked>
+                            <label class="form-check-label" for="colorByValue">
+                                Assessed Value
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="colorBy" id="colorByType" value="type">
+                            <label class="form-check-label" for="colorByType">
+                                Property Type
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-1"></i> Apply Filters
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Map Statistics</h5>
+            </div>
+            <div class="card-body">
+                <div id="mapStats">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Properties Displayed:</span>
+                        <span id="propertiesCount">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Average Value:</span>
+                        <span id="averageValue">$0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Median Value:</span>
+                        <span id="medianValue">$0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Value Range:</span>
+                        <span id="valueRange">$0 - $0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-9">
+        <div class="map-container">
+            <div id="map"></div>
+            <div id="loadingOverlay" class="loading-overlay d-none">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading map data...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Property Detail Modal -->
+<div class="modal fade" id="propertyModal" tabindex="-1" aria-labelledby="propertyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="propertyModalLabel">Property Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="propertyModalBody">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Property Information</h6>
+                        <table class="table table-sm">
+                            <tbody id="propertyInfoTable">
+                                <!-- Property info will be populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Assessment Information</h6>
+                        <table class="table table-sm">
+                            <tbody id="assessmentInfoTable">
+                                <!-- Assessment info will be populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div id="propertyImagesContainer" class="mt-3 d-none">
+                    <h6>Property Images</h6>
+                    <div id="propertyImages" class="row">
+                        <!-- Property images will be populated dynamically -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="#" id="viewFullDetailsBtn" class="btn btn-primary">View Full Details</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Help Modal -->
+<div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="helpModalLabel">Map Help</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6>Using the Property Map</h6>
+                <ul>
+                    <li><strong>Navigate:</strong> Click and drag to move the map. Use the mouse wheel or +/- buttons to zoom.</li>
+                    <li><strong>View Property:</strong> Click on any property marker to see basic information.</li>
+                    <li><strong>Details:</strong> Click "View Details" in the popup to see complete property information.</li>
+                    <li><strong>Filter:</strong> Use the filter panel to focus on specific property types or value ranges.</li>
+                    <li><strong>Heatmap:</strong> Toggle the heatmap view to visualize property value density.</li>
+                </ul>
+                
+                <h6>Map Legend</h6>
+                <p>Property markers are color-coded by either:</p>
+                <ul>
+                    <li><strong>Assessed Value:</strong> From green (lower) to red (higher)</li>
+                    <li><strong>Property Type:</strong> Different colors for residential, commercial, etc.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+<!-- Leaflet Heat plugin -->
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<!-- Property Map Script -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize the map
+    const map = L.map('map').setView([46.2807, -119.2787], 12); // Centered on Richland, WA
+    
+    // Add OpenStreetMap tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+    }).addTo(map);
+    
+    // Create layer groups
+    const propertyMarkers = L.layerGroup().addTo(map);
+    let heatLayer = null;
+    
+    // Define marker colors and icons
+    const getColorByValue = function(value) {
+        return value > 1000000 ? '#d73027' :
+               value > 500000  ? '#fc8d59' :
+               value > 250000  ? '#fee08b' :
+               value > 100000  ? '#d9ef8b' :
+                                 '#91cf60';
+    };
+    
+    const getColorByType = function(type) {
+        const typeColors = {
+            'residential': '#4575b4',
+            'commercial': '#d73027',
+            'industrial': '#fc8d59',
+            'agricultural': '#91cf60',
+            'vacant': '#fee08b',
+            'other': '#999999'
+        };
+        
+        return typeColors[type.toLowerCase()] || '#999999';
+    };
+    
+    // Function to create a custom marker
+    const createMarker = function(feature, latlng) {
+        const value = feature.properties.assessed_value || 0;
+        const type = feature.properties.property_type || 'other';
+        
+        const colorBy = document.querySelector('input[name="colorBy"]:checked').value;
+        const markerColor = colorBy === 'value' ? getColorByValue(value) : getColorByType(type);
+        
+        return L.circleMarker(latlng, {
+            radius: 8,
+            fillColor: markerColor,
+            color: '#000',
+            weight: 1,
+            opacity: 1,
+            fillOpacity: 0.8
+        });
+    };
+    
+    // Function to create popup content
+    const createPopupContent = function(feature) {
+        const props = feature.properties;
+        const address = props.property_address || 'N/A';
+        const city = props.property_city || '';
+        const value = props.assessed_value ? '$' + props.assessed_value.toLocaleString() : 'N/A';
+        const owner = props.owner_name || 'N/A';
+        const accountId = props.account_id || '';
+        
+        let content = `
+            <div class="property-popup">
+                <h5>Property Details</h5>
+                <div class="address">${address}, ${city}</div>
+                <table>
+                    <tr>
+                        <th>Owner:</th>
+                        <td>${owner}</td>
+                    </tr>
+                    <tr>
+                        <th>Assessed Value:</th>
+                        <td>${value}</td>
+                    </tr>
+                </table>
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-primary view-details-btn" data-account-id="${accountId}">
+                        View Details
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        return content;
+    };
+    
+    // Function to add popup click handler
+    const addPopupHandlers = function() {
+        document.querySelectorAll('.view-details-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const accountId = this.getAttribute('data-account-id');
+                showPropertyDetails(accountId);
+            });
+        });
+    };
+    
+    // Function to show property details modal
+    const showPropertyDetails = function(accountId) {
+        // Show loading state
+        const propertyInfoTable = document.getElementById('propertyInfoTable');
+        const assessmentInfoTable = document.getElementById('assessmentInfoTable');
+        propertyInfoTable.innerHTML = '<tr><td colspan="2" class="text-center"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Loading...</td></tr>';
+        assessmentInfoTable.innerHTML = '<tr><td colspan="2" class="text-center"><div class="spinner-border spinner-border-sm text-primary" role="status"></div> Loading...</td></tr>';
+        
+        // Show the modal
+        const propertyModal = new bootstrap.Modal(document.getElementById('propertyModal'));
+        propertyModal.show();
+        
+        // Set up the full details link
+        document.getElementById('viewFullDetailsBtn').href = `/api/imported-data/accounts/${accountId}`;
+        
+        // Fetch property details
+        fetch(`/api/imported-data/accounts/${accountId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const property = data.data;
+                    
+                    // Update property info table
+                    propertyInfoTable.innerHTML = `
+                        <tr>
+                            <th>Account ID:</th>
+                            <td>${property.account_id || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <th>Owner:</th>
+                            <td>${property.owner_name || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <th>Property Address:</th>
+                            <td>${property.property_address || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <th>Property City:</th>
+                            <td>${property.property_city || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <th>Mailing Address:</th>
+                            <td>${property.mailing_address || 'N/A'}<br>
+                            ${property.mailing_city || ''}, ${property.mailing_state || ''} ${property.mailing_zip || ''}</td>
+                        </tr>
+                    `;
+                    
+                    // Update assessment info table
+                    assessmentInfoTable.innerHTML = `
+                        <tr>
+                            <th>Assessment Year:</th>
+                            <td>${property.assessment_year || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <th>Assessed Value:</th>
+                            <td>${property.assessed_value ? '$' + property.assessed_value.toLocaleString() : 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <th>Tax Amount:</th>
+                            <td>${property.tax_amount ? '$' + property.tax_amount.toLocaleString() : 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <th>Tax Status:</th>
+                            <td>${property.tax_status || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <th>Legal Description:</th>
+                            <td>${property.legal_description || 'N/A'}</td>
+                        </tr>
+                    `;
+                    
+                    // Check for property images
+                    fetch(`/api/map/property-images/${property.account_id}`)
+                        .then(response => response.json())
+                        .then(imageData => {
+                            const imagesContainer = document.getElementById('propertyImagesContainer');
+                            const imagesDiv = document.getElementById('propertyImages');
+                            
+                            if (imageData.status === 'success' && imageData.data && imageData.data.length > 0) {
+                                imagesDiv.innerHTML = '';
+                                
+                                imageData.data.forEach(image => {
+                                    const imgCol = document.createElement('div');
+                                    imgCol.className = 'col-md-4 mb-2';
+                                    
+                                    const imgCard = document.createElement('div');
+                                    imgCard.className = 'card h-100';
+                                    
+                                    const img = document.createElement('img');
+                                    img.src = image.image_url || '/static/img/property-placeholder.jpg';
+                                    img.className = 'card-img-top';
+                                    img.alt = 'Property Image';
+                                    
+                                    const cardBody = document.createElement('div');
+                                    cardBody.className = 'card-body p-2';
+                                    cardBody.innerHTML = `<small>${image.image_type || 'Property Image'}</small>`;
+                                    
+                                    imgCard.appendChild(img);
+                                    imgCard.appendChild(cardBody);
+                                    imgCol.appendChild(imgCard);
+                                    imagesDiv.appendChild(imgCol);
+                                });
+                                
+                                imagesContainer.classList.remove('d-none');
+                            } else {
+                                imagesContainer.classList.add('d-none');
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching property images:', error);
+                            document.getElementById('propertyImagesContainer').classList.add('d-none');
+                        });
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching property details:', error);
+                propertyInfoTable.innerHTML = '<tr><td colspan="2" class="text-danger">Error loading property details</td></tr>';
+                assessmentInfoTable.innerHTML = '';
+            });
+    };
+    
+    // Function to load map data
+    const loadMapData = function() {
+        // Show loading overlay
+        document.getElementById('loadingOverlay').classList.remove('d-none');
+        
+        // Clear existing markers
+        propertyMarkers.clearLayers();
+        if (heatLayer) {
+            map.removeLayer(heatLayer);
+            heatLayer = null;
+        }
+        
+        // Get filter values
+        const dataSource = document.getElementById('dataSource').value;
+        const valueFilter = document.getElementById('valueFilter').value;
+        const cityFilter = document.getElementById('cityFilter').value;
+        const colorBy = document.querySelector('input[name="colorBy"]:checked').value;
+        const useHeatmap = document.getElementById('heatmapSwitch').checked;
+        
+        // Build query parameters
+        const params = new URLSearchParams();
+        params.append('data_source', dataSource);
+        params.append('value_filter', valueFilter);
+        if (cityFilter !== 'all') {
+            params.append('city', cityFilter);
+        }
+        
+        // Fetch property data
+        fetch(`/api/map/data?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Create GeoJSON layer
+                    const geoJsonLayer = L.geoJSON(data.geojson, {
+                        pointToLayer: createMarker,
+                        onEachFeature: function(feature, layer) {
+                            // Add popup to each marker
+                            layer.bindPopup(createPopupContent(feature));
+                            
+                            // Add event listener to enhance popup when opened
+                            layer.on('popupopen', function() {
+                                addPopupHandlers();
+                            });
+                        }
+                    });
+                    
+                    // Add markers to layer group
+                    geoJsonLayer.addTo(propertyMarkers);
+                    
+                    // Create heatmap if enabled
+                    if (useHeatmap) {
+                        const heatData = data.geojson.features.map(feature => {
+                            const lat = feature.geometry.coordinates[1];
+                            const lng = feature.geometry.coordinates[0];
+                            const intensity = feature.properties.assessed_value / 1000000 || 0.1; // Normalize values
+                            return [lat, lng, intensity];
+                        });
+                        
+                        heatLayer = L.heatLayer(heatData, {
+                            radius: 25,
+                            blur: 15,
+                            maxZoom: 17,
+                            gradient: {0.4: 'blue', 0.65: 'lime', 0.9: 'red'}
+                        }).addTo(map);
+                    }
+                    
+                    // Update map statistics
+                    updateMapStatistics(data.statistics);
+                    
+                    // Center map on data if needed
+                    if (data.bounds) {
+                        map.fitBounds([
+                            [data.bounds.south, data.bounds.west],
+                            [data.bounds.north, data.bounds.east]
+                        ]);
+                    }
+                    
+                    // Add legend
+                    updateLegend(colorBy);
+                } else {
+                    console.error('Error loading map data:', data.message);
+                    alert('Error loading map data: ' + data.message);
+                }
+                
+                // Hide loading overlay
+                document.getElementById('loadingOverlay').classList.add('d-none');
+            })
+            .catch(error => {
+                console.error('Error fetching map data:', error);
+                alert('Error fetching map data. Please try again later.');
+                document.getElementById('loadingOverlay').classList.add('d-none');
+            });
+    };
+    
+    // Function to update map statistics
+    const updateMapStatistics = function(statistics) {
+        if (!statistics) return;
+        
+        document.getElementById('propertiesCount').textContent = statistics.count.toLocaleString();
+        document.getElementById('averageValue').textContent = '$' + Math.round(statistics.average_value).toLocaleString();
+        document.getElementById('medianValue').textContent = '$' + Math.round(statistics.median_value).toLocaleString();
+        document.getElementById('valueRange').textContent = '$' + Math.round(statistics.min_value).toLocaleString() + 
+                                                           ' - $' + Math.round(statistics.max_value).toLocaleString();
+    };
+    
+    // Function to update legend
+    const updateLegend = function(colorBy) {
+        // Remove existing legend
+        if (map.legend) {
+            map.removeControl(map.legend);
+        }
+        
+        // Create new legend
+        const legend = L.control({position: 'bottomright'});
+        
+        legend.onAdd = function(map) {
+            const div = L.DomUtil.create('div', 'legend');
+            
+            if (colorBy === 'value') {
+                div.innerHTML = '<h6>Assessed Value</h6>';
+                const grades = [0, 100000, 250000, 500000, 1000000];
+                const labels = ['< $100k', '$100k - $250k', '$250k - $500k', '$500k - $1M', '> $1M'];
+                
+                for (let i = 0; i < grades.length; i++) {
+                    div.innerHTML +=
+                        '<i style="background:' + getColorByValue(grades[i] + 1) + '"></i> ' +
+                        labels[i] + '<br>';
+                }
+            } else {
+                div.innerHTML = '<h6>Property Type</h6>';
+                const types = ['residential', 'commercial', 'industrial', 'agricultural', 'vacant', 'other'];
+                const labels = ['Residential', 'Commercial', 'Industrial', 'Agricultural', 'Vacant', 'Other'];
+                
+                for (let i = 0; i < types.length; i++) {
+                    div.innerHTML +=
+                        '<i style="background:' + getColorByType(types[i]) + '"></i> ' +
+                        labels[i] + '<br>';
+                }
+            }
+            
+            return div;
+        };
+        
+        legend.addTo(map);
+        map.legend = legend;
+    };
+    
+    // Load city filter options
+    const loadCityOptions = function() {
+        fetch('/api/map/cities')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const citySelect = document.getElementById('cityFilter');
+                    
+                    // Keep the 'All Cities' option
+                    citySelect.innerHTML = '<option value="all" selected>All Cities</option>';
+                    
+                    // Add city options
+                    data.cities.forEach(city => {
+                        const option = document.createElement('option');
+                        option.value = city;
+                        option.textContent = city;
+                        citySelect.appendChild(option);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error loading city options:', error);
+            });
+    };
+    
+    // Initialize map
+    loadCityOptions();
+    loadMapData();
+    
+    // Event listeners
+    document.getElementById('mapFiltersForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        loadMapData();
+    });
+    
+    // Listen for color by changes
+    document.querySelectorAll('input[name="colorBy"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            // Just update markers without reloading data
+            propertyMarkers.eachLayer(function(layer) {
+                if (layer instanceof L.CircleMarker) {
+                    const feature = layer.feature;
+                    const value = feature.properties.assessed_value || 0;
+                    const type = feature.properties.property_type || 'other';
+                    
+                    const colorBy = document.querySelector('input[name="colorBy"]:checked').value;
+                    const markerColor = colorBy === 'value' ? getColorByValue(value) : getColorByType(type);
+                    
+                    layer.setStyle({
+                        fillColor: markerColor
+                    });
+                }
+            });
+            
+            // Update legend
+            updateLegend(this.value);
+        });
+    });
+    
+    // Listen for heatmap changes
+    document.getElementById('heatmapSwitch').addEventListener('change', function() {
+        if (this.checked) {
+            // Keep existing markers but add heatmap
+            loadMapData();
+        } else {
+            // Remove heatmap if it exists
+            if (heatLayer) {
+                map.removeLayer(heatLayer);
+                heatLayer = null;
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

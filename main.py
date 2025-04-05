@@ -24,6 +24,7 @@ from models import Parcel, Property, Sale, Account, PropertyImage
 from app.db import execute_parameterized_query, parse_for_parameters, sql_to_natural_language, get_connection_string
 from sqlalchemy import create_engine, inspect
 from app.validators import validate_query
+import map_module
 
 # Register routes
 app.register_blueprint(api_routes)
@@ -1300,6 +1301,28 @@ def visualize():
         current_year=current_year,
         previous_year=previous_year
     )
+
+
+@app.route('/map-view')
+def map_view():
+    """Render the property map view interface."""
+    return render_template('map_view.html', title="Property Map")
+    
+# Map API endpoints
+@app.route('/api/map/data', methods=['GET'])
+def map_data():
+    """Get map data with filtering options."""
+    return map_module.get_map_data()
+
+@app.route('/api/map/cities', methods=['GET'])
+def map_cities():
+    """Get list of cities for map filtering."""
+    return map_module.get_cities()
+
+@app.route('/api/map/property-images/<account_id>', methods=['GET'])
+def map_property_images(account_id):
+    """Get property images for a specific account."""
+    return map_module.get_property_images_for_map()
 
 
 # This is called when the Flask app is run
