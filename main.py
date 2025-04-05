@@ -22,7 +22,8 @@ import map_module
 from app_setup import app, db, create_tables
 from routes import api_routes
 from models import Parcel, Property, Sale, Account, PropertyImage
-from app.db import execute_parameterized_query, parse_for_parameters, sql_to_natural_language, get_connection_string
+from app.db import execute_parameterized_query, parse_for_parameters, get_connection_string
+from app.nl_processing import sql_to_natural_language, extract_query_intent
 from sqlalchemy import create_engine, inspect
 from app.validators import validate_query
 import map_module
@@ -395,64 +396,111 @@ def get_imported_improvements():
 
 @app.route('/api/discover-schema', methods=['GET'])
 def discover_schema():
-    """Discover database schema."""
+    """
+    Discover database schema with enhanced metadata.
+    
+    This endpoint provides detailed schema information for database tables,
+    including relationships, table statistics, and sample data.
+    """
     with app.app_context():
         try:
             # Get query parameters
             db_type = request.args.get('db', 'postgres')
+            include_samples = request.args.get('include_samples', 'false').lower() == 'true'
+            format_for_nl = request.args.get('format_for_nl', 'false').lower() == 'true'
             
-            # We'll focus on the main tables
-            tables = ['parcels', 'properties', 'sales', 'accounts', 'property_images', 'improvements']
+            # Import our enhanced schema discovery module
+            from app.schema_discovery import get_schema_discovery_instance
             
-            # Get schema information from SQLAlchemy metadata
-            from sqlalchemy import inspect
-            inspector = inspect(db.engine)
+            # Get schema discovery instance
+            schema_discovery = get_schema_discovery_instance(db.engine)
             
+            # If format for natural language is requested, return a formatted string
+            if format_for_nl:
+                schema_nl_format = schema_discovery.get_schema_for_nl()
+                return jsonify({
+                    "status": "success",
+                    "schema_text": schema_nl_format
+                })
+            
+            # Get all tables or focus on specific ones if specified
+            tables_param = request.args.get('tables')
+            if tables_param:
+                tables = tables_param.split(',')
+            else:
+                # Default focus tables
+                tables = schema_discovery.get_all_tables()
+            
+            # Get detailed table information
+            table_details = {}
             schema_items = []
             
             for table_name in tables:
                 try:
-                    columns = inspector.get_columns(table_name)
-                    pk_constraint = inspector.get_pk_constraint(table_name)
-                    primary_keys = pk_constraint.get('constrained_columns', [])
+                    # Get table details
+                    table_info = schema_discovery.get_table_details(table_name)
+                    table_details[table_name] = table_info
                     
-                    # Get foreign keys
-                    foreign_keys = inspector.get_foreign_keys(table_name)
-                    fk_columns = {}
-                    for fk in foreign_keys:
-                        for col in fk.get('constrained_columns', []):
-                            fk_columns[col] = {
-                                'table': fk.get('referred_table'),
-                                'column': fk.get('referred_columns')[0] if fk.get('referred_columns') else None
-                            }
-                    
-                    # Add each column to the schema
-                    for column in columns:
+                    # Convert to flat schema items (backward compatibility)
+                    for column in table_info.get('columns', []):
                         col_name = column.get('name')
-                        is_pk = col_name in primary_keys
-                        is_fk = col_name in fk_columns
+                        is_pk = col_name in table_info.get('primary_keys', [])
+                        
+                        # Look for foreign keys
+                        fk_info = None
+                        for fk in table_info.get('foreign_keys', []):
+                            if col_name in fk.get('constrained_columns', []):
+                                fk_info = fk
+                                break
+                        
+                        is_fk = fk_info is not None
                         
                         schema_item = {
                             'table_name': table_name,
                             'column_name': col_name,
-                            'data_type': str(column.get('type')),
+                            'data_type': column.get('type'),
                             'is_nullable': column.get('nullable', True),
-                            'column_default': str(column.get('default')) if column.get('default') else None,
+                            'column_default': column.get('default'),
                             'is_primary_key': is_pk,
                             'is_foreign_key': is_fk,
-                            'references_table': fk_columns.get(col_name, {}).get('table') if is_fk else None,
-                            'references_column': fk_columns.get(col_name, {}).get('column') if is_fk else None,
-                            'description': None  # We don't have descriptions in our schema
+                            'references_table': fk_info.get('referred_table') if fk_info else None,
+                            'references_column': fk_info.get('referred_columns')[0] if fk_info and fk_info.get('referred_columns') else None,
+                            'description': column.get('comment', '')
                         }
                         
                         schema_items.append(schema_item)
                 except Exception as e:
                     logger.warning(f"Error getting schema for table {table_name}: {str(e)}")
             
-            return jsonify({
+            # Get table relationships
+            relationships = schema_discovery.get_table_relationships()
+            
+            # Get sample data if requested
+            samples = {}
+            if include_samples:
+                for table_name in tables:
+                    try:
+                        samples[table_name] = schema_discovery.get_column_data_samples(table_name)
+                    except Exception as e:
+                        logger.warning(f"Error getting sample data for table {table_name}: {str(e)}")
+            
+            # Get database summary
+            summary = schema_discovery.get_database_summary()
+            
+            # Return comprehensive schema information
+            response = {
                 "status": "success",
-                "db_schema": schema_items
-            })
+                "db_schema": schema_items,  # Backward compatibility
+                "tables": list(table_details.values()),
+                "relationships": relationships,
+                "summary": summary
+            }
+            
+            # Add samples if included
+            if include_samples:
+                response["samples"] = samples
+                
+            return jsonify(response)
         except Exception as e:
             logger.error(f"Error discovering schema: {str(e)}")
             return jsonify({
@@ -889,253 +937,14 @@ def nl_to_sql():
         # Log the query
         logger.info(f"Processing natural language query: {nl_query}")
         
-        # Try to use OpenAI if available
-        openai_api_key = os.environ.get('OPENAI_API_KEY')
-        if openai_api_key:
-            try:
-                import openai
-                openai.api_key = openai_api_key
-                
-                # Get database schema information for context
-                schema_info = ""
-                
-                # We'll use a simplified schema for context as we can't access the whole schema dynamically
-                schema_info = """
-                Tables:
-                - accounts (account_id, owner_name, property_address, property_city, mailing_address, mailing_city, mailing_state, mailing_zip, legal_description, assessment_year, assessed_value, tax_amount, tax_status)
-                - property_images (id, property_id, account_id, image_url, image_path, image_type, image_date, width, height, file_size, file_format)
-                - properties (id, parcel_id, property_type, square_footage, bedrooms, bathrooms, year_built, stories)
-                - parcels (id, parcel_id, land_value, improvement_value, total_value, land_use_code, zoning_code)
-                - sales (id, parcel_id, sale_date, sale_price, sale_type, buyer_name, seller_name)
-                """
-                
-                # Create a prompt for the OpenAI model
-                prompt = f"""
-                Convert the following natural language query to SQL for a PostgreSQL database. Return only valid SQL without explanations.
-                
-                The database schema is:
-                {schema_info}
-                
-                Natural language query: {nl_query}
-                
-                SQL query:
-                """
-                
-                # Call OpenAI API
-                response = openai.Completion.create(
-                    engine="text-davinci-003",
-                    prompt=prompt,
-                    max_tokens=300,
-                    temperature=0.3,
-                    top_p=1.0,
-                    frequency_penalty=0.0,
-                    presence_penalty=0.0
-                )
-                
-                # Extract the SQL from the response
-                generated_sql = response.choices[0].text.strip()
-                
-                # Create an explanation prompt
-                explanation_prompt = f"""
-                Explain the following SQL query in simple, non-technical terms, one or two sentences maximum:
-                
-                {generated_sql}
-                """
-                
-                # Get explanation from OpenAI
-                explanation_response = openai.Completion.create(
-                    engine="text-davinci-003",
-                    prompt=explanation_prompt,
-                    max_tokens=100,
-                    temperature=0.3,
-                    top_p=1.0,
-                    frequency_penalty=0.0,
-                    presence_penalty=0.0
-                )
-                
-                explanation = explanation_response.choices[0].text.strip()
-                
-                # Add default LIMIT if not present
-                if "LIMIT" not in generated_sql.upper():
-                    generated_sql += " LIMIT 100"
-                
-                return jsonify({
-                    "status": "success",
-                    "sql": generated_sql,
-                    "explanation": explanation
-                })
-                
-            except ImportError:
-                logger.warning("OpenAI package not installed, falling back to rule-based conversion")
-            except Exception as e:
-                logger.warning(f"Error using OpenAI API: {str(e)}, falling back to rule-based conversion")
+        # Use our nl_to_sql implementation from app.nl_processing
+        from app.nl_processing import nl_to_sql as process_nl_to_sql
         
-        # Enhanced rule-based conversion if OpenAI is not available or fails
-        sql_query = ""
-        explanation = ""
-        
-        # Keyword mapping to determine table
-        table_keywords = {
-            'account': 'accounts',
-            'accounts': 'accounts',
-            'property': 'properties',
-            'properties': 'properties',
-            'sale': 'sales',
-            'sales': 'sales',
-            'parcel': 'parcels',
-            'parcels': 'parcels',
-            'image': 'property_images',
-            'images': 'property_images',
-            'improvement': 'properties',
-            'improvements': 'properties'
-        }
-        
-        # Determine the main table from keywords
-        table = 'accounts'  # Default table
-        for keyword, table_name in table_keywords.items():
-            if keyword.lower() in nl_query.lower():
-                table = table_name
-                break
-        
-        # Build the base query
-        sql_query = f"SELECT * FROM {table}"
-        explanation = f"This query retrieves records from the {table} table."
-        
-        # Check for aggregation functions
-        if any(word in nl_query.lower() for word in ['count', 'how many']):
-            sql_query = f"SELECT COUNT(*) AS count FROM {table}"
-            explanation = f"This query counts the total number of records in the {table} table."
-        elif any(word in nl_query.lower() for word in ['average', 'avg']):
-            for col in ['assessed_value', 'land_value', 'improvement_value', 'sale_price', 'square_footage']:
-                if col.replace('_', ' ') in nl_query.lower():
-                    sql_query = f"SELECT AVG({col}) AS average FROM {table}"
-                    explanation = f"This query calculates the average {col.replace('_', ' ')} in the {table} table."
-                    break
-        elif any(word in nl_query.lower() for word in ['sum', 'total']):
-            for col in ['assessed_value', 'land_value', 'improvement_value', 'sale_price']:
-                if col.replace('_', ' ') in nl_query.lower():
-                    sql_query = f"SELECT SUM({col}) AS total FROM {table}"
-                    explanation = f"This query calculates the total {col.replace('_', ' ')} in the {table} table."
-                    break
-        
-        # Check for filter conditions
-        conditions = []
-        
-        # Location-based filters
-        location_matches = re.findall(r"(in|at|from|located in|located at) ['\"]?([\w\s]+)['\"]?", nl_query, re.IGNORECASE)
-        if location_matches:
-            location = location_matches[0][1]
-            if table == 'accounts':
-                conditions.append(f"property_city ILIKE '%{location}%'")
-                explanation = f"This query finds accounts in {location}."
-            elif table == 'properties':
-                conditions.append(f"property_address ILIKE '%{location}%'")
-                explanation = f"This query finds properties in {location}."
-        
-        # Owner name filters
-        owner_matches = re.findall(r"(owned by|owned|owner|name is|named) ['\"]?([\w\s]+)['\"]?", nl_query, re.IGNORECASE)
-        if owner_matches:
-            owner = owner_matches[0][1]
-            if table in ['accounts', 'parcels']:
-                conditions.append(f"owner_name ILIKE '%{owner}%'")
-                explanation = f"This query finds {table} owned by {owner}."
-        
-        # Value-based filters
-        value_matches = re.findall(r"(value|worth|cost|price) (greater than|more than|over|above|less than|under|below) ['\"]?(\d+)['\"]?", nl_query, re.IGNORECASE)
-        if value_matches:
-            comparison = value_matches[0][1]
-            value = value_matches[0][2]
-            operator = '>' if any(x in comparison.lower() for x in ['greater', 'more', 'over', 'above']) else '<'
-            
-            # Determine appropriate value column based on table
-            value_column = 'assessed_value'
-            if table == 'properties':
-                value_column = 'total_value'
-            elif table == 'sales':
-                value_column = 'sale_price'
-            
-            conditions.append(f"{value_column} {operator} {value}")
-            explanation = f"This query finds {table} with {value_column.replace('_', ' ')} {operator} {value}."
-        
-        # Time-based filters
-        year_matches = re.findall(r"(from|in|after|before|since|until) (year|the year) ['\"]?(\d{4})['\"]?", nl_query, re.IGNORECASE)
-        if year_matches:
-            comparison = year_matches[0][0].lower()
-            year = year_matches[0][2]
-            
-            operator = '>=' if any(x in comparison for x in ['after', 'since']) else '<=' if any(x in comparison for x in ['before', 'until']) else '='
-            
-            # Determine appropriate date/year column based on table
-            date_column = 'assessment_year'
-            if table == 'properties':
-                date_column = 'year_built'
-            elif table == 'sales':
-                date_column = 'sale_date'
-                conditions.append(f"EXTRACT(YEAR FROM {date_column}) {operator} {year}")
-            else:
-                conditions.append(f"{date_column} {operator} {year}")
-            
-            explanation = f"This query finds {table} {comparison} {year}."
-        
-        # Add conditions to query if any
-        if conditions:
-            sql_query += " WHERE " + " AND ".join(conditions)
-        
-        # Add ordering
-        if 'newest' in nl_query.lower() or 'latest' in nl_query.lower() or 'recent' in nl_query.lower():
-            if table == 'sales':
-                sql_query += " ORDER BY sale_date DESC"
-            elif table == 'property_images':
-                sql_query += " ORDER BY image_date DESC"
-            elif table == 'properties':
-                sql_query += " ORDER BY year_built DESC"
-            else:
-                sql_query += " ORDER BY id DESC"
-            explanation += " Results are ordered by most recent first."
-        elif 'oldest' in nl_query.lower():
-            if table == 'sales':
-                sql_query += " ORDER BY sale_date ASC"
-            elif table == 'property_images':
-                sql_query += " ORDER BY image_date ASC"
-            elif table == 'properties':
-                sql_query += " ORDER BY year_built ASC"
-            else:
-                sql_query += " ORDER BY id ASC"
-            explanation += " Results are ordered by oldest first."
-        elif any(word in nl_query.lower() for word in ['expensive', 'highest value', 'most valuable']):
-            if table in ['accounts', 'parcels']:
-                sql_query += " ORDER BY assessed_value DESC"
-            elif table == 'sales':
-                sql_query += " ORDER BY sale_price DESC"
-            elif table == 'properties':
-                sql_query += " ORDER BY total_value DESC"
-            explanation += " Results are ordered by highest value first."
-        
-        # Add limit
-        limit_matches = re.findall(r"(limit|top|first) (\d+)", nl_query, re.IGNORECASE)
-        if limit_matches:
-            limit = limit_matches[0][1]
-            sql_query += f" LIMIT {limit}"
-            explanation += f" Limited to {limit} results."
-        else:
-            # Add a default limit for safety
-            sql_query += " LIMIT 100"
-            explanation += " Limited to 100 results for performance."
-        
-        # Get a natural language explanation of the SQL query if possible
-        try:
-            nl_explanation = sql_to_natural_language(sql_query)
-            if nl_explanation:
-                explanation = nl_explanation
-        except Exception as e:
-            logger.warning(f"Error generating natural language explanation: {e}")
+        # Process the query using our dedicated module
+        result = process_nl_to_sql(nl_query, db_type)
         
         # Return the result
-        return jsonify({
-            "status": "success",
-            "sql": sql_query,
-            "explanation": explanation
-        })
+        return jsonify(result)
         
     except Exception as e:
         logger.error(f"Error processing natural language query: {str(e)}")
@@ -1237,6 +1046,59 @@ def query_builder():
 def nl_query():
     """Render the natural language query interface."""
     return render_template('nl_query.html', title="Natural Language Query")
+
+@app.route('/api/nl-query-debug', methods=['POST'])
+def nl_query_debug():
+    """
+    Debug endpoint for natural language query intent extraction.
+    This endpoint shows the interpreted intent from a natural language query
+    without executing the SQL, useful for testing and debugging.
+    
+    Request JSON body:
+    {
+        "query": "Show me all properties in Richland worth more than 200000"
+    }
+    
+    Returns:
+    {
+        "status": "success",
+        "query": "original query text",
+        "intent": {
+            "action": "retrieve",
+            "table": "accounts",
+            "fields": ["*"],
+            "conditions": [...],
+            ...
+        }
+    }
+    """
+    try:
+        # Get request data
+        data = request.get_json()
+        if not data or 'query' not in data:
+            return jsonify({
+                "status": "error",
+                "message": "Missing required parameter: query"
+            }), 400
+        
+        nl_query_text = data['query']
+        
+        # Extract intent from natural language query
+        from app.nl_processing import extract_query_intent
+        intent = extract_query_intent(nl_query_text)
+        
+        return jsonify({
+            "status": "success",
+            "query": nl_query_text,
+            "intent": intent
+        })
+    
+    except Exception as e:
+        logger.error(f"Error processing natural language query: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to process natural language query: {str(e)}"
+        }), 500
 
 
 @app.route('/visualize')
