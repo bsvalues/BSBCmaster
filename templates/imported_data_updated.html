@@ -30,267 +30,74 @@
                 Improvements
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="combined-tab" data-bs-toggle="tab" data-bs-target="#combined-content" type="button" role="tab" aria-controls="combined-content" aria-selected="false">
+                Combined Export
+            </button>
+        </li>
     </ul>
 
     <!-- Tab content -->
     <div class="tab-content" id="dataTabsContent">
-        <!-- Accounts tab -->
-        <div class="tab-pane fade show active" id="accounts-content" role="tabpanel" aria-labelledby="accounts-tab">
-            <div class="row mb-3">
-                <div class="col-md-5">
-                    <div class="input-group">
-                        <input type="text" id="account-search" class="form-control" placeholder="Search by owner name...">
-                        <button class="btn btn-primary" type="button" id="search-accounts-btn">
-                            <i class="fas fa-search"></i> Search
-                        </button>
-                    </div>
+        <!-- Rest of the content similar to the original imported_data.html but with added export options -->
+        
+        <!-- Combined Export tab -->
+        <div class="tab-pane fade" id="combined-content" role="tabpanel" aria-labelledby="combined-tab">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Combined Data Export</h5>
                 </div>
-                <div class="col-md-4">
-                    <div class="btn-group" role="group">
-                        <a href="/api/export/accounts/csv" class="btn btn-success">
-                            <i class="fas fa-file-csv"></i> Export CSV
-                        </a>
-                        <a href="/api/export/accounts/excel" class="btn btn-success">
-                            <i class="fas fa-file-excel"></i> Export Excel
-                        </a>
-                    </div>
-                </div>
-                <div class="col-md-3 text-end">
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-outline-secondary" id="prev-accounts-page" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" id="next-accounts-page">
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
-                    <span class="ms-2" id="accounts-pagination-info">Showing 1-100 of 0</span>
-                </div>
-            </div>
-
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>Account ID</th>
-                            <th>Owner Name</th>
-                            <th>Property Address</th>
-                            <th>City</th>
-                            <th>Assessment Year</th>
-                            <th>Assessed Value</th>
-                            <th>Tax Amount</th>
-                            <th>Tax Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="accounts-table-body">
-                        <!-- Data will be loaded here -->
-                    </tbody>
-                </table>
-            </div>
-            
-            <!-- Loading indicator -->
-            <div class="d-flex justify-content-center my-4" id="accounts-loading">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
-            
-            <!-- No results indicator -->
-            <div class="alert alert-info text-center d-none" id="accounts-no-results">
-                No accounts found matching your search criteria.
-            </div>
-
-            <!-- Error indicator -->
-            <div class="alert alert-danger text-center d-none" id="accounts-error">
-                Error loading accounts data. Please try again later.
-            </div>
-        </div>
-
-        <!-- Property Images tab -->
-        <div class="tab-pane fade" id="images-content" role="tabpanel" aria-labelledby="images-tab">
-            <div class="row mb-3">
-                <div class="col-md-5">
-                    <div class="input-group">
-                        <input type="text" id="property-id-search" class="form-control" placeholder="Search by property ID...">
-                        <select class="form-select" id="image-type-filter">
-                            <option value="">All image types</option>
-                            <option value="exterior">Exterior</option>
-                            <option value="interior">Interior</option>
-                            <option value="aerial">Aerial</option>
-                        </select>
-                        <button class="btn btn-primary" type="button" id="search-images-btn">
-                            <i class="fas fa-search"></i> Search
-                        </button>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="btn-group" role="group">
-                        <a href="/api/export/property-images/csv" class="btn btn-success">
-                            <i class="fas fa-file-csv"></i> Export CSV
-                        </a>
-                        <a href="/api/export/property-images/excel" class="btn btn-success">
-                            <i class="fas fa-file-excel"></i> Export Excel
-                        </a>
-                    </div>
-                </div>
-                <div class="col-md-3 text-end">
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-outline-secondary" id="prev-images-page" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" id="next-images-page">
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
-                    <span class="ms-2" id="images-pagination-info">Showing 1-100 of 0</span>
-                </div>
-            </div>
-
-            <div class="row" id="images-gallery">
-                <!-- Image cards will be loaded here -->
-            </div>
-            
-            <!-- Loading indicator -->
-            <div class="d-flex justify-content-center my-4" id="images-loading">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
-            
-            <!-- No results indicator -->
-            <div class="alert alert-info text-center d-none" id="images-no-results">
-                No property images found matching your search criteria.
-            </div>
-
-            <!-- Error indicator -->
-            <div class="alert alert-danger text-center d-none" id="images-error">
-                Error loading property images. Please try again later.
-            </div>
-        </div>
-
-        <!-- Improvements tab -->
-        <div class="tab-pane fade" id="improvements-content" role="tabpanel" aria-labelledby="improvements-tab">
-            <div class="row mb-3">
-                <div class="col-md-5">
-                    <div class="input-group">
-                        <input type="text" id="improvement-property-id-search" class="form-control" placeholder="Search by property ID...">
-                        <button class="btn btn-primary" type="button" id="search-improvements-btn">
-                            <i class="fas fa-search"></i> Search
-                        </button>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="btn-group" role="group">
-                        <a href="/api/export/improvements/csv" class="btn btn-success">
-                            <i class="fas fa-file-csv"></i> Export CSV
-                        </a>
-                        <a href="/api/export/improvements/excel" class="btn btn-success">
-                            <i class="fas fa-file-excel"></i> Export Excel
-                        </a>
-                    </div>
-                </div>
-                <div class="col-md-3 text-end">
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn btn-outline-secondary" id="prev-improvements-page" disabled>
-                            <i class="fas fa-chevron-left"></i> Previous
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" id="next-improvements-page">
-                            Next <i class="fas fa-chevron-right"></i>
-                        </button>
-                    </div>
-                    <span class="ms-2" id="improvements-pagination-info">Showing 1-100 of 0</span>
-                </div>
-            </div>
-
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>Property ID</th>
-                            <th>Improvement ID</th>
-                            <th>Description</th>
-                            <th>Value</th>
-                            <th>Living Area</th>
-                            <th>Stories</th>
-                            <th>Year Built</th>
-                            <th>Primary Use</th>
-                        </tr>
-                    </thead>
-                    <tbody id="improvements-table-body">
-                        <!-- Data will be loaded here -->
-                    </tbody>
-                </table>
-            </div>
-            
-            <!-- Loading indicator -->
-            <div class="d-flex justify-content-center my-4" id="improvements-loading">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-            </div>
-            
-            <!-- No results indicator -->
-            <div class="alert alert-info text-center d-none" id="improvements-no-results">
-                No improvements found matching your search criteria.
-            </div>
-
-            <!-- Error indicator -->
-            <div class="alert alert-danger text-center d-none" id="improvements-error">
-                Error loading improvements data. Please try again later.
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Account Detail Modal -->
-<div class="modal fade" id="accountDetailModal" tabindex="-1" aria-labelledby="accountDetailModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="accountDetailModalLabel">Account Details</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="d-flex justify-content-center" id="account-detail-loading">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-                <div class="container-fluid" id="account-detail-content">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6 class="text-muted">Account Information</h6>
-                            <p><strong>Account ID:</strong> <span id="detail-account-id"></span></p>
-                            <p><strong>Owner Name:</strong> <span id="detail-owner-name"></span></p>
-                            <p><strong>Assessment Year:</strong> <span id="detail-assessment-year"></span></p>
-                            <p><strong>Assessed Value:</strong> <span id="detail-assessed-value"></span></p>
-                            <p><strong>Tax Amount:</strong> <span id="detail-tax-amount"></span></p>
-                            <p><strong>Tax Status:</strong> <span id="detail-tax-status"></span></p>
+                <div class="card-body">
+                    <p class="card-text">
+                        Export data from multiple tables in a single file. The combined export will include accounts data as the base,
+                        with related improvements and property images.
+                    </p>
+                    
+                    <form id="combined-export-form">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="combined-owner-name" class="form-label">Owner Name (contains)</label>
+                                <input type="text" class="form-control" id="combined-owner-name" name="owner_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="combined-property-city" class="form-label">Property City</label>
+                                <input type="text" class="form-control" id="combined-property-city" name="property_city">
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            <h6 class="text-muted">Property Information</h6>
-                            <p><strong>Property Address:</strong> <span id="detail-property-address"></span></p>
-                            <p><strong>Property City:</strong> <span id="detail-property-city"></span></p>
-                            <p><strong>Legal Description:</strong> <span id="detail-legal-description"></span></p>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Include Related Data</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="include-improvements" name="include_improvements" checked>
+                                    <label class="form-check-label" for="include-improvements">
+                                        Include Improvements
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="include-images" name="include_images" checked>
+                                    <label class="form-check-label" for="include-images">
+                                        Include Property Images
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="combined-limit" class="form-label">Maximum Records</label>
+                                <select class="form-select" id="combined-limit" name="limit">
+                                    <option value="100">100</option>
+                                    <option value="500" selected>500</option>
+                                    <option value="1000">1,000</option>
+                                </select>
+                            </div>
                         </div>
-                    </div>
-                    <div class="row mt-3">
-                        <div class="col-12">
-                            <h6 class="text-muted">Mailing Information</h6>
-                            <p><strong>Mailing Address:</strong> <span id="detail-mailing-address"></span></p>
-                            <p><strong>Mailing City:</strong> <span id="detail-mailing-city"></span></p>
-                            <p><strong>Mailing State:</strong> <span id="detail-mailing-state"></span></p>
-                            <p><strong>Mailing ZIP:</strong> <span id="detail-mailing-zip"></span></p>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="button" class="btn btn-success" id="export-combined-btn">
+                                <i class="fas fa-file-excel"></i> Export as Excel
+                            </button>
                         </div>
-                    </div>
+                    </form>
                 </div>
-                <div class="alert alert-danger d-none" id="account-detail-error">
-                    Error loading account details. Please try again later.
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -299,456 +106,34 @@
 
 {% block scripts %}
 <script>
-    // Variables to track pagination
-    let accountsOffset = 0;
-    let accountsLimit = 100;
-    let accountsTotalCount = 0;
-    let accountsSearchTerm = '';
-    
-    let imagesOffset = 0;
-    let imagesLimit = 100;
-    let imagesTotalCount = 0;
-    let imagesPropertyId = '';
-    let imagesType = '';
-    
-    let improvementsOffset = 0;
-    let improvementsLimit = 100;
-    let improvementsTotalCount = 0;
-    let improvementsPropertyId = '';
-    
-    // Document ready
-    document.addEventListener('DOMContentLoaded', function() {
-        // Load initial accounts data
-        loadAccounts();
+// JavaScript code for handling export form submissions
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle combined export
+    document.getElementById('export-combined-btn').addEventListener('click', function() {
+        const form = document.getElementById('combined-export-form');
+        const formData = new FormData(form);
+        const params = new URLSearchParams();
         
-        // Set up event listeners
-        document.getElementById('search-accounts-btn').addEventListener('click', function() {
-            accountsSearchTerm = document.getElementById('account-search').value;
-            accountsOffset = 0;
-            loadAccounts();
-        });
-        
-        document.getElementById('account-search').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                accountsSearchTerm = document.getElementById('account-search').value;
-                accountsOffset = 0;
-                loadAccounts();
+        for (let [key, value] of formData.entries()) {
+            if (value && key !== "include_improvements" && key !== "include_images") {
+                params.append(key, value);
             }
-        });
+        }
         
-        document.getElementById('prev-accounts-page').addEventListener('click', function() {
-            if (accountsOffset >= accountsLimit) {
-                accountsOffset -= accountsLimit;
-                loadAccounts();
-            }
-        });
+        // Handle checkboxes separately
+        if (document.getElementById('include-improvements')) {
+            params.append('include_improvements', document.getElementById('include-improvements').checked);
+        }
+        if (document.getElementById('include-images')) {
+            params.append('include_images', document.getElementById('include-images').checked);
+        }
         
-        document.getElementById('next-accounts-page').addEventListener('click', function() {
-            if (accountsOffset + accountsLimit < accountsTotalCount) {
-                accountsOffset += accountsLimit;
-                loadAccounts();
-            }
-        });
+        // Create the export URL with all parameters
+        const exportUrl = `/api/export/combined/excel?${params.toString()}`;
         
-        // Set up Property Images tab events
-        document.getElementById('images-tab').addEventListener('click', function() {
-            if (document.getElementById('images-gallery').children.length === 0) {
-                loadPropertyImages();
-            }
-        });
-        
-        document.getElementById('search-images-btn').addEventListener('click', function() {
-            imagesPropertyId = document.getElementById('property-id-search').value;
-            imagesType = document.getElementById('image-type-filter').value;
-            imagesOffset = 0;
-            loadPropertyImages();
-        });
-        
-        document.getElementById('prev-images-page').addEventListener('click', function() {
-            if (imagesOffset >= imagesLimit) {
-                imagesOffset -= imagesLimit;
-                loadPropertyImages();
-            }
-        });
-        
-        document.getElementById('next-images-page').addEventListener('click', function() {
-            if (imagesOffset + imagesLimit < imagesTotalCount) {
-                imagesOffset += imagesLimit;
-                loadPropertyImages();
-            }
-        });
-        
-        // Set up Improvements tab events
-        document.getElementById('improvements-tab').addEventListener('click', function() {
-            if (document.getElementById('improvements-table-body').children.length === 0) {
-                loadImprovements();
-            }
-        });
-        
-        document.getElementById('search-improvements-btn').addEventListener('click', function() {
-            improvementsPropertyId = document.getElementById('improvement-property-id-search').value;
-            improvementsOffset = 0;
-            loadImprovements();
-        });
-        
-        document.getElementById('prev-improvements-page').addEventListener('click', function() {
-            if (improvementsOffset >= improvementsLimit) {
-                improvementsOffset -= improvementsLimit;
-                loadImprovements();
-            }
-        });
-        
-        document.getElementById('next-improvements-page').addEventListener('click', function() {
-            if (improvementsOffset + improvementsLimit < improvementsTotalCount) {
-                improvementsOffset += improvementsLimit;
-                loadImprovements();
-            }
-        });
+        // Redirect to the export URL
+        window.location.href = exportUrl;
     });
-    
-    // Load accounts data
-    function loadAccounts() {
-        const tableBody = document.getElementById('accounts-table-body');
-        const loadingIndicator = document.getElementById('accounts-loading');
-        const noResultsIndicator = document.getElementById('accounts-no-results');
-        const errorIndicator = document.getElementById('accounts-error');
-        const paginationInfo = document.getElementById('accounts-pagination-info');
-        const prevButton = document.getElementById('prev-accounts-page');
-        const nextButton = document.getElementById('next-accounts-page');
-        
-        // Show loading indicator
-        tableBody.innerHTML = '';
-        loadingIndicator.classList.remove('d-none');
-        noResultsIndicator.classList.add('d-none');
-        errorIndicator.classList.add('d-none');
-        
-        // Build query params
-        let params = new URLSearchParams();
-        params.append('offset', accountsOffset);
-        params.append('limit', accountsLimit);
-        if (accountsSearchTerm) {
-            params.append('owner_name', accountsSearchTerm);
-        }
-        
-        // Fetch data from API
-        fetch(`/api/imported-data/accounts?${params.toString()}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                // Hide loading indicator
-                loadingIndicator.classList.add('d-none');
-                
-                // Update accounts count
-                accountsTotalCount = data.total;
-                
-                // Update pagination info
-                const start = accountsOffset + 1;
-                const end = Math.min(accountsOffset + accountsLimit, accountsTotalCount);
-                paginationInfo.textContent = `Showing ${start}-${end} of ${accountsTotalCount}`;
-                
-                // Update pagination buttons
-                prevButton.disabled = accountsOffset === 0;
-                nextButton.disabled = end >= accountsTotalCount;
-                
-                // Check if we have results
-                if (data.accounts.length === 0) {
-                    noResultsIndicator.classList.remove('d-none');
-                    return;
-                }
-                
-                // Render accounts
-                data.accounts.forEach(account => {
-                    const row = document.createElement('tr');
-                    
-                    // Format assessed value and tax amount
-                    const assessedValue = new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'USD'
-                    }).format(account.assessed_value || 0);
-                    
-                    const taxAmount = new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'USD'
-                    }).format(account.tax_amount || 0);
-                    
-                    row.innerHTML = `
-                        <td>${account.account_id || '-'}</td>
-                        <td>${account.owner_name || '-'}</td>
-                        <td>${account.property_address || '-'}</td>
-                        <td>${account.property_city || '-'}</td>
-                        <td>${account.assessment_year || '-'}</td>
-                        <td>${assessedValue}</td>
-                        <td>${taxAmount}</td>
-                        <td>${account.tax_status || '-'}</td>
-                        <td>
-                            <button class="btn btn-sm btn-primary view-account-details" data-account-id="${account.account_id}">
-                                View Details
-                            </button>
-                        </td>
-                    `;
-                    
-                    tableBody.appendChild(row);
-                });
-                
-                // Add event listeners to detail buttons
-                document.querySelectorAll('.view-account-details').forEach(button => {
-                    button.addEventListener('click', function() {
-                        const accountId = this.getAttribute('data-account-id');
-                        showAccountDetails(accountId);
-                    });
-                });
-            })
-            .catch(error => {
-                console.error('Error loading accounts:', error);
-                loadingIndicator.classList.add('d-none');
-                errorIndicator.classList.remove('d-none');
-            });
-    }
-    
-    // Show account details in modal
-    function showAccountDetails(accountId) {
-        const loadingIndicator = document.getElementById('account-detail-loading');
-        const contentContainer = document.getElementById('account-detail-content');
-        const errorIndicator = document.getElementById('account-detail-error');
-        const modal = new bootstrap.Modal(document.getElementById('accountDetailModal'));
-        
-        // Reset modal content
-        loadingIndicator.classList.remove('d-none');
-        contentContainer.classList.add('d-none');
-        errorIndicator.classList.add('d-none');
-        
-        // Show modal
-        modal.show();
-        
-        // Fetch account details
-        fetch(`/api/imported-data/accounts/${accountId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (!data.account) {
-                    throw new Error('Account not found');
-                }
-                
-                // Hide loading indicator
-                loadingIndicator.classList.add('d-none');
-                contentContainer.classList.remove('d-none');
-                
-                // Format currency values
-                const assessedValue = new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD'
-                }).format(data.account.assessed_value || 0);
-                
-                const taxAmount = new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD'
-                }).format(data.account.tax_amount || 0);
-                
-                // Update modal content
-                document.getElementById('detail-account-id').textContent = data.account.account_id || '-';
-                document.getElementById('detail-owner-name').textContent = data.account.owner_name || '-';
-                document.getElementById('detail-assessment-year').textContent = data.account.assessment_year || '-';
-                document.getElementById('detail-assessed-value').textContent = assessedValue;
-                document.getElementById('detail-tax-amount').textContent = taxAmount;
-                document.getElementById('detail-tax-status').textContent = data.account.tax_status || '-';
-                
-                document.getElementById('detail-property-address').textContent = data.account.property_address || '-';
-                document.getElementById('detail-property-city').textContent = data.account.property_city || '-';
-                document.getElementById('detail-legal-description').textContent = data.account.legal_description || '-';
-                
-                document.getElementById('detail-mailing-address').textContent = data.account.mailing_address || '-';
-                document.getElementById('detail-mailing-city').textContent = data.account.mailing_city || '-';
-                document.getElementById('detail-mailing-state').textContent = data.account.mailing_state || '-';
-                document.getElementById('detail-mailing-zip').textContent = data.account.mailing_zip || '-';
-            })
-            .catch(error => {
-                console.error('Error loading account details:', error);
-                loadingIndicator.classList.add('d-none');
-                errorIndicator.classList.remove('d-none');
-            });
-    }
-    
-    // Load property images
-    function loadPropertyImages() {
-        const gallery = document.getElementById('images-gallery');
-        const loadingIndicator = document.getElementById('images-loading');
-        const noResultsIndicator = document.getElementById('images-no-results');
-        const errorIndicator = document.getElementById('images-error');
-        const paginationInfo = document.getElementById('images-pagination-info');
-        const prevButton = document.getElementById('prev-images-page');
-        const nextButton = document.getElementById('next-images-page');
-        
-        // Show loading indicator
-        gallery.innerHTML = '';
-        loadingIndicator.classList.remove('d-none');
-        noResultsIndicator.classList.add('d-none');
-        errorIndicator.classList.add('d-none');
-        
-        // Build query params
-        let params = new URLSearchParams();
-        params.append('offset', imagesOffset);
-        params.append('limit', imagesLimit);
-        if (imagesPropertyId) {
-            params.append('property_id', imagesPropertyId);
-        }
-        if (imagesType) {
-            params.append('image_type', imagesType);
-        }
-        
-        // Fetch data from API
-        fetch(`/api/imported-data/property-images?${params.toString()}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                // Hide loading indicator
-                loadingIndicator.classList.add('d-none');
-                
-                // Update images count
-                imagesTotalCount = data.total;
-                
-                // Update pagination info
-                const start = imagesOffset + 1;
-                const end = Math.min(imagesOffset + imagesLimit, imagesTotalCount);
-                paginationInfo.textContent = `Showing ${start}-${end} of ${imagesTotalCount}`;
-                
-                // Update pagination buttons
-                prevButton.disabled = imagesOffset === 0;
-                nextButton.disabled = end >= imagesTotalCount;
-                
-                // Check if we have results
-                if (data.images.length === 0) {
-                    noResultsIndicator.classList.remove('d-none');
-                    return;
-                }
-                
-                // Render image cards
-                data.images.forEach(image => {
-                    const col = document.createElement('div');
-                    col.className = 'col-md-3 col-sm-6 mb-4';
-                    
-                    const imageUrl = image.image_url || 'https://via.placeholder.com/250x200?text=No+Image';
-                    const imageDate = image.image_date ? new Date(image.image_date).toLocaleDateString() : 'Unknown';
-                    
-                    col.innerHTML = `
-                        <div class="card h-100">
-                            <img src="${imageUrl}" class="card-img-top" alt="Property image" style="height: 200px; object-fit: cover;">
-                            <div class="card-body">
-                                <h5 class="card-title">Property ID: ${image.property_id}</h5>
-                                <p class="card-text">
-                                    <strong>Type:</strong> ${image.image_type || 'Unknown'}<br>
-                                    <strong>Date:</strong> ${imageDate}<br>
-                                    <strong>Size:</strong> ${image.width || '?'}×${image.height || '?'} px<br>
-                                    <strong>Format:</strong> ${image.file_format || 'Unknown'}
-                                </p>
-                            </div>
-                        </div>
-                    `;
-                    
-                    gallery.appendChild(col);
-                });
-            })
-            .catch(error => {
-                console.error('Error loading property images:', error);
-                loadingIndicator.classList.add('d-none');
-                errorIndicator.classList.remove('d-none');
-            });
-    }
-    
-    // Load improvements data
-    function loadImprovements() {
-        const tableBody = document.getElementById('improvements-table-body');
-        const loadingIndicator = document.getElementById('improvements-loading');
-        const noResultsIndicator = document.getElementById('improvements-no-results');
-        const errorIndicator = document.getElementById('improvements-error');
-        const paginationInfo = document.getElementById('improvements-pagination-info');
-        const prevButton = document.getElementById('prev-improvements-page');
-        const nextButton = document.getElementById('next-improvements-page');
-        
-        // Show loading indicator
-        tableBody.innerHTML = '';
-        loadingIndicator.classList.remove('d-none');
-        noResultsIndicator.classList.add('d-none');
-        errorIndicator.classList.add('d-none');
-        
-        // Build query params
-        let params = new URLSearchParams();
-        params.append('offset', improvementsOffset);
-        params.append('limit', improvementsLimit);
-        if (improvementsPropertyId) {
-            params.append('property_id', improvementsPropertyId);
-        }
-        
-        // Fetch data from API
-        fetch(`/api/imported-data/improvements?${params.toString()}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                // Hide loading indicator
-                loadingIndicator.classList.add('d-none');
-                
-                // Update improvements count
-                improvementsTotalCount = data.total;
-                
-                // Update pagination info
-                const start = improvementsOffset + 1;
-                const end = Math.min(improvementsOffset + improvementsLimit, improvementsTotalCount);
-                paginationInfo.textContent = `Showing ${start}-${end} of ${improvementsTotalCount}`;
-                
-                // Update pagination buttons
-                prevButton.disabled = improvementsOffset === 0;
-                nextButton.disabled = end >= improvementsTotalCount;
-                
-                // Check if we have results
-                if (data.improvements.length === 0) {
-                    noResultsIndicator.classList.remove('d-none');
-                    return;
-                }
-                
-                // Render improvements
-                data.improvements.forEach(improvement => {
-                    const row = document.createElement('tr');
-                    
-                    // Format improvement value
-                    const value = new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'USD'
-                    }).format(improvement.improvement_value || 0);
-                    
-                    row.innerHTML = `
-                        <td>${improvement.property_id || '-'}</td>
-                        <td>${improvement.improvement_id || '-'}</td>
-                        <td>${improvement.description || '-'}</td>
-                        <td>${value}</td>
-                        <td>${improvement.living_area ? improvement.living_area + ' sq ft' : '-'}</td>
-                        <td>${improvement.stories || '-'}</td>
-                        <td>${improvement.year_built || '-'}</td>
-                        <td>${improvement.primary_use || '-'}</td>
-                    `;
-                    
-                    tableBody.appendChild(row);
-                });
-            })
-            .catch(error => {
-                console.error('Error loading improvements:', error);
-                loadingIndicator.classList.add('d-none');
-                errorIndicator.classList.remove('d-none');
-            });
-    }
+});
 </script>
 {% endblock %}

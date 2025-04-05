@@ -321,6 +321,13 @@ def export_property_images_route(format):
     limit = request.args.get('limit', 1000, type=int)
     return export_property_images(format=format, limit=limit)
 
+@api_routes.route('/api/export/combined/<format>')
+def export_combined_data_route(format):
+    """Export combined data from multiple tables to CSV or Excel."""
+    from export_data import export_combined_data
+    limit = request.args.get('limit', 1000, type=int)
+    return export_combined_data(format=format, limit=limit)
+
 # API endpoints for visualization data
 @api_routes.route('/api/visualization-data/summary')
 def visualization_summary():

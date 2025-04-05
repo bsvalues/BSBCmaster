@@ -442,6 +442,67 @@ def discover_schema():
                 "message": f"Failed to discover schema: {str(e)}"
             }), 500
 
+
+@app.route('/api/export/accounts/<format>', methods=['GET'])
+def export_accounts_endpoint(format):
+    """Export accounts data in the specified format with filtering."""
+    try:
+        from export_data import export_accounts
+        limit = min(int(request.args.get('limit', 1000)), 5000)  # Cap at 5000
+        return export_accounts(format=format, limit=limit)
+    except Exception as e:
+        logger.error(f"Error exporting accounts: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/export/improvements/<format>', methods=['GET'])
+def export_improvements_endpoint(format):
+    """Export improvements data in the specified format with filtering."""
+    try:
+        from export_data import export_improvements
+        limit = min(int(request.args.get('limit', 1000)), 5000)  # Cap at 5000
+        return export_improvements(format=format, limit=limit)
+    except Exception as e:
+        logger.error(f"Error exporting improvements: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/export/property-images/<format>', methods=['GET'])
+def export_property_images_endpoint(format):
+    """Export property images data in the specified format with filtering."""
+    try:
+        from export_data import export_property_images
+        limit = min(int(request.args.get('limit', 1000)), 5000)  # Cap at 5000
+        return export_property_images(format=format, limit=limit)
+    except Exception as e:
+        logger.error(f"Error exporting property images: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
+@app.route('/api/export/combined/<format>', methods=['GET'])
+def export_combined_data_endpoint(format):
+    """Export combined data from multiple tables with filtering."""
+    try:
+        from export_data import export_combined_data
+        limit = min(int(request.args.get('limit', 1000)), 5000)  # Cap at 5000
+        return export_combined_data(format=format, limit=limit)
+    except Exception as e:
+        logger.error(f"Error exporting combined data: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
 @app.route('/')
 def index():
     """Handle the root route."""
