@@ -519,8 +519,8 @@ function formatValue(value, type) {
 // Initialize charts when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize enhanced assessment charts
-    const charts = new EnhancedAssessmentCharts();
+    const enhancedCharts = new EnhancedAssessmentCharts();
     
     // Add to window for debugging
-    window.assessmentCharts = charts;
+    window.enhancedCharts = enhancedCharts;
 });
