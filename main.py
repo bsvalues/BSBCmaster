@@ -525,7 +525,7 @@ def get_chart_data():
     
     Query parameters:
     - dataset: The dataset to use (accounts, improvements, property_images, combined)
-    - chart_type: Type of chart (bar, line, pie, scatter)
+    - chart_type: Type of chart (bar, line, pie, scatter, doughnut, radar, polarArea)
     - dimension: The dimension to group by
     - measure: The measure to aggregate
     - aggregation: How to aggregate (count, sum, avg, min, max)
@@ -753,6 +753,96 @@ def run_query():
         return jsonify({
             "status": "error",
             "message": f"Query execution failed: {str(e)}"
+        }), 500
+
+
+@app.route('/api/chart-metadata', methods=['GET'])
+def get_chart_metadata():
+    """
+    Get available chart dimensions and measures for each dataset.
+    This endpoint provides metadata needed by the enhanced chart builder.
+    
+    Returns:
+    {
+        "status": "success",
+        "metadata": {
+            "accounts": {
+                "dimensions": [...],
+                "measures": [...]
+            },
+            "property_images": {
+                "dimensions": [...],
+                "measures": [...]
+            },
+            ...
+        }
+    }
+    """
+    try:
+        # Define field mappings for each dataset
+        metadata = {
+            "accounts": {
+                "dimensions": [
+                    {"value": "owner_name", "label": "Owner Name"},
+                    {"value": "assessment_year", "label": "Assessment Year"},
+                    {"value": "tax_status", "label": "Tax Status"},
+                    {"value": "mailing_city", "label": "Mailing City"},
+                    {"value": "mailing_state", "label": "Mailing State"},
+                    {"value": "mailing_zip", "label": "Mailing ZIP"}
+                ],
+                "measures": [
+                    {"value": "id", "label": "Count"},
+                    {"value": "assessed_value", "label": "Assessed Value"},
+                    {"value": "tax_amount", "label": "Tax Amount"}
+                ]
+            },
+            "property_images": {
+                "dimensions": [
+                    {"value": "image_type", "label": "Image Type"},
+                    {"value": "file_format", "label": "File Format"},
+                    {"value": "EXTRACT(YEAR FROM image_date)", "label": "Image Year"}
+                ],
+                "measures": [
+                    {"value": "file_size", "label": "File Size"},
+                    {"value": "width", "label": "Width"},
+                    {"value": "height", "label": "Height"},
+                    {"value": "id", "label": "Count"}
+                ]
+            },
+            "improvements": {
+                "dimensions": [
+                    {"value": "IMPR_CODE", "label": "Improvement Code"},
+                    {"value": "YEAR_BUILT", "label": "Year Built"},
+                    {"value": "FLOOR(LIVING_AREA / 500) * 500", "label": "Living Area Range"}
+                ],
+                "measures": [
+                    {"value": "IMPR_VALUE", "label": "Improvement Value"},
+                    {"value": "LIVING_AREA", "label": "Living Area"},
+                    {"value": "NUM_STORIES", "label": "Number of Stories"},
+                    {"value": "id", "label": "Count"}
+                ]
+            }
+        }
+        
+        # Get list of available image types, improvement codes, etc.
+        with app.app_context():
+            # Get distinct image types
+            image_types = db.session.query(PropertyImage.image_type).distinct().all()
+            metadata["available_filters"] = {
+                "image_types": [t[0] for t in image_types if t[0]],
+                "years": list(range(2010, 2026))
+            }
+        
+        return jsonify({
+            "status": "success",
+            "metadata": metadata
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting chart metadata: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to retrieve chart metadata: {str(e)}"
         }), 500
 
 
@@ -1145,6 +1235,72 @@ def query_builder():
 def nl_query():
     """Render the natural language query interface."""
     return render_template('nl_query.html', title="Natural Language Query")
+
+
+@app.route('/visualize')
+def visualize():
+    """Render the data visualization interface."""
+    # Get unique values for dropdown filters
+    with app.app_context():
+        try:
+            # Get cities (using mailing_city since property_city is often empty)
+            cities_query = db.session.query(Account.mailing_city)\
+                .filter(Account.mailing_city != None, Account.mailing_city != '')\
+                .distinct()\
+                .order_by(Account.mailing_city)
+            cities = [city[0] for city in cities_query.all()]
+        except Exception as e:
+            logger.error(f"Error fetching cities: {str(e)}")
+            cities = []
+        
+        try:
+            # Get property types
+            property_types_query = db.session.query(Property.property_type)\
+                .filter(Property.property_type != None, Property.property_type != '')\
+                .distinct()\
+                .order_by(Property.property_type)
+            property_types = [p_type[0] for p_type in property_types_query.all()]
+        except Exception as e:
+            logger.error(f"Error fetching property types: {str(e)}")
+            property_types = []
+        
+        try:
+            # Get image types for filtering
+            image_types_query = db.session.query(PropertyImage.image_type)\
+                .filter(PropertyImage.image_type != None, PropertyImage.image_type != '')\
+                .distinct()\
+                .order_by(PropertyImage.image_type)
+            image_types = [i_type[0] for i_type in image_types_query.all()]
+        except Exception as e:
+            logger.error(f"Error fetching image types: {str(e)}")
+            image_types = []
+        
+        try:
+            # Get improvement codes
+            improvement_codes_query = db.session.query(text("DISTINCT impr_code FROM ftp_dl_imprv"))\
+                .filter(text("impr_code IS NOT NULL"))\
+                .order_by(text("impr_code"))
+            improvement_codes = [code[0] for code in db.session.execute(improvement_codes_query)]
+        except Exception as e:
+            logger.error(f"Error fetching improvement codes: {str(e)}")
+            improvement_codes = []
+        
+    # Get current year and previous year for statistics
+    current_year = datetime.datetime.now().year
+    previous_year = current_year - 1
+    
+    return render_template(
+        'visualize.html', 
+        title="MCP Assessor Data Visualization",
+        version="2.0",
+        cities=cities,
+        property_types=property_types,
+        image_types=image_types,
+        improvement_codes=improvement_codes,
+        current_year=current_year,
+        previous_year=previous_year
+    )
+
 
 # This is called when the Flask app is run
 if __name__ == "__main__":

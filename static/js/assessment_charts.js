@@ -201,18 +201,39 @@ class AssessmentCharts {
             this.chart.destroy();
         }
         
-        // Format data for chart
+        // Prepare chart data based on the response format
+        let labels = [];
+        let values = [];
+        
+        if (data.chart_data && data.chart_data.data) {
+            // New API format
+            labels = data.chart_data.data.map(item => item.dimension || 'Unknown');
+            values = data.chart_data.data.map(item => item.value || 0);
+        } else if (data.labels && data.values) {
+            // Legacy format
+            labels = data.labels;
+            values = data.values;
+        } else if (Array.isArray(data)) {
+            // Direct array format
+            labels = data.map(item => item.dimension || 'Unknown');
+            values = data.map(item => item.value || 0);
+        }
+        
+        // Format data for different chart types
         const chartData = {
-            labels: data.labels,
+            labels: labels,
             datasets: [{
-                label: data.title,
-                data: data.values,
-                backgroundColor: chartType === 'line' ? this.colors[0] : 
-                    data.labels.map((_, i) => this.colors[i % this.colors.length]),
-                borderColor: chartType === 'line' ? this.colors[0] : 
-                    data.labels.map((_, i) => this.colors[i % this.colors.length]),
-                borderWidth: chartType === 'line' ? 2 : 1,
-                fill: chartType === 'line' ? false : undefined
+                label: data.chart_data?.measure || data.title || 'Value',
+                data: values,
+                backgroundColor: this.getBackgroundColors(chartType, labels.length),
+                borderColor: this.getBorderColors(chartType, labels.length),
+                borderWidth: this.getBorderWidth(chartType),
+                fill: chartType === 'line' || chartType === 'radar' ? 0.3 : undefined,
+                tension: chartType === 'line' ? 0.3 : undefined, // Add curve to lines
+                pointBackgroundColor: chartType === 'scatter' ? this.colors.map(c => c + '80') : undefined,
+                pointBorderColor: chartType === 'scatter' ? this.colors : undefined,
+                pointRadius: chartType === 'scatter' ? 6 : 4,
+                pointHoverRadius: chartType === 'scatter' ? 10 : 6
             }]
         };
         
