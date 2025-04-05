@@ -1,0 +1,653 @@
+{% extends "base.html" %}
+
+{% block title %}Natural Language Query - MCP Assessor Agent API{% endblock %}
+
+{% block head %}
+<style>
+    .query-results {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+    
+    .explanation-card {
+        background-color: rgba(25, 135, 84, 0.1);
+        border-left: 4px solid var(--bs-success);
+    }
+    
+    .query-form {
+        margin-bottom: 2rem;
+    }
+    
+    .copy-btn {
+        cursor: pointer;
+    }
+    
+    .code-editor {
+        font-family: 'Courier New', monospace;
+        min-height: 150px;
+        resize: vertical;
+    }
+    
+    .sql-display {
+        font-family: 'Courier New', monospace;
+        background-color: var(--bs-dark);
+        color: var(--bs-light);
+        padding: 1rem;
+        border-radius: 0.25rem;
+        position: relative;
+    }
+    
+    .example-queries {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    
+    .example-queries:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .result-table {
+        width: 100%;
+        overflow-x: auto;
+    }
+    
+    .highlight {
+        background-color: rgba(255, 193, 7, 0.2);
+    }
+    
+    .schema-info {
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Natural Language Query</h1>
+            <div>
+                <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#helpModal">
+                    <i class="fas fa-question-circle me-1"></i> Help
+                </button>
+            </div>
+        </div>
+        <p class="lead">Ask questions about property assessment data in plain English and get SQL queries automatically.</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card query-form">
+            <div class="card-header">
+                <h5 class="mb-0">Ask Your Question</h5>
+            </div>
+            <div class="card-body">
+                <form id="nlQueryForm">
+                    <div class="mb-3">
+                        <label for="nlQuery" class="form-label">What would you like to know about the property data?</label>
+                        <div class="input-group">
+                            <textarea class="form-control" id="nlQuery" rows="3" 
+                                placeholder="e.g. 'Show me properties in Richland with values over $500,000' or 'Find accounts with highest assessed values'"></textarea>
+                            <button class="btn btn-primary" type="submit" id="submitQuery">
+                                <i class="fas fa-search me-1"></i> Generate SQL
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer bg-transparent">
+                <small class="text-muted">Try one of these examples:</small>
+                <div class="row mt-2">
+                    <div class="col-md-4">
+                        <div class="example-queries p-2 rounded mb-2" data-query="Find all accounts where the owner name contains 'Smith'">
+                            Find all accounts where the owner name contains 'Smith'
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="example-queries p-2 rounded mb-2" data-query="What are the 10 most valuable properties based on assessed value?">
+                            What are the 10 most valuable properties based on assessed value?
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="example-queries p-2 rounded mb-2" data-query="Show me property images uploaded in the last year">
+                            Show me property images uploaded in the last year
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultsContainer" class="d-none">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Generated SQL Query</h5>
+                    <button class="btn btn-sm btn-outline-primary copy-btn" data-target="sqlQuery">
+                        <i class="fas fa-copy me-1"></i> Copy
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="sql-display" id="sqlQuery">
+                        <pre><code></code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4 explanation-card">
+                <div class="card-body">
+                    <h5><i class="fas fa-lightbulb me-2"></i> Explanation</h5>
+                    <p class="mb-0" id="explanation"></p>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Query Results</h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary me-2" id="executeBtn">
+                            <i class="fas fa-play me-1"></i> Execute
+                        </button>
+                        <button class="btn btn-sm btn-outline-success me-2 d-none" id="exportCsvBtn">
+                            <i class="fas fa-file-csv me-1"></i> CSV
+                        </button>
+                        <button class="btn btn-sm btn-outline-success d-none" id="exportExcelBtn">
+                            <i class="fas fa-file-excel me-1"></i> Excel
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body query-results">
+                    <div id="loadingResults" class="text-center d-none">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Executing query...</p>
+                    </div>
+                    <div id="noResults" class="text-center d-none">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <p>No results found or query not executed yet.</p>
+                    </div>
+                    <div id="errorResults" class="text-center d-none">
+                        <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+                        <p class="text-danger">Error executing query:</p>
+                        <pre id="errorMessage" class="bg-dark text-light p-3 rounded"></pre>
+                    </div>
+                    <div id="resultsTable" class="result-table d-none">
+                    </div>
+                </div>
+                <div class="card-footer d-none" id="resultStats">
+                    <small class="text-muted">
+                        Showing <span id="resultCount">0</span> results. Query executed in <span id="queryTime">0</span> seconds.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card sticky-top" style="top: 76px;">
+            <div class="card-header">
+                <h5 class="mb-0">Database Schema Reference</h5>
+            </div>
+            <div class="card-body schema-info">
+                <div class="accordion" id="schemaAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#accountsSchema">
+                                accounts
+                            </button>
+                        </h2>
+                        <div id="accountsSchema" class="accordion-collapse collapse" data-bs-parent="#schemaAccordion">
+                            <div class="accordion-body">
+                                <ul class="list-unstyled mb-0">
+                                    <li><code>account_id</code> - Unique identifier for the account</li>
+                                    <li><code>owner_name</code> - Name of the property owner</li>
+                                    <li><code>property_address</code> - Physical address of the property</li>
+                                    <li><code>property_city</code> - City where the property is located</li>
+                                    <li><code>mailing_address</code> - Owner's mailing address</li>
+                                    <li><code>mailing_city</code> - City of the mailing address</li>
+                                    <li><code>mailing_state</code> - State of the mailing address</li>
+                                    <li><code>mailing_zip</code> - ZIP code of the mailing address</li>
+                                    <li><code>assessment_year</code> - Year of assessment</li>
+                                    <li><code>assessed_value</code> - Total assessed value</li>
+                                    <li><code>tax_amount</code> - Annual tax amount</li>
+                                    <li><code>tax_status</code> - Current tax payment status</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#propertiesSchema">
+                                properties
+                            </button>
+                        </h2>
+                        <div id="propertiesSchema" class="accordion-collapse collapse" data-bs-parent="#schemaAccordion">
+                            <div class="accordion-body">
+                                <ul class="list-unstyled mb-0">
+                                    <li><code>id</code> - Primary key</li>
+                                    <li><code>parcel_id</code> - Foreign key to parcels table</li>
+                                    <li><code>property_type</code> - Type of property (residential, commercial, etc.)</li>
+                                    <li><code>square_footage</code> - Total square footage</li>
+                                    <li><code>bedrooms</code> - Number of bedrooms</li>
+                                    <li><code>bathrooms</code> - Number of bathrooms</li>
+                                    <li><code>year_built</code> - Year the property was built</li>
+                                    <li><code>stories</code> - Number of stories</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#parcelsSchema">
+                                parcels
+                            </button>
+                        </h2>
+                        <div id="parcelsSchema" class="accordion-collapse collapse" data-bs-parent="#schemaAccordion">
+                            <div class="accordion-body">
+                                <ul class="list-unstyled mb-0">
+                                    <li><code>id</code> - Primary key</li>
+                                    <li><code>parcel_id</code> - Unique identifier for the parcel</li>
+                                    <li><code>land_value</code> - Assessed value of the land</li>
+                                    <li><code>improvement_value</code> - Assessed value of improvements</li>
+                                    <li><code>total_value</code> - Total assessed value</li>
+                                    <li><code>land_use_code</code> - Code indicating land use</li>
+                                    <li><code>zoning_code</code> - Zoning designation</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#salesSchema">
+                                sales
+                            </button>
+                        </h2>
+                        <div id="salesSchema" class="accordion-collapse collapse" data-bs-parent="#schemaAccordion">
+                            <div class="accordion-body">
+                                <ul class="list-unstyled mb-0">
+                                    <li><code>id</code> - Primary key</li>
+                                    <li><code>parcel_id</code> - Foreign key to parcels table</li>
+                                    <li><code>sale_date</code> - Date of sale</li>
+                                    <li><code>sale_price</code> - Sale price amount</li>
+                                    <li><code>sale_type</code> - Type of sale transaction</li>
+                                    <li><code>buyer_name</code> - Name of buyer</li>
+                                    <li><code>seller_name</code> - Name of seller</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#imagesSchema">
+                                property_images
+                            </button>
+                        </h2>
+                        <div id="imagesSchema" class="accordion-collapse collapse" data-bs-parent="#schemaAccordion">
+                            <div class="accordion-body">
+                                <ul class="list-unstyled mb-0">
+                                    <li><code>id</code> - Primary key</li>
+                                    <li><code>property_id</code> - Property identifier</li>
+                                    <li><code>account_id</code> - Related account ID</li>
+                                    <li><code>image_url</code> - URL to the image</li>
+                                    <li><code>image_path</code> - File system path to image</li>
+                                    <li><code>image_type</code> - Type of image (exterior, interior, etc.)</li>
+                                    <li><code>image_date</code> - Date image was taken</li>
+                                    <li><code>width</code> - Image width in pixels</li>
+                                    <li><code>height</code> - Image height in pixels</li>
+                                    <li><code>file_size</code> - Size of image file in bytes</li>
+                                    <li><code>file_format</code> - Format of the image (JPEG, PNG, etc.)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Help Modal -->
+<div class="modal fade" id="helpModal" tabindex="-1" aria-labelledby="helpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="helpModalLabel">Natural Language Query Help</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6>How to Use This Tool</h6>
+                <p>The Natural Language Query tool allows you to ask questions about property assessment data in plain English. The system will convert your question into a SQL query and execute it against the database.</p>
+                
+                <h6>Example Questions</h6>
+                <ul>
+                    <li>"Show me the 10 most valuable properties in Richland"</li>
+                    <li>"Find all properties built after 2010 with more than 3 bedrooms"</li>
+                    <li>"What's the average assessed value of commercial properties?"</li>
+                    <li>"List property sales above $500,000 in the last year"</li>
+                    <li>"How many properties have property images?"</li>
+                </ul>
+                
+                <h6>Tips for Better Results</h6>
+                <ul>
+                    <li>Be specific about which data you want to see (accounts, properties, sales, etc.)</li>
+                    <li>Include specific criteria like dates, values, or names</li>
+                    <li>Specify how many results you want (e.g., "top 10" or "limit to 20")</li>
+                    <li>Ask for specific sorting (e.g., "sort by value highest first")</li>
+                </ul>
+                
+                <h6>Available Data Tables</h6>
+                <ul>
+                    <li><strong>accounts</strong> - Property account information including owner details and assessment values</li>
+                    <li><strong>properties</strong> - Physical property details like size, bedrooms, and year built</li>
+                    <li><strong>parcels</strong> - Land parcel information including values and zoning</li>
+                    <li><strong>sales</strong> - Property sale transactions including dates, prices, and parties</li>
+                    <li><strong>property_images</strong> - Images associated with properties</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Constants and elements
+        const nlQueryForm = document.getElementById('nlQueryForm');
+        const nlQueryInput = document.getElementById('nlQuery');
+        const submitQueryBtn = document.getElementById('submitQuery');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const sqlQueryDisplay = document.getElementById('sqlQuery').querySelector('code');
+        const explanationDisplay = document.getElementById('explanation');
+        const executeBtn = document.getElementById('executeBtn');
+        const exportCsvBtn = document.getElementById('exportCsvBtn');
+        const exportExcelBtn = document.getElementById('exportExcelBtn');
+        const loadingResults = document.getElementById('loadingResults');
+        const noResults = document.getElementById('noResults');
+        const errorResults = document.getElementById('errorResults');
+        const errorMessage = document.getElementById('errorMessage');
+        const resultsTable = document.getElementById('resultsTable');
+        const resultStats = document.getElementById('resultStats');
+        const resultCount = document.getElementById('resultCount');
+        const queryTime = document.getElementById('queryTime');
+        const exampleQueries = document.querySelectorAll('.example-queries');
+        const copyButtons = document.querySelectorAll('.copy-btn');
+        
+        // Current state
+        let currentSql = '';
+        let currentExplanation = '';
+        
+        // Handle natural language query form submission
+        nlQueryForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const query = nlQueryInput.value.trim();
+            if (!query) return;
+            
+            // Disable submit button and show loading state
+            submitQueryBtn.disabled = true;
+            submitQueryBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+            
+            // Call NL to SQL API
+            fetch('/api/nl-to-sql', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    query: query,
+                    db: 'postgres'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Update UI with results
+                if (data.status === 'success') {
+                    currentSql = data.sql;
+                    currentExplanation = data.explanation;
+                    
+                    // Update SQL display
+                    sqlQueryDisplay.textContent = currentSql;
+                    explanationDisplay.textContent = currentExplanation;
+                    
+                    // Show results container and hide loading indicators
+                    resultsContainer.classList.remove('d-none');
+                    
+                    // Reset execute button and results display
+                    executeBtn.disabled = false;
+                    resetResultsDisplay();
+                } else {
+                    // Show error
+                    showError(data.message || 'Failed to convert natural language to SQL.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showError('An error occurred while processing your query.');
+            })
+            .finally(() => {
+                // Re-enable submit button
+                submitQueryBtn.disabled = false;
+                submitQueryBtn.innerHTML = '<i class="fas fa-search me-1"></i> Generate SQL';
+            });
+        });
+        
+        // Handle execute button click
+        executeBtn.addEventListener('click', function() {
+            if (!currentSql) return;
+            
+            // Show loading state
+            loadingResults.classList.remove('d-none');
+            noResults.classList.add('d-none');
+            errorResults.classList.add('d-none');
+            resultsTable.classList.add('d-none');
+            resultStats.classList.add('d-none');
+            exportCsvBtn.classList.add('d-none');
+            exportExcelBtn.classList.add('d-none');
+            
+            // Disable execute button
+            executeBtn.disabled = true;
+            executeBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Executing...';
+            
+            // Call query API
+            fetch('/api/query', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    db: 'postgres',
+                    query: currentSql,
+                    page: 1,
+                    page_size: 100,
+                    security_level: 'medium'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Show results
+                    displayQueryResults(data);
+                } else {
+                    // Show error
+                    showError(data.message || 'Failed to execute SQL query.');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showError('An error occurred while executing your query.');
+            })
+            .finally(() => {
+                // Hide loading indicator
+                loadingResults.classList.add('d-none');
+                
+                // Re-enable execute button
+                executeBtn.disabled = false;
+                executeBtn.innerHTML = '<i class="fas fa-play me-1"></i> Execute';
+            });
+        });
+        
+        // Handle export buttons
+        exportCsvBtn.addEventListener('click', function() {
+            if (!currentSql) return;
+            exportData('csv');
+        });
+        
+        exportExcelBtn.addEventListener('click', function() {
+            if (!currentSql) return;
+            exportData('excel');
+        });
+        
+        // Handle example query clicks
+        exampleQueries.forEach(example => {
+            example.addEventListener('click', function() {
+                const query = this.getAttribute('data-query');
+                nlQueryInput.value = query;
+                // Scroll to form and focus
+                nlQueryInput.scrollIntoView({ behavior: 'smooth' });
+                nlQueryInput.focus();
+            });
+        });
+        
+        // Handle copy buttons
+        copyButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const target = this.getAttribute('data-target');
+                let textToCopy = '';
+                
+                if (target === 'sqlQuery') {
+                    textToCopy = currentSql;
+                }
+                
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    // Success feedback
+                    const originalText = this.innerHTML;
+                    this.innerHTML = '<i class="fas fa-check me-1"></i> Copied!';
+                    this.classList.remove('btn-outline-primary');
+                    this.classList.add('btn-success');
+                    
+                    // Reset after 2 seconds
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                        this.classList.remove('btn-success');
+                        this.classList.add('btn-outline-primary');
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy text: ', err);
+                });
+            });
+        });
+        
+        // Helper function to display query results
+        function displayQueryResults(data) {
+            // Check if we have results
+            if (!data.data || data.data.length === 0) {
+                noResults.classList.remove('d-none');
+                return;
+            }
+            
+            // Get column names from first result
+            const columns = Object.keys(data.data[0]);
+            
+            // Build HTML table
+            let tableHtml = '<table class="table table-striped table-hover"><thead><tr>';
+            
+            // Add headers
+            columns.forEach(column => {
+                tableHtml += `<th>${column}</th>`;
+            });
+            
+            tableHtml += '</tr></thead><tbody>';
+            
+            // Add rows
+            data.data.forEach(row => {
+                tableHtml += '<tr>';
+                columns.forEach(column => {
+                    // Format the cell value
+                    let cellValue = row[column];
+                    
+                    // Handle null values
+                    if (cellValue === null) {
+                        cellValue = '<span class="text-muted">NULL</span>';
+                    }
+                    
+                    // Format dates nicely
+                    if (typeof cellValue === 'string' && cellValue.match(/^\d{4}-\d{2}-\d{2}T/)) {
+                        const date = new Date(cellValue);
+                        cellValue = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                    }
+                    
+                    tableHtml += `<td>${cellValue}</td>`;
+                });
+                tableHtml += '</tr>';
+            });
+            
+            tableHtml += '</tbody></table>';
+            
+            // Update the results table and show it
+            resultsTable.innerHTML = tableHtml;
+            resultsTable.classList.remove('d-none');
+            
+            // Update stats
+            resultCount.textContent = data.data.length;
+            queryTime.textContent = data.execution_time ? data.execution_time.toFixed(3) : '0.000';
+            resultStats.classList.remove('d-none');
+            
+            // Show export buttons
+            exportCsvBtn.classList.remove('d-none');
+            exportExcelBtn.classList.remove('d-none');
+        }
+        
+        // Helper function to show errors
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorResults.classList.remove('d-none');
+            resultsTable.classList.add('d-none');
+            noResults.classList.add('d-none');
+            loadingResults.classList.add('d-none');
+            resultStats.classList.add('d-none');
+        }
+        
+        // Helper function to reset results display
+        function resetResultsDisplay() {
+            loadingResults.classList.add('d-none');
+            noResults.classList.remove('d-none');
+            errorResults.classList.add('d-none');
+            resultsTable.classList.add('d-none');
+            resultStats.classList.add('d-none');
+            exportCsvBtn.classList.add('d-none');
+            exportExcelBtn.classList.add('d-none');
+        }
+        
+        // Helper function to export data
+        function exportData(format) {
+            // Determine appropriate endpoint based on SQL query
+            let endpoint = '/api/export/';
+            
+            // Extract table from SQL if possible
+            const tableMatch = currentSql.match(/from\s+(\w+)/i);
+            const table = tableMatch ? tableMatch[1].toLowerCase() : '';
+            
+            // Map table name to export endpoint
+            if (table === 'accounts') {
+                endpoint += 'accounts';
+            } else if (table === 'properties' || table === 'improvements') {
+                endpoint += 'improvements';
+            } else if (table === 'property_images') {
+                endpoint += 'property-images';
+            } else {
+                endpoint += 'combined';
+            }
+            
+            // Add format
+            endpoint += '.' + format;
+            
+            // Open in new tab
+            window.open(endpoint, '_blank');
+        }
+    });
+</script>
+{% endblock %}

@@ -143,14 +143,8 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/api/docs" target="_blank">OpenAPI</a>
                     </li>
-                </ul>
-                <div class="d-flex">
-                    <div class="badge rounded-pill text-bg-success me-2">
-                        <span class="status-indicator"></span>
-                        <span class="status-text">API Online</span>
-                    </div>
-                </div>
-            </div>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/nl-query' %}active{% endif %}" href="/nl-query">Natural Language Query</a>
                     </li>
                 </ul>
                 <div class="d-flex">
@@ -186,6 +180,12 @@
                 </div>
                 <div class="col-md-3">
                     <h5>Contact</h5>
+                    <ul class="list-unstyled">
+                        <li><a href="mailto:support@mcp-assessor.gov" class="text-decoration-none">Email Support</a></li>
+                        <li><a href="tel:+15551234567" class="text-decoration-none">Call (555) 123-4567</a></li>
+                    </ul>
+                </div>
+            </div>
             <hr>
             <div class="d-flex justify-content-between">
                 <p class="text-muted mb-0">&copy; 2025 MCP Assessor. All rights reserved.</p>
