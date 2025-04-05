@@ -287,10 +287,11 @@ def parameterized_query():
 
 @api_routes.route('/api/nl-to-sql', methods=['POST'])
 def nl_to_sql():
-    """Convert natural language to SQL using OpenAI (placeholder)."""
+    """Convert natural language to SQL using our NL processing module."""
     try:
         data = request.json
         natural_language_query = data.get('query')
+        db_type = data.get('db', 'postgres')
         
         if not natural_language_query:
             return jsonify({
@@ -298,12 +299,14 @@ def nl_to_sql():
                 "message": "No natural language query provided"
             }), 400
         
-        # TODO: Implement OpenAI integration for NL to SQL conversion
-        # For now, return a placeholder response
-        return jsonify({
-            "status": "error",
-            "message": "Natural language to SQL conversion is not yet implemented in direct database access mode"
-        }), 501
+        # Import the function from our nl_processing module
+        from app.nl_processing import nl_to_sql as process_nl_to_sql
+        
+        # Process the query using our dedicated module
+        result = process_nl_to_sql(natural_language_query, db_type)
+        
+        # Return the result
+        return jsonify(result)
     except Exception as e:
         logger.error(f"Error processing natural language query: {str(e)}")
         return jsonify({
