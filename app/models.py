@@ -2,6 +2,7 @@
 This module defines the data models for the API.
 """
 
+import re
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional, Dict, Any, Union, Set
@@ -35,16 +36,75 @@ class ParameterizedSQLQuery(BaseModel):
     """Parameterized SQL query request model."""
     db: DatabaseType = Field(..., description="Database to use")
     query: str = Field(..., description="SQL query to execute with parameter placeholders")
-    params: Optional[Dict[str, Any]] = Field({}, description="Named parameters for the query")
+    params: Optional[Union[Dict[str, Any], List[Any]]] = Field({}, description="Parameters for the query (dict for named, list for qmark)")
     param_style: ParamStyle = Field(ParamStyle.NAMED, description="Parameter style to use")
     page: int = Field(1, ge=1, description="Page number (starting from 1)")
     page_size: Optional[int] = Field(50, ge=1, le=1000, description="Number of records per page")
     
     @validator('params')
-    def validate_params(cls, v):
-        """Validate that parameters dict has values for all placeholders."""
-        # This would be more complex in reality, checking against query
-        return v if v is not None else {}
+    def validate_params(cls, v, values):
+        """Validate that parameters match the parameter style and query."""
+        if v is None:
+            return {}
+            
+        if 'query' not in values or not values['query']:
+            return v
+            
+        query = values['query']
+        param_style = values.get('param_style', ParamStyle.NAMED)
+        
+        # For named parameters, params should be a dict
+        if param_style == ParamStyle.NAMED:
+            # Make sure params is a dict for named parameters
+            if not isinstance(v, dict):
+                raise ValueError("For named parameter style, params must be a dictionary")
+                
+            # Find all named parameters in the query
+            param_matches = set()
+            
+            # Match :param style
+            colon_params = re.findall(r':(\w+)', query)
+            param_matches.update(colon_params)
+            
+            # Match @param style
+            at_params = re.findall(r'@(\w+)', query)
+            param_matches.update(at_params)
+            
+            # Check if all parameters in the query are provided
+            missing_params = [param for param in param_matches if param not in v]
+            if missing_params:
+                missing_list = ", ".join(missing_params)
+                raise ValueError(f"Missing parameters: {missing_list}")
+                
+        # For qmark style, params should be a list
+        elif param_style == ParamStyle.QMARK:
+            # Make sure params is a list for qmark parameters
+            if not isinstance(v, list):
+                raise ValueError("For qmark parameter style, params must be a list")
+                
+            # Count question mark placeholders
+            placeholder_count = query.count('?')
+            
+            if placeholder_count != len(v):
+                raise ValueError(f"Parameter count mismatch: {placeholder_count} placeholders, {len(v)} values")
+        
+        return v
+    
+    @validator('query')
+    def validate_query(cls, v):
+        """Validate that the query is not empty and is a valid SQL query."""
+        if not v or not v.strip():
+            raise ValueError("Query cannot be empty")
+            
+        # Check for basic SQL syntax
+        v = v.strip()
+        
+        # Simple validation to ensure query starts with SELECT, INSERT, UPDATE, DELETE, etc.
+        valid_starters = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'WITH', 'CREATE', 'ALTER', 'DROP', 'TRUNCATE']
+        if not any(v.upper().startswith(starter) for starter in valid_starters):
+            raise ValueError("Query must start with a valid SQL statement (SELECT, INSERT, UPDATE, etc.)")
+            
+        return v
 
 
 class SQLQuery(BaseModel):

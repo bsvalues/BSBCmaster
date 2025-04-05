@@ -107,30 +107,70 @@ def format_query_params(query: str, params: Union[Dict[str, Any], List[Any]], db
         Tuple[str, Union[Dict[str, Any], List[Any]]]: The formatted query and parameters
     """
     if db_type == "postgres":
-        # If using a list of parameters, convert to using numbered placeholders
+        # If using a list of parameters, convert to using PostgreSQL placeholders
         if isinstance(params, list):
-            formatted_query = query
-            for i in range(len(params)):
-                formatted_query = formatted_query.replace("?", f"%s", 1)
+            # Replace ? with %s for PostgreSQL
+            formatted_query = re.sub(r'\?', '%s', query)
             return formatted_query, params
+            
         # If using a dict of parameters, convert to using named placeholders
         elif isinstance(params, dict):
             formatted_query = query
-            # Replace :param with %(param)s for psycopg2
-            for param_name in params:
-                formatted_query = formatted_query.replace(f":{param_name}", f"%({param_name})s")
+            
+            # Check for different parameter styles
+            # Handle :param style (convert to %(param)s)
+            for param_name in params.keys():
+                # Look for exact matches of :param_name (not partial matches)
+                pattern = r':(' + param_name + r')\b'
+                formatted_query = re.sub(pattern, r'%(\1)s', formatted_query)
+            
+            # Handle @param style (sometimes used in SQL Server)
+            for param_name in params.keys():
+                pattern = r'@(' + param_name + r')\b'
+                formatted_query = re.sub(pattern, r'%(\1)s', formatted_query)
+                
             return formatted_query, params
+        
+        # Return unmodified if params is None or another type
+        return query, params if params is not None else {}
+        
     elif db_type == "mssql":
-        # For MSSQL, use ? placeholders
+        # For MSSQL, handle parameter conversion
         if isinstance(params, list):
+            # ? placeholders are the native style for pyodbc
             return query, params
-        # For MSSQL with dict parameters, convert to using ? placeholders
+            
+        # For MSSQL with dict parameters, convert to ordered list
         elif isinstance(params, dict):
-            # This is more complex and would require parameter order tracking
-            # Simplified for now
-            return query, params
+            # Use regex to find all named parameters in the query
+            # This matches both :param and @param styles
+            param_matches = re.findall(r'[:@](\w+)', query)
+            
+            # Create ordered parameter list based on occurrence in query
+            ordered_params = []
+            param_map = {}  # Track parameter positions
+            
+            # Build an ordered list of parameters
+            for param_name in param_matches:
+                if param_name in params:
+                    # If we've already processed this parameter, skip it
+                    if param_name in param_map:
+                        continue
+                        
+                    # Add parameter to ordered list
+                    ordered_params.append(params[param_name])
+                    param_map[param_name] = len(ordered_params) - 1
+            
+            # Replace named parameters with ? placeholders
+            formatted_query = query
+            for param_name in param_map:
+                # Replace both :param and @param styles
+                formatted_query = re.sub(r'[:@]' + param_name + r'\b', '?', formatted_query)
+                
+            return formatted_query, ordered_params
     
-    return query, params
+    # Default case - return unmodified
+    return query, params if params is not None else {}
 
 def paginate_results(data: List[Dict[str, Any]], page: int, page_size: int, total_count: int) -> Dict[str, Any]:
     """
@@ -177,10 +217,12 @@ async def execute_parameterized_query(payload: ParameterizedSQLQuery, allow_writ
     # Extract query parameters
     db_type = payload.db.value
     query = payload.query
-    params = payload.params
+    params = payload.params if payload.params is not None else {}
     param_style = payload.param_style.value
     page = payload.page
     page_size = payload.page_size
+    
+    logger.info(f"Executing parameterized query on {db_type} with {len(params)} params")
     
     # Check for dangerous patterns
     if is_dangerous_query(query) and not allow_write:

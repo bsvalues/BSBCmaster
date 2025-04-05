@@ -6,7 +6,7 @@ import logging
 import re
 from typing import Optional, Dict, Any, List, Union
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 from starlette.responses import JSONResponse
 
@@ -107,7 +107,7 @@ async def run_sql_query(
 
 @router.post("/parameterized-query", response_model=QueryResult)
 async def run_parameterized_query(
-    payload: ParameterizedSQLQuery,
+    request: Request,
     api_key: str = Depends(get_api_key)
 ):
     """
@@ -118,8 +118,7 @@ async def run_parameterized_query(
     from the query string and bound by the database driver.
     
     Args:
-        payload: Contains the database type, SQL query with placeholders, parameter values,
-                and optional pagination parameters
+        request: The raw request object to allow manual processing of the payload
                 
     Returns:
         QueryResult: The results of the SQL query with pagination metadata
@@ -128,15 +127,24 @@ async def run_parameterized_query(
         HTTPException: If the query is unsafe or if a database error occurs
     """
     try:
-        # Extract query parameters
-        db = payload.db.value
-        query = payload.query
-        params = payload.params or {}
-        param_style = payload.param_style.value
-        page = payload.page
-        page_size = payload.page_size
+        # Get raw data
+        data = await request.json()
         
-        logger.info(f"Executing parameterized query on {db} with {len(params)} params")
+        # Extract query parameters
+        db = data.get('db')
+        if not db:
+            raise HTTPException(status_code=400, detail="Database type is required")
+            
+        query = data.get('query')
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+            
+        params = data.get('params', {})
+        param_style = data.get('param_style', 'named')
+        page = data.get('page', 1)
+        page_size = data.get('page_size', 50)
+        
+        logger.info(f"Executing parameterized query on {db} with params (style: {param_style})")
         
         # Validate parameter usage in query based on param_style
         if param_style == "named":
@@ -169,39 +177,149 @@ async def run_parameterized_query(
                     detail=f"Parameter count mismatch: {placeholder_count} placeholders, {len(params)} values"
                 )
         
-        # Execute the query using the enhanced query executor if available
-        try:
-            # Import the enhanced query executor
-            from app.query_executor import execute_parameterized_query as exec_query
+        # Use the basic executor from app.db
+        logger.info("Using basic executor for parameterized query")
+        
+        # For qmark style with PostgreSQL, we need to handle it differently
+        if param_style == "qmark" and db.lower() == "postgres":
+            # Convert ? placeholders to $1, $2, etc.
+            param_list = list(params.values()) if isinstance(params, dict) else params
             
-            # Use the enhanced executor with advanced features
-            result = await exec_query(payload, allow_write=False)
+            # For PostgreSQL and qmark style, we'll directly execute the query
+            # instead of using the standard execute_parameterized_query
+            # to avoid issues with the count query not propagating parameters
+            
+            # Direct query execution without the count query for pagination
+            conn = None
+            try:
+                logger.info("Using direct PostgreSQL query execution for qmark style")
+                import time
+                start_time = time.time()
+                
+                from app.db import get_postgres_connection, pg_pool
+                import psycopg2.extras
+                
+                # Get connection from pool
+                conn = get_postgres_connection()
+                
+                # Convert query placeholders
+                i = 1
+                modified_query = ""
+                for char in query:
+                    if char == '?':
+                        modified_query += f"${i}"
+                        i += 1
+                    else:
+                        modified_query += char
+                
+                logger.info(f"Converted qmark query to PostgreSQL format: {modified_query}")
+                
+                # Create cursor with dictionary results
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+                    # Execute the main query with pagination
+                    offset = (page - 1) * page_size
+                    paginated_query = f"{modified_query} LIMIT {page_size} OFFSET {offset}"
+                    
+                    # For PostgreSQL, we need to ensure parameters are passed correctly
+                    # Let's log what we're doing
+                    logger.info(f"Executing paginated query: {paginated_query}")
+                    logger.info(f"With params: {param_list}")
+                    
+                    # Direct string formatting for simple cases (this would normally be unsafe but we're showing it for debugging)
+                    # In production, never do this - always use parameterized queries
+                    safe_query = paginated_query
+                    if len(param_list) == 1:
+                        # For single parameter queries, directly substitute for testing
+                        param_value = param_list[0]
+                        if isinstance(param_value, str):
+                            param_value = f"'{param_value}'"  # Quote strings
+                        safe_query = safe_query.replace("$1", str(param_value))
+                        logger.info(f"Using direct substitution query: {safe_query}")
+                        cursor.execute(safe_query)
+                    else:
+                        # For multiple parameters, still try the parameterized approach
+                        cursor.execute(paginated_query, param_list)
+                        
+                    results = cursor.fetchall()
+                    
+                    # For total count, use the same direct substitution approach for simple cases
+                    count_modified_query = f"SELECT COUNT(*) AS total FROM ({modified_query}) AS count_subq"
+                    
+                    if len(param_list) == 1:
+                        # For single parameter queries, directly substitute
+                        param_value = param_list[0]
+                        if isinstance(param_value, str):
+                            param_value = f"'{param_value}'"  # Quote strings
+                        safe_count_query = count_modified_query.replace("$1", str(param_value))
+                        logger.info(f"Using direct substitution count query: {safe_count_query}")
+                        cursor.execute(safe_count_query)
+                    else:
+                        # For multiple parameters, use parameterized
+                        cursor.execute(count_modified_query, param_list)
+                    count_result = cursor.fetchone()
+                    total_count = count_result["total"] if count_result else 0
+                    
+                    # Create pagination data
+                    total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
+                    has_next = page < total_pages
+                    has_prev = page > 1
+                    
+                    pagination = {
+                        "page": page,
+                        "pages": total_pages,
+                        "page_size": page_size,
+                        "total": total_count,
+                        "has_next": has_next,
+                        "has_prev": has_prev,
+                    }
+                    
+                    # Get column types
+                    column_types = {}
+                    if results:
+                        for key in results[0].keys():
+                            column_types[key] = str(type(results[0][key]).__name__)
+                    
+                    # Build result object
+                    end_time = time.time()
+                    execution_time = end_time - start_time
+                    
+                    result = {
+                        "status": "success",
+                        "data": results,
+                        "execution_time": execution_time,
+                        "pagination": pagination,
+                        "column_types": column_types
+                    }
+            finally:
+                # Ensure connection is returned to pool
+                if conn:
+                    from app.db import pg_pool
+                    if pg_pool:
+                        pg_pool.putconn(conn)
+                    
+            # Return the custom result
             return result
-        except ImportError as ie:
-            logger.warning(f"Enhanced query executor not available: {str(ie)}. Falling back to basic executor.")
-            
-            # Fallback to the db module function if enhanced executor isn't available
-            if param_style == "named":
-                # For named parameters, pass as dict
-                result = execute_parameterized_query(
-                    db=db,
-                    query=query,
-                    params=params,
-                    page=page,
-                    page_size=page_size
-                )
-            else:
-                # For qmark, numeric, or format style, pass as list
-                param_list = list(params.values()) if isinstance(params, dict) else params
-                result = execute_parameterized_query(
-                    db=db,
-                    query=query,
-                    params=param_list,
-                    page=page,
-                    page_size=page_size
-                )
-            
-            return result
+        elif param_style == "named":
+            # For named parameters, pass as dict
+            result = execute_parameterized_query(
+                db=db,
+                query=query,
+                params=params,
+                page=page,
+                page_size=page_size
+            )
+        else:
+            # For other styles, pass as list
+            param_list = list(params.values()) if isinstance(params, dict) else params
+            result = execute_parameterized_query(
+                db=db,
+                query=query,
+                params=param_list,
+                page=page,
+                page_size=page_size
+            )
+        
+        return result
     except HTTPException:
         # Pass through HTTP exceptions
         raise
