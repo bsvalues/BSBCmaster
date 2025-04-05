@@ -3,7 +3,7 @@ This module defines the database models for the MCP Assessor Agent API.
 """
 
 import datetime
-from sqlalchemy import Column, Integer, Float, String, ForeignKey, Numeric, Date, DateTime
+from sqlalchemy import Column, Integer, Float, String, ForeignKey, Numeric, Date, DateTime, Text
 from sqlalchemy.orm import relationship
 from app_setup import db
 
@@ -97,3 +97,62 @@ class Sale(db.Model):
 
     def __repr__(self):
         return f"<Sale {self.id} for Parcel {self.parcel_id}: ${self.sale_price} on {self.sale_date}>"
+
+
+class Account(db.Model):
+    """Property assessment account information."""
+    __tablename__ = 'accounts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    account_id = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    owner_name = db.Column(db.String(255), nullable=True)
+    mailing_address = db.Column(db.String(255), nullable=True)
+    mailing_city = db.Column(db.String(100), nullable=True)
+    mailing_state = db.Column(db.String(50), nullable=True)
+    mailing_zip = db.Column(db.String(20), nullable=True)
+    
+    # Property details
+    property_address = db.Column(db.String(255), nullable=True)
+    property_city = db.Column(db.String(100), nullable=True)
+    legal_description = db.Column(db.Text, nullable=True)
+    
+    # Assessment details
+    assessment_year = db.Column(db.Integer, nullable=True)
+    assessed_value = db.Column(db.Numeric(12, 2), nullable=True)
+    tax_amount = db.Column(db.Numeric(12, 2), nullable=True)
+    tax_status = db.Column(db.String(50), nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<Account {self.account_id}: {self.owner_name}, {self.property_address}>"
+
+
+class PropertyImage(db.Model):
+    """Property images and associated metadata."""
+    __tablename__ = 'property_images'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    property_id = db.Column(db.String(50), nullable=False, index=True)
+    account_id = db.Column(db.String(50), nullable=True, index=True)
+    
+    # Image details
+    image_url = db.Column(db.String(512), nullable=True)
+    image_path = db.Column(db.String(512), nullable=True)
+    image_type = db.Column(db.String(50), nullable=True)
+    image_date = db.Column(db.Date, nullable=True)
+    
+    # Image metadata
+    width = db.Column(db.Integer, nullable=True)
+    height = db.Column(db.Integer, nullable=True)
+    file_size = db.Column(db.Integer, nullable=True)  # in bytes
+    file_format = db.Column(db.String(20), nullable=True)  # e.g., "JPEG", "PNG"
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<PropertyImage {self.id} for Property {self.property_id}, Type: {self.image_type}>"

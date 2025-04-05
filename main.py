@@ -5,212 +5,141 @@ It serves as the main entry point for the hybrid Flask-FastAPI application in Re
 
 import os
 import sys
-import logging
-import subprocess
-import threading
-import time
-import atexit
 import signal
+import logging
+import threading
+import subprocess
+import time
 import requests
-from datetime import datetime
-from dotenv import load_dotenv
+from urllib.parse import urlparse
 
-# Load environment variables
-load_dotenv()
+from app_setup import app, db, create_tables
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("both_services.log"),
-    ]
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Check if API_KEY is set
-api_key = os.environ.get("API_KEY")
-if not api_key:
-    custom_key = "b6212a0ff43102f608553e842293eba0ec013ff6926459f96fba31d0fabacd2e"
-    logger.warning(f"API_KEY not set. Using custom value: {custom_key[:8]}...")
-    os.environ["API_KEY"] = custom_key
+# Configuration
+FASTAPI_PORT = 8000
+FLASK_PORT = 5000
 
-# Define FastAPI URL
-FASTAPI_URL = os.environ.get("FASTAPI_URL", "http://localhost:8000")
-logger.info(f"FastAPI URL: {FASTAPI_URL}")
-
-from flask import Flask, render_template, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
-
-# Import app and db from app_setup (already configured)
-from app_setup import app, db
-
-# Import models for database initialization
-from models import Parcel, Property, Sale
-
-# Ensure database tables are created
-with app.app_context():
-    try:
-        db.create_all()
-        logger.info("Database tables created successfully")
-    except Exception as e:
-        logger.error(f"Error creating database tables: {e}")
-
-# Import routes and database blueprint
-from routes import api_routes
-from database import database_bp
-
-# Register the blueprints
-app.register_blueprint(api_routes)
-app.register_blueprint(database_bp, url_prefix='/database')
-
-# Function to seed the database if needed
 def seed_database_if_needed():
-    try:
-        # We need to ensure this runs in the Flask app context
-        with app.app_context():
-            try:
-                # Check if we need to seed the database
-                parcel_count = Parcel.query.count()
-                if parcel_count == 0:
-                    logger.info("No parcels found in database. Running seed script...")
-                    # Run in a separate process but with proper env variables
-                    subprocess.run(["python", "seed_database.py"], check=True)
-                    logger.info("Database seeded successfully")
-                else:
-                    logger.info(f"Database already has {parcel_count} parcels. No seeding needed.")
-            except Exception as inner_e:
-                logger.error(f"Inner error checking/seeding database: {inner_e}")
-    except Exception as e:
-        logger.error(f"Error in seed_database_if_needed: {e}")
-
-# Global variables to track FastAPI process
-fastapi_process = None
-fastapi_thread = None
+    """Seed the database if it's empty."""
+    from import_attached_data import import_all_data
+    # Check if we have any data
+    with app.app_context():
+        from sqlalchemy import text
+        try:
+            # Try to query the accounts table
+            result = text("SELECT COUNT(*) FROM accounts")
+            count = db.session.execute(result).scalar()
+            
+            if count == 0:
+                logger.info("No data found in accounts table, importing sample data")
+                import_all_data()
+            else:
+                logger.info(f"Found {count} records in accounts table, skipping import")
+                
+        except Exception as e:
+            logger.info(f"Tables may not exist yet: {str(e)}")
+            logger.info("Creating tables and importing sample data")
+            create_tables()
+            import_all_data()
 
 def start_fastapi():
     """Start the FastAPI service in a background thread."""
-    global fastapi_thread, fastapi_process
+    logger.info("Starting FastAPI service...")
+    
+    # We'll run the fastapi server in a separate process
+    fastapi_process = None
     
     def run_server():
         """Run uvicorn server in a separate process."""
-        global fastapi_process
-        try:
-            # Try to kill any existing process on port 8000
-            try:
-                subprocess.run(
-                    ["fuser", "-k", "8000/tcp"],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    check=False
-                )
-            except Exception as e:
-                logger.debug(f"Failed to kill existing process on port 8000: {e}")
+        nonlocal fastapi_process
+        cmd = [
+            sys.executable, "-m", "uvicorn", 
+            "asgi:app", 
+            "--host", "0.0.0.0", 
+            "--port", str(FASTAPI_PORT),
+            "--reload"
+        ]
+        fastapi_process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            bufsize=1
+        )
+        
+        # Monitor and log FastAPI output
+        for line in fastapi_process.stdout:
+            logger.info(f"[FastAPI] {line.strip()}")
             
-            # Set up environment variables for consistent database access
-            env = os.environ.copy()
-            
-            # Important: Pass all necessary environment variables
-            env["DATABASE_URL"] = os.environ.get("DATABASE_URL", "")
-            env["API_KEY"] = os.environ.get("API_KEY", "")
-            env["FLASK_SECRET_KEY"] = os.environ.get("FLASK_SECRET_KEY", "mcp_assessor_api_secure_key")
-            env["FASTAPI_URL"] = FASTAPI_URL
-            
-            # Start FastAPI with uvicorn directly from the asgi.py file
-            # This ensures it uses the app defined in app/__init__.py
-            cmd = ["python", "-m", "uvicorn", "asgi:app", "--host", "0.0.0.0", "--port", "8000"]
-            logger.info(f"Starting FastAPI service with command: {' '.join(cmd)}")
-            
-            fastapi_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.STDOUT,
-                bufsize=1,
-                universal_newlines=True,
-                env=env
-            )
-            
-            # Log the output from the process
-            for line in iter(fastapi_process.stdout.readline, ""):
-                logger.info(f"[FastAPI] {line.rstrip()}")
-            
-            # Process has ended
-            return_code = fastapi_process.wait()
-            logger.info(f"FastAPI process exited with code {return_code}")
-            
-        except Exception as e:
-            logger.error(f"Error in FastAPI thread: {e}")
+        # If we get here, the process has terminated
+        logger.info("FastAPI process exited with code {}".format(
+            fastapi_process.returncode if fastapi_process else "unknown"
+        ))
     
-    # Start FastAPI in a separate thread
+    # Start FastAPI in a background thread
     fastapi_thread = threading.Thread(target=run_server)
     fastapi_thread.daemon = True
     fastapi_thread.start()
-    logger.info("FastAPI thread started")
     
-    # Wait for FastAPI to start (up to 60 seconds with more verbose logging)
-    logger.info("Waiting for FastAPI to become available...")
-    for attempt in range(60):
+    # Wait for FastAPI to start
+    logger.info("Waiting for FastAPI to start...")
+    for i in range(60):  # Wait up to 60 seconds
         try:
-            response = requests.get(f"{FASTAPI_URL}/health", timeout=1)
+            response = requests.get(f"http://localhost:{FASTAPI_PORT}/health")
             if response.status_code == 200:
-                logger.info(f"FastAPI is running and healthy after {attempt+1} attempts")
-                return True
-            else:
-                logger.warning(f"FastAPI health check returned status code {response.status_code}")
-        except requests.exceptions.RequestException as e:
-            if attempt % 10 == 0:  # Log only every 10 attempts to avoid log flooding
-                logger.info(f"Waiting for FastAPI to start (attempt {attempt+1}/60): {str(e)}")
-        time.sleep(1)
+                logger.info("FastAPI started successfully")
+                return fastapi_process
+        except requests.exceptions.ConnectionError as e:
+            logger.info(f"Waiting for FastAPI to start (attempt {i+1}/60): {str(e)}")
+            time.sleep(1)
     
     logger.warning("Timed out waiting for FastAPI to start")
-    return fastapi_process and fastapi_process.poll() is None
+    logger.error("Failed to start FastAPI")
+    return fastapi_process
 
-# Cleanup resources when the server exits
 def cleanup_on_exit(signum=None, frame=None):
     """Cleanup resources on exit."""
     logger.info("Shutting down MCP Assessor Agent API server...")
-    
-    if fastapi_process and fastapi_process.poll() is None:
-        logger.info("Terminating FastAPI process...")
-        fastapi_process.terminate()
-        try:
-            fastapi_process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            logger.warning("FastAPI process did not terminate, killing it...")
-            fastapi_process.kill()
-    
+    # Perform any cleanup here as needed
     logger.info("Shutdown complete")
-    
-    # Exit if this was called as a signal handler
-    if signum is not None:
-        sys.exit(0)
+    sys.exit(0)
 
-# Register the cleanup function
-atexit.register(cleanup_on_exit)
+# Register signal handlers for graceful shutdown
 signal.signal(signal.SIGINT, cleanup_on_exit)
 signal.signal(signal.SIGTERM, cleanup_on_exit)
 
-# In newer Flask versions, we use this pattern for initialization
-with app.app_context():
-    try:
-        # Try to seed database at startup
-        seed_database_if_needed()
-    except Exception as e:
-        logger.error(f"Failed to seed database at startup: {e}")
+@app.route('/')
+def index():
+    """Handle the root route."""
+    return """
+    <h1>MCP Assessor Agent API</h1>
+    <p>Welcome to the MCP Assessor Agent API. This application provides:</p>
+    <ul>
+        <li><a href="/api/docs">API Documentation</a> - Interactive API documentation and testing</li>
+        <li><a href="/api/imported-data/accounts">Imported Accounts Data</a> - View imported account data</li>
+        <li><a href="/api/imported-data/property-images">Imported Property Images</a> - View imported property images</li>
+    </ul>
+    """
 
-# Always start FastAPI as soon as this module is imported
-logger.info("Starting MCP Assessor Agent API server...")
-if start_fastapi():
-    logger.info("FastAPI started successfully")
-else:
-    logger.error("Failed to start FastAPI")
-
+# This is called when the Flask app is run
 if __name__ == "__main__":
-    # If running directly (not via Gunicorn), also start Flask
-    # For workflow, Flask is started by Gunicorn
-    if "gunicorn" not in os.environ.get("SERVER_SOFTWARE", ""):
-        flask_port = int(os.environ.get("FLASK_PORT", 5000))
-        logger.info(f"Starting Flask documentation interface on port {flask_port}")
-        app.run(host="0.0.0.0", port=flask_port, debug=True, use_reloader=False)
+    # Create tables and seed database if needed
+    create_tables()
+    seed_database_if_needed()
+    
+    # Start the FastAPI process
+    fastapi_process = start_fastapi()
+    
+    try:
+        # Run the Flask app
+        app.run(host="0.0.0.0", port=FLASK_PORT, debug=True, use_reloader=False)
+    except KeyboardInterrupt:
+        cleanup_on_exit()
+    finally:
+        # Clean up the FastAPI process when Flask exits
+        if fastapi_process:
+            fastapi_process.terminate()

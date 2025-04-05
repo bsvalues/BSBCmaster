@@ -5,29 +5,12 @@ It allows running the FastAPI application with Gunicorn and uvicorn workers.
 
 import os
 import logging
-from dotenv import load_dotenv
-
-# Load environment variables first
-load_dotenv()
+from app import app as fastapi_app
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("fastapi.log"),
-    ]
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-try:
-    # Import the FastAPI app
-    from app import app as fastapi_app
-    # Export as "app" for gunicorn with uvicorn workers
-    # Use with: gunicorn -k uvicorn.workers.UvicornWorker asgi:app
-    app = fastapi_app
-    logger.info("FastAPI application loaded successfully")
-except Exception as e:
-    logger.error(f"Error loading FastAPI application: {str(e)}", exc_info=True)
-    raise
+# Make the FastAPI app instance available at the module level
+# This is what Uvicorn will import when run with asgi:app
+app = fastapi_app
