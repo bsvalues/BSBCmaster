@@ -119,6 +119,98 @@ def proxy_nl_to_sql():
             "message": f"Failed to proxy request: {str(e)}"
         }), 500
         
+# Proxy routes for imported data endpoints
+@api_routes.route('/api/imported-data/accounts', methods=['GET'])
+def proxy_imported_accounts():
+    """Proxy for the FastAPI imported-data/accounts endpoint."""
+    try:
+        # Forward the request to FastAPI with query parameters
+        headers = {
+            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+        }
+        response = requests.get(
+            f"{FASTAPI_URL}/api/imported-data/accounts",
+            params=request.args,
+            headers=headers
+        )
+        
+        # Return the response from FastAPI
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        logger.error(f"Error proxying imported-data/accounts: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to proxy request: {str(e)}"
+        }), 500
+
+@api_routes.route('/api/imported-data/accounts/<account_id>', methods=['GET'])
+def proxy_imported_account(account_id):
+    """Proxy for the FastAPI imported-data/accounts/{account_id} endpoint."""
+    try:
+        # Forward the request to FastAPI
+        headers = {
+            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+        }
+        response = requests.get(
+            f"{FASTAPI_URL}/api/imported-data/accounts/{account_id}",
+            headers=headers
+        )
+        
+        # Return the response from FastAPI
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        logger.error(f"Error proxying imported-data/accounts/{account_id}: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to proxy request: {str(e)}"
+        }), 500
+
+@api_routes.route('/api/imported-data/property-images', methods=['GET'])
+def proxy_imported_property_images():
+    """Proxy for the FastAPI imported-data/property-images endpoint."""
+    try:
+        # Forward the request to FastAPI with query parameters
+        headers = {
+            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+        }
+        response = requests.get(
+            f"{FASTAPI_URL}/api/imported-data/property-images",
+            params=request.args,
+            headers=headers
+        )
+        
+        # Return the response from FastAPI
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        logger.error(f"Error proxying imported-data/property-images: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to proxy request: {str(e)}"
+        }), 500
+
+@api_routes.route('/api/imported-data/improvements', methods=['GET'])
+def proxy_imported_improvements():
+    """Proxy for the FastAPI imported-data/improvements endpoint."""
+    try:
+        # Forward the request to FastAPI with query parameters
+        headers = {
+            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
+        }
+        response = requests.get(
+            f"{FASTAPI_URL}/api/imported-data/improvements",
+            params=request.args,
+            headers=headers
+        )
+        
+        # Return the response from FastAPI
+        return jsonify(response.json()), response.status_code
+    except Exception as e:
+        logger.error(f"Error proxying imported-data/improvements: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to proxy request: {str(e)}"
+        }), 500
+        
 @api_routes.route('/query-builder')
 def query_builder():
     """Render the interactive query builder interface."""
@@ -195,6 +287,16 @@ def visualize():
         cities=cities,
         property_types=property_types,
         description="Interactive data visualization for property assessments"
+    )
+
+@api_routes.route('/imported-data')
+def imported_data():
+    """Render the imported data dashboard."""
+    return render_template(
+        'imported_data.html',
+        title="Imported Assessment Data",
+        version="1.0.0",
+        description="View and analyze imported property assessment data"
     )
 
 # API endpoints for visualization data

@@ -14,6 +14,10 @@ import requests
 from urllib.parse import urlparse
 
 from app_setup import app, db, create_tables
+from routes import api_routes
+
+# Register routes
+app.register_blueprint(api_routes)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -119,9 +123,12 @@ def index():
     <h1>MCP Assessor Agent API</h1>
     <p>Welcome to the MCP Assessor Agent API. This application provides:</p>
     <ul>
-        <li><a href="/api/docs">API Documentation</a> - Interactive API documentation and testing</li>
-        <li><a href="/api/imported-data/accounts">Imported Accounts Data</a> - View imported account data</li>
-        <li><a href="/api/imported-data/property-images">Imported Property Images</a> - View imported property images</li>
+        <li><a href="/api-docs">API Documentation</a> - Interactive API documentation and testing</li>
+        <li><a href="/query-builder">Query Builder</a> - Build and execute SQL queries</li>
+        <li><a href="/visualize">Data Visualization</a> - Interactive data visualization dashboard</li>
+        <li><a href="/imported-data">Imported Assessment Data</a> - View and analyze imported property assessment data</li>
+        <li><a href="/api/imported-data/accounts">API: Imported Accounts</a> - Raw API endpoint for imported account data</li>
+        <li><a href="/api/imported-data/property-images">API: Property Images</a> - Raw API endpoint for property images</li>
     </ul>
     """
 
@@ -133,6 +140,10 @@ if __name__ == "__main__":
     
     # Start the FastAPI process
     fastapi_process = start_fastapi()
+    
+    # Make sure it started
+    logger.info("Started FastAPI process with PID: %s", 
+                fastapi_process.pid if fastapi_process else "unknown")
     
     try:
         # Run the Flask app

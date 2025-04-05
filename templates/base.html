@@ -7,6 +7,8 @@
     
     <!-- Bootstrap CSS (Replit-themed) -->
     <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Custom CSS -->
     <style>
@@ -130,7 +132,25 @@
                         <a class="nav-link {% if request.path == '/api-docs' %}active{% endif %}" href="/api-docs">API Docs</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/query-builder' %}active{% endif %}" href="/query-builder">Query Builder</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/visualize' %}active{% endif %}" href="/visualize">Visualize</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/imported-data' %}active{% endif %}" href="/imported-data">Imported Data</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="/api/docs" target="_blank">OpenAPI</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    <div class="badge rounded-pill text-bg-success me-2">
+                        <span class="status-indicator"></span>
+                        <span class="status-text">API Online</span>
+                    </div>
+                </div>
+            </div>
                     </li>
                 </ul>
                 <div class="d-flex">
@@ -166,10 +186,8 @@
                 </div>
                 <div class="col-md-3">
                     <h5>Contact</h5>
-                    <ul class="list-unstyled">
-                        <li><a href="mailto:support@example.com" class="text-decoration-none">Support</a></li>
-                        <li><a href="#" class="text-decoration-none">Status Page</a></li>
-                    </ul>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
                 </div>
             </div>
             <hr>
