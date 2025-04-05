@@ -122,93 +122,238 @@ def proxy_nl_to_sql():
 # Proxy routes for imported data endpoints
 @api_routes.route('/api/imported-data/accounts', methods=['GET'])
 def proxy_imported_accounts():
-    """Proxy for the FastAPI imported-data/accounts endpoint."""
+    """Get imported account data directly from the database."""
     try:
-        # Forward the request to FastAPI with query parameters
-        headers = {
-            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
-        }
-        response = requests.get(
-            f"{FASTAPI_URL}/api/imported-data/accounts",
-            params=request.args,
-            headers=headers
-        )
+        # Get query parameters
+        offset = request.args.get('offset', 0, type=int)
+        limit = request.args.get('limit', 100, type=int)
+        owner_name = request.args.get('owner_name', '')
         
-        # Return the response from FastAPI
-        return jsonify(response.json()), response.status_code
+        # Build query
+        from app import db
+        query = db.session.query(Account)
+        
+        # Apply filters
+        if owner_name:
+            query = query.filter(Account.owner_name.ilike(f'%{owner_name}%'))
+        
+        # Get total count
+        total_count = query.count()
+        
+        # Apply pagination
+        query = query.order_by(Account.id).offset(offset).limit(limit)
+        
+        # Execute query
+        accounts = query.all()
+        
+        # Prepare response
+        accounts_data = [{
+            'id': account.id,
+            'account_id': account.account_id,
+            'owner_name': account.owner_name,
+            'mailing_address': account.mailing_address,
+            'mailing_city': account.mailing_city,
+            'mailing_state': account.mailing_state,
+            'mailing_zip': account.mailing_zip,
+            'property_address': account.property_address,
+            'property_city': account.property_city,
+            'legal_description': account.legal_description,
+            'assessment_year': account.assessment_year,
+            'assessed_value': float(account.assessed_value) if account.assessed_value else None,
+            'tax_amount': float(account.tax_amount) if account.tax_amount else None,
+            'tax_status': account.tax_status,
+            'created_at': account.created_at.isoformat() if account.created_at else None,
+            'updated_at': account.updated_at.isoformat() if account.updated_at else None
+        } for account in accounts]
+        
+        return jsonify({
+            'accounts': accounts_data,
+            'total': total_count,
+            'offset': offset,
+            'limit': limit,
+        })
     except Exception as e:
-        logger.error(f"Error proxying imported-data/accounts: {str(e)}")
+        logger.error(f"Error fetching accounts data: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": f"Failed to proxy request: {str(e)}"
+            "message": f"Failed to fetch accounts data: {str(e)}"
         }), 500
 
 @api_routes.route('/api/imported-data/accounts/<account_id>', methods=['GET'])
 def proxy_imported_account(account_id):
-    """Proxy for the FastAPI imported-data/accounts/{account_id} endpoint."""
+    """Get details for a specific account directly from the database."""
     try:
-        # Forward the request to FastAPI
-        headers = {
-            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
-        }
-        response = requests.get(
-            f"{FASTAPI_URL}/api/imported-data/accounts/{account_id}",
-            headers=headers
-        )
+        # Build query
+        from app import db
+        account = db.session.query(Account).filter(Account.account_id == account_id).first()
         
-        # Return the response from FastAPI
-        return jsonify(response.json()), response.status_code
+        if not account:
+            return jsonify({
+                "status": "error",
+                "message": f"Account with ID {account_id} not found"
+            }), 404
+        
+        # Prepare response
+        account_data = {
+            'id': account.id,
+            'account_id': account.account_id,
+            'owner_name': account.owner_name,
+            'mailing_address': account.mailing_address,
+            'mailing_city': account.mailing_city,
+            'mailing_state': account.mailing_state,
+            'mailing_zip': account.mailing_zip,
+            'property_address': account.property_address,
+            'property_city': account.property_city,
+            'legal_description': account.legal_description,
+            'assessment_year': account.assessment_year,
+            'assessed_value': float(account.assessed_value) if account.assessed_value else None,
+            'tax_amount': float(account.tax_amount) if account.tax_amount else None,
+            'tax_status': account.tax_status,
+            'created_at': account.created_at.isoformat() if account.created_at else None,
+            'updated_at': account.updated_at.isoformat() if account.updated_at else None
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'account': account_data
+        })
     except Exception as e:
-        logger.error(f"Error proxying imported-data/accounts/{account_id}: {str(e)}")
+        logger.error(f"Error fetching account {account_id}: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": f"Failed to proxy request: {str(e)}"
+            "message": f"Failed to fetch account details: {str(e)}"
         }), 500
 
 @api_routes.route('/api/imported-data/property-images', methods=['GET'])
 def proxy_imported_property_images():
-    """Proxy for the FastAPI imported-data/property-images endpoint."""
+    """Get property images data directly from the database."""
     try:
-        # Forward the request to FastAPI with query parameters
-        headers = {
-            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
-        }
-        response = requests.get(
-            f"{FASTAPI_URL}/api/imported-data/property-images",
-            params=request.args,
-            headers=headers
-        )
+        # Get query parameters
+        offset = request.args.get('offset', 0, type=int)
+        limit = request.args.get('limit', 100, type=int)
+        property_id = request.args.get('property_id', '')
+        image_type = request.args.get('image_type', '')
         
-        # Return the response from FastAPI
-        return jsonify(response.json()), response.status_code
+        # Build query
+        from app import db
+        query = db.session.query(PropertyImage)
+        
+        # Apply filters
+        if property_id:
+            query = query.filter(PropertyImage.property_id.ilike(f'%{property_id}%'))
+        if image_type:
+            query = query.filter(PropertyImage.image_type == image_type)
+        
+        # Get total count
+        total_count = query.count()
+        
+        # Apply pagination
+        query = query.order_by(PropertyImage.id).offset(offset).limit(limit)
+        
+        # Execute query
+        images = query.all()
+        
+        # Prepare response
+        images_data = [{
+            'id': image.id,
+            'property_id': image.property_id,
+            'account_id': image.account_id,
+            'image_url': image.image_url,
+            'image_path': image.image_path,
+            'image_type': image.image_type,
+            'image_date': image.image_date.isoformat() if image.image_date else None,
+            'width': image.width,
+            'height': image.height,
+            'file_size': image.file_size,
+            'file_format': image.file_format,
+            'created_at': image.created_at.isoformat() if image.created_at else None,
+            'updated_at': image.updated_at.isoformat() if image.updated_at else None
+        } for image in images]
+        
+        return jsonify({
+            'property_images': images_data,
+            'total': total_count,
+            'offset': offset,
+            'limit': limit,
+        })
     except Exception as e:
-        logger.error(f"Error proxying imported-data/property-images: {str(e)}")
+        logger.error(f"Error fetching property images data: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": f"Failed to proxy request: {str(e)}"
+            "message": f"Failed to fetch property images data: {str(e)}"
         }), 500
 
 @api_routes.route('/api/imported-data/improvements', methods=['GET'])
 def proxy_imported_improvements():
-    """Proxy for the FastAPI imported-data/improvements endpoint."""
+    """Get property improvements data directly from the database."""
     try:
-        # Forward the request to FastAPI with query parameters
-        headers = {
-            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
-        }
-        response = requests.get(
-            f"{FASTAPI_URL}/api/imported-data/improvements",
-            params=request.args,
-            headers=headers
-        )
+        # Get query parameters
+        offset = request.args.get('offset', 0, type=int)
+        limit = request.args.get('limit', 100, type=int)
+        property_id = request.args.get('property_id', '')
         
-        # Return the response from FastAPI
-        return jsonify(response.json()), response.status_code
+        # Build query
+        from app import db
+        # Since we don't have a dedicated Improvement model,
+        # we'll query from Property model which has improvement details
+        query = db.session.query(Property)
+        
+        # Apply filters
+        if property_id:
+            # Filter properties that have a matching parcel ID string
+            parcel = db.session.query(Parcel).filter(Parcel.parcel_id.ilike(f'%{property_id}%')).first()
+            if parcel:
+                query = query.filter(Property.parcel_id == parcel.id)
+            else:
+                # No matching parcel, return empty result
+                return jsonify({
+                    'improvements': [],
+                    'total': 0,
+                    'offset': offset,
+                    'limit': limit,
+                })
+        
+        # Get total count
+        total_count = query.count()
+        
+        # Apply pagination
+        query = query.order_by(Property.id).offset(offset).limit(limit)
+        
+        # Execute query
+        properties = query.all()
+        
+        # Prepare response
+        # Map property attributes to improvement attributes
+        improvements_data = []
+        for prop in properties:
+            # Get the associated parcel
+            parcel = db.session.query(Parcel).filter(Parcel.id == prop.parcel_id).first()
+            if parcel:
+                improvements_data.append({
+                    'id': prop.id,
+                    'property_id': parcel.parcel_id,
+                    'improvement_id': f"I-{prop.id}",  # Generate an improvement ID
+                    'description': f"{prop.property_type} structure",
+                    'improvement_value': float(parcel.improvement_value) if parcel.improvement_value else 0,
+                    'living_area': prop.square_footage,
+                    'stories': prop.stories,
+                    'year_built': prop.year_built,
+                    'primary_use': prop.property_type,
+                    'created_at': prop.created_at.isoformat() if prop.created_at else None,
+                    'updated_at': prop.updated_at.isoformat() if prop.updated_at else None
+                })
+        
+        return jsonify({
+            'improvements': improvements_data,
+            'total': total_count,
+            'offset': offset,
+            'limit': limit,
+        })
     except Exception as e:
-        logger.error(f"Error proxying imported-data/improvements: {str(e)}")
+        logger.error(f"Error fetching improvements data: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": f"Failed to proxy request: {str(e)}"
+            "message": f"Failed to fetch improvements data: {str(e)}"
         }), 500
         
 @api_routes.route('/query-builder')

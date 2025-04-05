@@ -1,454 +1,113 @@
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MCP Assessor Agent API</title>
-    <!-- Bootstrap CSS via CDN -->
-    <link rel="stylesheet" href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css">
-    <style>
-        body {
-            padding-top: 2rem;
-        }
-        .api-section {
-            margin-bottom: 2rem;
-            padding: 1.5rem;
-            border-radius: 0.25rem;
-        }
-        .code-block {
-            background-color: var(--bs-dark);
-            padding: 1rem;
-            border-radius: 0.25rem;
-            font-family: monospace;
-            white-space: pre-wrap;
-            overflow-x: auto;
-        }
-        .navbar-brand img {
-            margin-right: 10px;
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
-        <div class="container">
-            <a class="navbar-brand" href="/">
-                <img src="/static/icon.svg" alt="MCP Assessor" width="30" height="30">
-                MCP Assessor Agent API
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/query-builder">Query Builder</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/api/docs">API Docs</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/schema">Schema</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
+{% extends "base.html" %}
 
-    <div class="container mt-5">
-        <header class="py-5 text-center">
-            <h1>MCP Assessor Agent API</h1>
-            <p class="lead">
-                A secure multi-database intermediary service for real estate property assessment data
+{% block title %}MCP Assessor Agent API{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-5">
+    <div class="row mb-5">
+        <div class="col-12 text-center">
+            <h1 class="display-4 mb-3">MCP Assessor Agent API</h1>
+            <p class="lead text-secondary">
+                A sophisticated multi-database querying service for intelligent property and assessment data analysis.
             </p>
-        </header>
-
-        <section class="row mb-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-body">
-                        <h2 class="card-title">Getting Started</h2>
-                        <p>
-                            The MCP Assessor Agent API provides a secure interface for querying real estate assessment data.
-                            It supports multiple database types, parameterized queries, and natural language query translation.
-                        </p>
-                        <div class="alert alert-info">
-                            <i class="bi bi-info-circle"></i>
-                            API base URL: <code>http://localhost:8000</code>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="row mb-4">
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h3>API Key Authentication</h3>
-                    </div>
-                    <div class="card-body">
-                        <p>All API requests require an API key for authentication:</p>
-                        <div class="code-block">
-curl -X GET http://localhost:8000/api/health \
-  -H "X-API-Key: your_api_key_here"</div>
-                        <p class="mt-3">For testing, use the default API key from your .env file.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h3>Health Check</h3>
-                    </div>
-                    <div class="card-body">
-                        <p>Verify the API is running and database connections are healthy:</p>
-                        <div class="code-block">
-GET /api/health</div>
-                        <button class="btn btn-primary mt-3" id="healthCheck">Test Health Check</button>
-                        <div id="healthResult" class="mt-3"></div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="row mb-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Natural Language to SQL</h3>
-                    </div>
-                    <div class="card-body">
-                        <p>Convert natural language questions to SQL queries:</p>
-                        <div class="mb-3">
-                            <label for="nlPrompt" class="form-label">Enter your question:</label>
-                            <input type="text" class="form-control" id="nlPrompt" 
-                                placeholder="Show me all properties in Seattle with more than 3 bedrooms">
-                        </div>
-                        <div class="mb-3">
-                            <label for="dbType" class="form-label">Database Type:</label>
-                            <select class="form-select" id="dbType">
-                                <option value="postgres">PostgreSQL</option>
-                                <option value="mssql">SQL Server</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-primary" id="translateBtn">Translate to SQL</button>
-                        <div id="translateResult" class="mt-3"></div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="row mb-4">
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h3>Run SQL Query</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="sqlQuery" class="form-label">SQL Query:</label>
-                            <textarea class="form-control" id="sqlQuery" rows="4" 
-                                placeholder="SELECT * FROM parcels LIMIT 10"></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label for="sqlDbType" class="form-label">Database Type:</label>
-                            <select class="form-select" id="sqlDbType">
-                                <option value="postgres">PostgreSQL</option>
-                                <option value="mssql">SQL Server</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-primary" id="runSqlBtn">Run Query</button>
-                        <div id="sqlResult" class="mt-3"></div>
-                        <div id="sqlVisualization" class="mt-4"></div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card h-100">
-                    <div class="card-header">
-                        <h3>Schema Discovery</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="schemaDbType" class="form-label">Database Type:</label>
-                            <select class="form-select" id="schemaDbType">
-                                <option value="postgres">PostgreSQL</option>
-                                <option value="mssql">SQL Server</option>
-                            </select>
-                        </div>
-                        <button class="btn btn-primary" id="discoverSchemaBtn">Discover Schema</button>
-                        <button class="btn btn-secondary ms-2" id="schemaSummaryBtn">Schema Summary</button>
-                        <div id="schemaResult" class="mt-3"></div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="row mb-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Parameterized Query</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="paramQuery" class="form-label">SQL Query with Parameters:</label>
-                            <textarea class="form-control" id="paramQuery" rows="3" 
-                                placeholder="SELECT * FROM parcels WHERE city = :city AND total_value > :min_value LIMIT 10"></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label for="paramDbType" class="form-label">Database Type:</label>
-                            <select class="form-select" id="paramDbType">
-                                <option value="postgres">PostgreSQL</option>
-                                <option value="mssql">SQL Server</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label for="parameters" class="form-label">Parameters (JSON):</label>
-                            <textarea class="form-control" id="parameters" rows="3" 
-                                placeholder='{"city": "Seattle", "min_value": 500000}'></textarea>
-                        </div>
-                        <button class="btn btn-primary" id="runParamBtn">Run Parameterized Query</button>
-                        <div id="paramResult" class="mt-3"></div>
-                        <div id="paramVisualization" class="mt-4"></div>
-                    </div>
-                </div>
-            </div>
-        </section>
+        </div>
     </div>
 
-    <footer class="bg-dark text-white mt-5 py-4">
-        <div class="container">
-            <div class="row">
-                <div class="col-md-6">
-                    <h4>MCP Assessor Agent API</h4>
-                    <p>A secure multi-database intermediary service for real estate property assessment data.</p>
+    <div class="row g-4 py-3">
+        <div class="col-md-6 col-lg-3">
+            <div class="card bg-dark text-white h-100 border-0 shadow">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle bg-primary p-2 me-3">
+                            <i class="bi bi-book fs-4"></i>
+                        </div>
+                        <h5 class="card-title mb-0">API Documentation</h5>
+                    </div>
+                    <p class="card-text">Interactive API documentation and testing interface for the MCP Assessor Agent API.</p>
+                    <a href="/api-docs" class="btn btn-outline-light stretched-link">View Documentation</a>
                 </div>
-                <div class="col-md-3">
-                    <h5>Links</h5>
-                    <ul class="list-unstyled">
-                        <li><a href="/" class="text-white">Home</a></li>
-                        <li><a href="/api/docs" class="text-white">API Documentation</a></li>
-                        <li><a href="/schema" class="text-white">Database Schema</a></li>
-                    </ul>
-                </div>
-                <div class="col-md-3">
-                    <h5>API Endpoints</h5>
-                    <ul class="list-unstyled">
-                        <li><a href="/api/health" class="text-white">Health Check</a></li>
-                        <li><a href="/api/discover-schema?db=postgres" class="text-white">Schema Discovery</a></li>
-                        <li><a href="/api/docs" class="text-white">Full API Docs</a></li>
-                    </ul>
-                </div>
-            </div>
-            <hr>
-            <div class="text-center">
-                <p>&copy; 2024 MCP Assessor Agent API. All rights reserved.</p>
             </div>
         </div>
-    </footer>
 
-    <!-- Bootstrap and jQuery JS via CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="/static/js/visualization.js"></script>
-    <script src="/static/js/visualization_app.js"></script>
-            const API_KEY = 'mcp_assessor_api_default_key_2024_secure_random_token_987654321';
-            const API_BASE_URL = 'http://localhost:8000';
-            
-            // Helper function to display results
-            function displayResult(elementId, data, isError = false) {
-                const resultElement = $(`#${elementId}`);
-                
-                if (isError) {
-                    resultElement.html(`
-                        <div class="alert alert-danger">
-                            <strong>Error:</strong> ${data}
+        <div class="col-md-6 col-lg-3">
+            <div class="card bg-dark text-white h-100 border-0 shadow">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle bg-success p-2 me-3">
+                            <i class="bi bi-code-square fs-4"></i>
                         </div>
-                    `);
-                    return;
-                }
-                
-                // Create result display
-                let resultHtml = `
-                    <div class="card bg-dark">
-                        <div class="card-header">Result</div>
-                        <div class="card-body">
-                            <pre class="mb-0">${JSON.stringify(data, null, 2)}</pre>
+                        <h5 class="card-title mb-0">Query Builder</h5>
+                    </div>
+                    <p class="card-text">Build and execute SQL queries for property assessment data with an interactive interface.</p>
+                    <a href="/query-builder" class="btn btn-outline-light stretched-link">Build Queries</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3">
+            <div class="card bg-dark text-white h-100 border-0 shadow">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle bg-info p-2 me-3">
+                            <i class="bi bi-bar-chart-line fs-4"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Data Visualization</h5>
+                    </div>
+                    <p class="card-text">Interactive data visualization dashboard for property assessments with advanced filtering.</p>
+                    <a href="/visualize" class="btn btn-outline-light stretched-link">Explore Visualizations</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-3">
+            <div class="card bg-dark text-white h-100 border-0 shadow">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle bg-warning p-2 me-3">
+                            <i class="bi bi-database fs-4"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Imported Data</h5>
+                    </div>
+                    <p class="card-text">View and analyze imported property assessment data with advanced filtering and export options.</p>
+                    <a href="/imported-data" class="btn btn-outline-light stretched-link">View Data</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-5">
+        <div class="col-12">
+            <div class="card bg-dark border-light">
+                <div class="card-header">
+                    <h5 class="mb-0">Key Features</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <ul class="list-unstyled">
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Advanced property data querying</li>
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Multi-database support</li>
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Interactive visualization dashboards</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <ul class="list-unstyled">
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Real-time assessment data</li>
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Advanced export capabilities</li>
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Customizable data views</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <ul class="list-unstyled">
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Detailed property records</li>
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Statistical analysis tools</li>
+                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Performance-optimized APIs</li>
+                            </ul>
                         </div>
                     </div>
-                `;
-                
-                resultElement.html(resultHtml);
-            }
-            
-            // Health Check
-            $('#healthCheck').click(function() {
-                $.ajax({
-                    url: `${API_BASE_URL}/api/health`,
-                    type: 'GET',
-                    headers: {
-                        'X-API-Key': API_KEY
-                    },
-                    success: function(result) {
-                        displayResult('healthResult', result);
-                    },
-                    error: function(xhr) {
-                        displayResult('healthResult', xhr.responseText || 'Request failed', true);
-                    }
-                });
-            });
-            
-            // Natural Language to SQL
-            $('#translateBtn').click(function() {
-                const prompt = $('#nlPrompt').val();
-                const dbType = $('#dbType').val();
-                
-                if (!prompt) {
-                    displayResult('translateResult', 'Please enter a natural language prompt', true);
-                    return;
-                }
-                
-                $.ajax({
-                    url: `${API_BASE_URL}/api/nl-to-sql`,
-                    type: 'POST',
-                    headers: {
-                        'X-API-Key': API_KEY,
-                        'Content-Type': 'application/json'
-                    },
-                    data: JSON.stringify({
-                        prompt: prompt,
-                        db_type: dbType
-                    }),
-                    success: function(result) {
-                        displayResult('translateResult', result);
-                        // Copy the SQL to the query textarea
-                        if (result.sql) {
-                            $('#sqlQuery').val(result.sql);
-                            $('#sqlDbType').val(dbType);
-                        }
-                    },
-                    error: function(xhr) {
-                        displayResult('translateResult', xhr.responseText || 'Translation failed', true);
-                    }
-                });
-            });
-            
-            // Run SQL Query
-            $('#runSqlBtn').click(function() {
-                const query = $('#sqlQuery').val();
-                const dbType = $('#sqlDbType').val();
-                
-                if (!query) {
-                    displayResult('sqlResult', 'Please enter a SQL query', true);
-                    return;
-                }
-                
-                $.ajax({
-                    url: `${API_BASE_URL}/api/run-query`,
-                    type: 'POST',
-                    headers: {
-                        'X-API-Key': API_KEY,
-                        'Content-Type': 'application/json'
-                    },
-                    data: JSON.stringify({
-                        db_type: dbType,
-                        query: query,
-                        page: 1,
-                        page_size: 10
-                    }),
-                    success: function(result) {
-                        displayResult('sqlResult', result);
-                    },
-                    error: function(xhr) {
-                        displayResult('sqlResult', xhr.responseText || 'Query execution failed', true);
-                    }
-                });
-            });
-            
-            // Discover Schema
-            $('#discoverSchemaBtn').click(function() {
-                const dbType = $('#schemaDbType').val();
-                
-                $.ajax({
-                    url: `${API_BASE_URL}/api/discover-schema?db=${dbType}`,
-                    type: 'GET',
-                    headers: {
-                        'X-API-Key': API_KEY
-                    },
-                    success: function(result) {
-                        displayResult('schemaResult', result);
-                    },
-                    error: function(xhr) {
-                        displayResult('schemaResult', xhr.responseText || 'Schema discovery failed', true);
-                    }
-                });
-            });
-            
-            // Schema Summary
-            $('#schemaSummaryBtn').click(function() {
-                const dbType = $('#schemaDbType').val();
-                
-                $.ajax({
-                    url: `${API_BASE_URL}/api/schema-summary?db=${dbType}`,
-                    type: 'GET',
-                    headers: {
-                        'X-API-Key': API_KEY
-                    },
-                    success: function(result) {
-                        displayResult('schemaResult', result);
-                    },
-                    error: function(xhr) {
-                        displayResult('schemaResult', xhr.responseText || 'Schema summary failed', true);
-                    }
-                });
-            });
-            
-            // Run Parameterized Query
-            $('#runParamBtn').click(function() {
-                const query = $('#paramQuery').val();
-                const dbType = $('#paramDbType').val();
-                let parameters;
-                
-                try {
-                    parameters = JSON.parse($('#parameters').val());
-                } catch (e) {
-                    displayResult('paramResult', 'Invalid JSON parameters: ' + e.message, true);
-                    return;
-                }
-                
-                if (!query) {
-                    displayResult('paramResult', 'Please enter a SQL query', true);
-                    return;
-                }
-                
-                $.ajax({
-                    url: `${API_BASE_URL}/api/parameterized-query`,
-                    type: 'POST',
-                    headers: {
-                        'X-API-Key': API_KEY,
-                        'Content-Type': 'application/json'
-                    },
-                    data: JSON.stringify({
-                        db_type: dbType,
-                        query: query,
-                        parameters: parameters,
-                        page: 1,
-                        page_size: 10
-                    }),
-                    success: function(result) {
-                        displayResult('paramResult', result);
-                    },
-                    error: function(xhr) {
-                        displayResult('paramResult', xhr.responseText || 'Query execution failed', true);
-                    }
-                });
-            });
-        });
-    </script>
-</body>
-</html>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

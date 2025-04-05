@@ -661,18 +661,7 @@ def get_chart_data():
 @app.route('/')
 def index():
     """Handle the root route."""
-    return """
-    <h1>MCP Assessor Agent API</h1>
-    <p>Welcome to the MCP Assessor Agent API. This application provides:</p>
-    <ul>
-        <li><a href="/api-docs">API Documentation</a> - Interactive API documentation and testing</li>
-        <li><a href="/query-builder">Query Builder</a> - Build and execute SQL queries</li>
-        <li><a href="/visualize">Data Visualization</a> - Interactive data visualization dashboard</li>
-        <li><a href="/imported-data">Imported Assessment Data</a> - View and analyze imported property assessment data</li>
-        <li><a href="/api/imported-data/accounts">API: Imported Accounts</a> - Raw API endpoint for imported account data</li>
-        <li><a href="/api/imported-data/property-images">API: Property Images</a> - Raw API endpoint for property images</li>
-    </ul>
-    """
+    return render_template('index.html', title="MCP Assessor Agent API")
 
 # This is called when the Flask app is run
 if __name__ == "__main__":

@@ -1,0 +1,35 @@
+import os
+
+project_structure = {
+    "benton-geo-desktop": {
+        "public": {
+            "index.html": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <title>BentonGeoPro Desktop</title>\n  </head>\n  <body>\n    <div id=\"root\"></div>\n  </body>\n</html>"
+        },
+        "src": {
+            "main.ts": "// Electron main process\nimport { app, BrowserWindow } from 'electron';\nimport path from 'path';\n\nfunction createWindow() {\n  const win = new BrowserWindow({\n    width: 1200,\n    height: 800,\n    webPreferences: {\n      preload: path.join(__dirname, 'preload.js'),\n      nodeIntegration: false,\n      contextIsolation: true,\n    },\n  });\n  win.loadURL('http://localhost:3000'); // React dev server\n}\n\napp.whenReady().then(createWindow);",
+            "preload.js": "// Safe IPC bridge can be extended later\nwindow.api = {};",
+            "renderer": {
+                "App.tsx": "import React, { useEffect, useState } from 'react';\nimport L from 'leaflet';\nimport 'leaflet/dist/leaflet.css';\nimport './App.css';\n\nconst App = () => {\n  const [map, setMap] = useState(null);\n  const [parcelData, setParcelData] = useState(null);\n\n  useEffect(() => {\n    const mapInstance = L.map('map').setView([46.2, -119.1], 12);\n    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {\n      attribution: '&copy; OpenStreetMap contributors',\n    }).addTo(mapInstance);\n    setMap(mapInstance);\n  }, []);\n\n  useEffect(() => {\n    fetch('http://localhost:4000/api/parcel/123')\n      .then(res => res.json())\n      .then(data => setParcelData(data));\n  }, []);\n\n  return (\n    <div style={{ height: '100vh' }}>\n      <div id=\"map\" style={{ height: '100%' }}></div>\n    </div>\n  );\n};\n\nexport default App;",
+                "main.tsx": "import React from 'react';\nimport ReactDOM from 'react-dom/client';\nimport App from './App';\n\nReactDOM.createRoot(document.getElementById('root')!).render(\n  <React.StrictMode>\n    <App />\n  </React.StrictMode>\n);"
+            },
+            "App.css": "#map { height: 100%; width: 100%; }"
+        },
+        "mock-api": {
+            "server.js": "const express = require('express');\nconst cors = require('cors');\nconst app = express();\napp.use(cors());\n\napp.get('/api/parcel/:id', (req, res) => {\n  res.json({ id: req.params.id, owner: 'John Doe', acres: 2.5 });\n});\n\napp.listen(4000, () => console.log('Mock API running on port 4000'));"
+        },
+        "package.json": "{\n  \"name\": \"benton-geo-desktop\",\n  \"version\": \"0.1.0\",\n  \"main\": \"src/main.ts\",\n  \"scripts\": {\n    \"start\": \"concurrently \\\"vite\\\" \\\"electron .\\\"\",\n    \"api\": \"node mock-api/server.js\"\n  },\n  \"dependencies\": {\n    \"electron\": \"latest\",\n    \"leaflet\": \"^1.9.3\",\n    \"react\": \"^18.2.0\",\n    \"react-dom\": \"^18.2.0\"\n  },\n  \"devDependencies\": {\n    \"typescript\": \"^5.0.0\",\n    \"vite\": \"^4.0.0\",\n    \"concurrently\": \"^8.0.0\"\n  }\n}"
+    }
+}
+
+import json
+from pathlib import Path
+
+base = Path("/mnt/data/benton-geo-desktop")
+for folder, structure in project_structure["benton-geo-desktop"].items():
+    subfolder_path = base / folder
+    for path, content in structure.items():
+        filepath = subfolder_path / path
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        filepath.write_text(content)
+
+str(base)
