@@ -113,7 +113,7 @@ def run_query():
         result = db.session.execute(text(sql_query))
         
         # Format the result
-        columns = result.keys()
+        columns = list(result.keys())
         rows = [dict(zip(columns, row)) for row in result.fetchall()]
         
         return jsonify({
@@ -126,6 +126,163 @@ def run_query():
         return jsonify({
             "status": "error",
             "message": f"Failed to execute query: {str(e)}"
+        }), 500
+        
+@api_routes.route('/api/parameterized-query', methods=['POST'])
+def parameterized_query():
+    """Execute a parameterized SQL query against the database with enhanced security."""
+    try:
+        from app_setup import db
+        from sqlalchemy import text
+        import time
+        
+        # Get query details from request
+        data = request.json
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "No JSON data provided"
+            }), 400
+            
+        # Extract parameters
+        db_type = data.get('db', 'postgres')
+        query = data.get('query')
+        params = data.get('params', [])
+        param_style = data.get('param_style', 'format')
+        page = data.get('page', 1)
+        page_size = data.get('page_size', 50)
+        security_level = data.get('security_level', 'medium')
+        
+        if not query:
+            return jsonify({
+                "status": "error",
+                "message": "No SQL query provided"
+            }), 400
+            
+        # Start timing execution
+        start_time = time.time()
+        
+        # Basic security check
+        if security_level != 'none':
+            # Define patterns that might indicate SQL injection attempts
+            dangerous_patterns = [
+                r';\s*DROP', r';\s*DELETE', r';\s*UPDATE', r';\s*INSERT',
+                r'--', r'/\*', r'\bOR\s+1\s*=\s*1\b', r'\bOR\s+\'1\'\s*=\s*\'1\'\b',
+                r'\bUNION\s+SELECT\b', r'\bEXEC\b', r'\bXP_\w+\b'
+            ]
+            
+            # Check for dangerous patterns
+            import re
+            for pattern in dangerous_patterns:
+                if re.search(pattern, query, re.IGNORECASE):
+                    return jsonify({
+                        "status": "error",
+                        "message": "Potentially unsafe query detected",
+                        "execution_time": time.time() - start_time
+                    }), 403
+        
+        # For direct database execution, use SQLAlchemy
+        try:
+            # Format parameters based on style and SQL driver requirements
+            if param_style == 'named':
+                # Named parameters - convert list to dict if needed
+                if isinstance(params, list):
+                    # Extract parameter names from query like :param1, :param2, etc.
+                    import re
+                    param_names = re.findall(r':(\w+)', query)
+                    if len(param_names) == len(params):
+                        params = {name: value for name, value in zip(param_names, params)}
+                    else:
+                        return jsonify({
+                            "status": "error",
+                            "message": "Parameter count mismatch",
+                            "execution_time": time.time() - start_time
+                        }), 400
+                        
+                # Execute with named parameters
+                result = db.session.execute(text(query), params)
+            else:
+                # Format query to use SQLAlchemy placeholders
+                if '%s' in query:
+                    # Convert %s format to SQLAlchemy's :param format
+                    import re
+                    param_count = query.count('%s')
+                    param_names = [f'param{i}' for i in range(param_count)]
+                    
+                    # Replace %s with :param0, :param1, etc.
+                    for i, param_name in enumerate(param_names):
+                        query = query.replace('%s', f':{param_name}', 1)
+                    
+                    # Convert params list to dict with param names
+                    if isinstance(params, list) and len(params) == param_count:
+                        params = {name: value for name, value in zip(param_names, params)}
+                        result = db.session.execute(text(query), params)
+                    else:
+                        return jsonify({
+                            "status": "error",
+                            "message": "Parameter count mismatch",
+                            "execution_time": time.time() - start_time
+                        }), 400
+                else:
+                    # If query already uses SQLAlchemy-compatible placeholders
+                    # or no parameters are needed
+                    if isinstance(params, list) and len(params) > 0:
+                        # Convert to a dictionary for SQLAlchemy
+                        params = {"param" + str(i): value for i, value in enumerate(params)}
+                    
+                    # Execute query with parameters
+                    result = db.session.execute(text(query), params)
+                
+            # Get column names and rows
+            columns = list(result.keys())
+            rows = [dict(zip(columns, row)) for row in result.fetchall()]
+            
+            # Handle pagination
+            if page_size:
+                # Simple pagination
+                total_count = len(rows)
+                total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+                
+                # Slice the results based on page and page_size
+                start_idx = (page - 1) * page_size
+                end_idx = start_idx + page_size
+                rows = rows[start_idx:end_idx]
+                
+                pagination = {
+                    "page": page,
+                    "page_size": page_size,
+                    "total_records": total_count,
+                    "total_pages": total_pages,
+                    "has_next": page < total_pages,
+                    "has_prev": page > 1
+                }
+            else:
+                pagination = None
+                
+            # Calculate execution time
+            execution_time = time.time() - start_time
+            
+            return jsonify({
+                "status": "success",
+                "columns": columns,
+                "rows": rows,
+                "pagination": pagination,
+                "execution_time": execution_time
+            })
+                
+        except Exception as e:
+            logger.error(f"Error executing parameterized query: {str(e)}")
+            return jsonify({
+                "status": "error",
+                "message": f"Query execution failed: {str(e)}",
+                "execution_time": time.time() - start_time
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error handling parameterized query request: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Request processing failed: {str(e)}"
         }), 500
 
 @api_routes.route('/api/nl-to-sql', methods=['POST'])

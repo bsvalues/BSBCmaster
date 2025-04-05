@@ -324,8 +324,135 @@ async def execute_parameterized_query(payload: ParameterizedSQLQuery, allow_writ
                     }
             finally:
                 close_pg_connection(conn)
+        elif db_type == "mssql":
+            try:
+                import pyodbc
+                from app.db import get_connection_string
+                
+                # Get MSSQL connection string from environment
+                conn_string = get_connection_string("mssql")
+                
+                # Convert SQLAlchemy connection string to pyodbc format if needed
+                if "mssql+pyodbc" in conn_string:
+                    # Extract components
+                    parts = conn_string.replace("mssql+pyodbc://", "").split("/")
+                    if len(parts) >= 2:
+                        auth_part = parts[0]  # username:password@server
+                        db_part = parts[1].split("?")[0]  # database
+                        
+                        # Extract username, password, server
+                        auth_components = auth_part.split("@")
+                        if len(auth_components) == 2:
+                            credentials = auth_components[0].split(":")
+                            if len(credentials) == 2:
+                                username = credentials[0]
+                                password = credentials[1]
+                                server = auth_components[1]
+                                
+                                # Create pyodbc connection string
+                                conn_string = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={db_part};UID={username};PWD={password}"
+                
+                # Connect to MSSQL
+                conn = pyodbc.connect(conn_string)
+                
+                try:
+                    # Format parameters based on style
+                    formatted_query = query
+                    formatted_params = params
+                    
+                    # Create cursor
+                    cursor = conn.cursor()
+                    
+                    # For pagination, we need count query
+                    count_query = None
+                    total_count = 0
+                    
+                    if page_size:
+                        # Extract the base query (before any ORDER BY, OFFSET, etc.)
+                        base_query = re.sub(r'\bORDER\s+BY\b.*', '', formatted_query, flags=re.IGNORECASE | re.DOTALL)
+                        base_query = re.sub(r'\bOFFSET\b.*', '', base_query, flags=re.IGNORECASE | re.DOTALL)
+                        base_query = re.sub(r'\bFETCH\b.*', '', base_query, flags=re.IGNORECASE | re.DOTALL)
+                        
+                        # Create count query
+                        count_query = f"SELECT COUNT(*) AS total_count FROM ({base_query}) AS count_subquery"
+                        
+                        # Execute count query
+                        try:
+                            cursor.execute(count_query, formatted_params)
+                            count_result = cursor.fetchone()
+                            if count_result:
+                                total_count = count_result[0]
+                        except Exception as e:
+                            logger.warning(f"Count query failed, pagination may be incomplete: {str(e)}")
+                        
+                        # Make sure we have an ORDER BY for OFFSET/FETCH
+                        if "ORDER BY" not in formatted_query.upper():
+                            formatted_query = f"{formatted_query} ORDER BY 1"
+                        
+                        # Add pagination
+                        offset = (page - 1) * page_size
+                        paginated_query = f"{formatted_query} OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
+                        formatted_query = paginated_query
+                    
+                    # Execute main query
+                    cursor.execute(formatted_query, formatted_params)
+                    
+                    # Get column names
+                    columns = {}
+                    if cursor.description:
+                        for i, column in enumerate(cursor.description):
+                            col_name = column[0]
+                            col_type = column[1].__name__ if column[1] else "unknown"
+                            columns[col_name] = col_type
+                    
+                    # Fetch results
+                    rows = cursor.fetchall()
+                    
+                    # Convert to list of dicts
+                    results = []
+                    for row in rows:
+                        result_dict = {}
+                        for i, column in enumerate(cursor.description):
+                            # Handle different data types
+                            value = row[i]
+                            if isinstance(value, (datetime, bytearray, bytes)):
+                                # Convert to string for serialization
+                                value = str(value)
+                            result_dict[column[0]] = value
+                        results.append(result_dict)
+                    
+                    # Create pagination metadata
+                    pagination = paginate_results(results, page, page_size, total_count)
+                    
+                    # Calculate execution time
+                    execution_time = time.time() - start_time
+                    
+                    return {
+                        "status": "success",
+                        "data": results,
+                        "execution_time": execution_time,
+                        "pagination": pagination,
+                        "column_types": columns
+                    }
+                finally:
+                    # Close cursor and connection
+                    if 'cursor' in locals():
+                        cursor.close()
+                    conn.close()
+            except ImportError as e:
+                logger.error(f"Missing dependencies for MSSQL support: {str(e)}")
+                raise HTTPException(
+                    status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="MSSQL support requires pyodbc, which is not installed"
+                )
+            except Exception as e:
+                logger.error(f"MSSQL error executing query: {str(e)}")
+                raise HTTPException(
+                    status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"MSSQL error: {str(e)}"
+                )
         else:
-            # Placeholder for MSSQL implementation
+            # Unsupported database type
             raise HTTPException(
                 status_code=HTTP_400_BAD_REQUEST,
                 detail=f"Database type {db_type} not implemented yet"
@@ -504,8 +631,204 @@ def extract_schema_info(db_type: str) -> Dict[str, Any]:
                 "tables": list(tables_dict.values()),
                 "execution_time": execution_time
             }
+        elif db_type == "mssql":
+            try:
+                import pyodbc
+                from app.db import get_connection_string
+                
+                # Get MSSQL connection string from environment
+                conn_string = get_connection_string("mssql")
+                
+                # Connect to MSSQL using pyodbc
+                # Convert SQLAlchemy connection string to pyodbc format if needed
+                if "mssql+pyodbc" in conn_string:
+                    # Extract components
+                    parts = conn_string.replace("mssql+pyodbc://", "").split("/")
+                    if len(parts) >= 2:
+                        auth_part = parts[0]  # username:password@server
+                        db_part = parts[1].split("?")[0]  # database
+                        
+                        # Extract username, password, server
+                        auth_components = auth_part.split("@")
+                        if len(auth_components) == 2:
+                            credentials = auth_components[0].split(":")
+                            if len(credentials) == 2:
+                                username = credentials[0]
+                                password = credentials[1]
+                                server = auth_components[1]
+                                
+                                # Create pyodbc connection string
+                                conn_string = f"DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={server};DATABASE={db_part};UID={username};PWD={password}"
+                
+                # Connect to MSSQL
+                conn = pyodbc.connect(conn_string)
+                
+                try:
+                    cursor = conn.cursor()
+                    
+                    # Get table information
+                    schema_items = []
+                    tables_dict = {}
+                    
+                    # Query for tables, columns, and their properties
+                    schema_query = """
+                    SELECT 
+                        t.TABLE_SCHEMA as table_schema,
+                        t.TABLE_NAME as table_name,
+                        c.COLUMN_NAME as column_name,
+                        c.DATA_TYPE as data_type,
+                        CASE WHEN c.IS_NULLABLE = 'YES' THEN 1 ELSE 0 END as is_nullable,
+                        c.COLUMN_DEFAULT as column_default,
+                        CASE WHEN pk.COLUMN_NAME IS NOT NULL THEN 1 ELSE 0 END as is_primary_key,
+                        CASE WHEN fk.COLUMN_NAME IS NOT NULL THEN 1 ELSE 0 END as is_foreign_key,
+                        fk.REFERENCED_TABLE_NAME as referenced_table_name,
+                        fk.REFERENCED_COLUMN_NAME as referenced_column_name,
+                        ep.value as description
+                    FROM 
+                        INFORMATION_SCHEMA.TABLES t
+                    JOIN 
+                        INFORMATION_SCHEMA.COLUMNS c ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
+                    LEFT JOIN (
+                        SELECT 
+                            ku.TABLE_SCHEMA,
+                            ku.TABLE_NAME,
+                            ku.COLUMN_NAME
+                        FROM 
+                            INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+                        JOIN 
+                            INFORMATION_SCHEMA.KEY_COLUMN_USAGE ku ON tc.CONSTRAINT_NAME = ku.CONSTRAINT_NAME
+                        WHERE 
+                            tc.CONSTRAINT_TYPE = 'PRIMARY KEY'
+                    ) pk ON c.TABLE_SCHEMA = pk.TABLE_SCHEMA AND c.TABLE_NAME = pk.TABLE_NAME AND c.COLUMN_NAME = pk.COLUMN_NAME
+                    LEFT JOIN (
+                        SELECT 
+                            ku1.TABLE_SCHEMA,
+                            ku1.TABLE_NAME,
+                            ku1.COLUMN_NAME,
+                            ku2.TABLE_NAME AS REFERENCED_TABLE_NAME,
+                            ku2.COLUMN_NAME AS REFERENCED_COLUMN_NAME
+                        FROM 
+                            INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+                        JOIN 
+                            INFORMATION_SCHEMA.KEY_COLUMN_USAGE ku1 ON rc.CONSTRAINT_NAME = ku1.CONSTRAINT_NAME
+                        JOIN 
+                            INFORMATION_SCHEMA.KEY_COLUMN_USAGE ku2 ON rc.UNIQUE_CONSTRAINT_NAME = ku2.CONSTRAINT_NAME
+                    ) fk ON c.TABLE_SCHEMA = fk.TABLE_SCHEMA AND c.TABLE_NAME = fk.TABLE_NAME AND c.COLUMN_NAME = fk.COLUMN_NAME
+                    LEFT JOIN 
+                        sys.extended_properties ep ON OBJECT_ID(t.TABLE_SCHEMA + '.' + t.TABLE_NAME) = ep.major_id 
+                        AND c.ORDINAL_POSITION = ep.minor_id 
+                        AND ep.name = 'MS_Description'
+                    WHERE 
+                        t.TABLE_TYPE = 'BASE TABLE'
+                        AND t.TABLE_SCHEMA = 'dbo'
+                    ORDER BY 
+                        t.TABLE_NAME, c.ORDINAL_POSITION;
+                    """
+                    
+                    cursor.execute(schema_query)
+                    
+                    # Process results
+                    for row in cursor.fetchall():
+                        schema_item = {
+                            "table_name": row.table_name,
+                            "column_name": row.column_name,
+                            "data_type": row.data_type,
+                            "is_nullable": bool(row.is_nullable),
+                            "column_default": row.column_default,
+                            "is_primary_key": bool(row.is_primary_key),
+                            "is_foreign_key": bool(row.is_foreign_key),
+                            "references_table": row.referenced_table_name,
+                            "references_column": row.referenced_column_name,
+                            "description": row.description
+                        }
+                        schema_items.append(schema_item)
+                        
+                        # Add to tables dictionary
+                        table_name = row.table_name
+                        if table_name not in tables_dict:
+                            tables_dict[table_name] = {
+                                "name": table_name,
+                                "description": None,
+                                "columns": [],
+                                "primary_keys": [],
+                                "foreign_keys": {},
+                                "row_count": None
+                            }
+                        
+                        # Add column to table
+                        tables_dict[table_name]["columns"].append(schema_item)
+                        
+                        # Add primary key if applicable
+                        if bool(row.is_primary_key):
+                            tables_dict[table_name]["primary_keys"].append(row.column_name)
+                        
+                        # Add foreign key if applicable
+                        if bool(row.is_foreign_key):
+                            tables_dict[table_name]["foreign_keys"][row.column_name] = {
+                                "references_table": row.referenced_table_name,
+                                "references_column": row.referenced_column_name
+                            }
+                    
+                    # Get row counts for each table
+                    for table_name in tables_dict.keys():
+                        try:
+                            cursor.execute(f"SELECT COUNT(*) AS count FROM [{table_name}]")
+                            count_result = cursor.fetchone()
+                            if count_result:
+                                tables_dict[table_name]["row_count"] = count_result.count
+                        except Exception as e:
+                            logger.warning(f"Could not get row count for table {table_name}: {str(e)}")
+                    
+                    # Get table descriptions
+                    table_desc_query = """
+                    SELECT 
+                        t.name AS table_name,
+                        ep.value AS description
+                    FROM 
+                        sys.tables t
+                    LEFT JOIN 
+                        sys.extended_properties ep ON t.object_id = ep.major_id 
+                        AND ep.minor_id = 0 
+                        AND ep.name = 'MS_Description'
+                    WHERE 
+                        t.schema_id = SCHEMA_ID('dbo')
+                    """
+                    
+                    cursor.execute(table_desc_query)
+                    for row in cursor.fetchall():
+                        if row.table_name in tables_dict:
+                            tables_dict[row.table_name]["description"] = row.description
+                
+                finally:
+                    # Close cursor and connection
+                    if 'cursor' in locals():
+                        cursor.close()
+                    conn.close()
+                
+                # Calculate execution time
+                execution_time = time.time() - start_time
+                
+                return {
+                    "status": "success",
+                    "db_schema": schema_items,
+                    "tables": list(tables_dict.values()),
+                    "execution_time": execution_time
+                }
+                
+            except ImportError as e:
+                logger.error(f"Missing dependencies for MSSQL schema discovery: {str(e)}")
+                raise HTTPException(
+                    status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="MSSQL support requires pyodbc, which is not installed"
+                )
+            except Exception as e:
+                logger.error(f"MSSQL error getting schema: {str(e)}")
+                raise HTTPException(
+                    status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"MSSQL schema discovery error: {str(e)}"
+                )
         else:
-            # Placeholder for MSSQL implementation
+            # Unsupported database type
             raise HTTPException(
                 status_code=HTTP_400_BAD_REQUEST,
                 detail=f"Database type {db_type} not implemented yet"
