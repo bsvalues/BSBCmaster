@@ -143,22 +143,22 @@ def get_property_data(
         
         # Process query results
         for row in result:
-            # Convert SQLAlchemy Row to dictionary
+            # Convert SQLAlchemy Row to dictionary with float conversion for decimal values
             property_data = {
                 'account_id': row.account_id,
                 'owner_name': row.owner_name,
                 'property_address': row.property_address,
                 'property_city': row.property_city,
-                'assessed_value': row.assessed_value,
+                'assessed_value': float(row.assessed_value) if row.assessed_value else None,
                 'property_type': row.property_type,
-                'longitude': row.longitude,
-                'latitude': row.latitude
+                'longitude': float(row.longitude) if row.longitude else None,
+                'latitude': float(row.latitude) if row.latitude else None
             }
             properties.append(property_data)
             
             # Add property value for statistics if available
             if row.assessed_value:
-                property_values.append(row.assessed_value)
+                property_values.append(float(row.assessed_value))
         
         # Calculate statistics
         stats = calculate_property_statistics(property_values)
@@ -329,11 +329,17 @@ def calculate_map_boundaries(properties: List[Dict[str, Any]]) -> Dict[str, floa
     # Calculate boundaries with a buffer
     buffer = 0.02  # About 2km buffer
     
+    # Convert to float to avoid decimal + float issues
+    max_lat = float(max(latitudes))
+    min_lat = float(min(latitudes))
+    max_lng = float(max(longitudes))
+    min_lng = float(min(longitudes))
+    
     return {
-        'north': max(latitudes) + buffer,
-        'south': min(latitudes) - buffer,
-        'east': max(longitudes) + buffer,
-        'west': min(longitudes) - buffer
+        'north': max_lat + buffer,
+        'south': min_lat - buffer,
+        'east': max_lng + buffer,
+        'west': min_lng - buffer
     }
 
 # API endpoint handlers (to be imported in main.py)
