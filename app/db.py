@@ -6,7 +6,7 @@ import logging
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import psycopg2
 import psycopg2.extras
@@ -253,6 +253,154 @@ def execute_parameterized_query(
             status_code=HTTP_400_BAD_REQUEST,
             detail=f"Unsupported database type: {db}",
         )
+
+def execute_query_with_explicit_params(
+    db: str,
+    query: str,
+    params: Any,
+    page: int = 1,
+    page_size: int = 50
+) -> Dict[str, Any]:
+    """
+    Execute a query with explicit parameter handling, particularly useful for 
+    PostgreSQL with various parameter styles.
+    
+    This function uses direct mogrification to safely substitute parameter values,
+    which is especially useful for PostgreSQL when dealing with ? placeholders or
+    :named parameters that need to be converted to PostgreSQL's %s style.
+    
+    Args:
+        db: Database type (postgres, mssql)
+        query: SQL query with ? or :name placeholders
+        params: List or Dict of parameter values
+        page: Page number for pagination (starting from 1)
+        page_size: Number of results per page
+        
+    Returns:
+        Dict containing query results and metadata
+    """
+    import time
+    start_time = time.time()
+    
+    if db.lower() != "postgres":
+        raise ValueError("This function is only for PostgreSQL queries")
+    
+    # Handle different parameter styles
+    postgres_query = query
+    postgres_params = params
+    
+    # Convert parameters based on their type
+    if isinstance(params, dict):
+        # For named parameters, convert :name to %s and build a parameter list
+        named_params = []
+        import re
+        
+        # Find all parameter names in the query
+        param_names = re.findall(r':([a-zA-Z0-9_]+)', query)
+        
+        # Build the parameter list in order of appearance
+        for name in param_names:
+            if name in params:
+                named_params.append(params[name])
+            else:
+                raise ValueError(f"Named parameter '{name}' not found in params dictionary")
+        
+        # Replace :name with %s placeholders
+        postgres_query = re.sub(r':([a-zA-Z0-9_]+)', '%s', query)
+        postgres_params = named_params
+        
+        logger.info(f"Converted named parameters query: {postgres_query}")
+        logger.info(f"Parameter list: {postgres_params}")
+    else:
+        # For positional parameters (qmark style), just replace ? with %s
+        postgres_query = query.replace('?', '%s')
+        logger.info(f"Converted query placeholders: {postgres_query}")
+    
+    # For PostgreSQL, use direct safe SQL execution with mogrify
+    conn = None
+    try:
+        # Get connection from pool
+        conn = get_postgres_connection()
+        
+        # Create cursor
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            # Set a timeout for long-running queries
+            cursor.execute("SET statement_timeout TO 30000")  # 30 seconds
+            
+            # First prepare the main query with pagination
+            offset = (page - 1) * page_size
+            paginated_query = f"{postgres_query} LIMIT {page_size} OFFSET {offset}"
+            
+            try:
+                # Log the mogrified query (with parameters substituted) for debugging
+                if postgres_params:
+                    debug_query = cursor.mogrify(paginated_query, postgres_params).decode('utf-8')
+                    logger.info(f"Executing: {debug_query}")
+            except Exception as e:
+                logger.warning(f"Could not create debug query: {str(e)}")
+            
+            # Execute the paginated query safely with parameters
+            cursor.execute(paginated_query, postgres_params)
+            results = cursor.fetchall()
+            
+            # Now get total count with a separate query
+            # We use tuple params to ensure parameters are properly passed to the subquery
+            count_query = f"SELECT COUNT(*) AS total FROM ({postgres_query}) AS count_subquery"
+            
+            try:
+                if postgres_params:
+                    debug_count = cursor.mogrify(count_query, postgres_params).decode('utf-8')
+                    logger.info(f"Count query: {debug_count}")
+            except Exception as e:
+                logger.warning(f"Could not create debug count query: {str(e)}")
+            
+            # Execute the count query safely
+            cursor.execute(count_query, postgres_params)
+            count_result = cursor.fetchone()
+            total_count = count_result["total"] if count_result else 0
+            
+            # Create pagination metadata
+            total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
+            has_next = page < total_pages
+            has_prev = page > 1
+            
+            pagination = {
+                "page": page,
+                "pages": total_pages,
+                "page_size": page_size,
+                "total": total_count,
+                "has_next": has_next,
+                "has_prev": has_prev,
+            }
+            
+            # Get column types
+            column_types = {}
+            if results:
+                for key in results[0].keys():
+                    column_types[key] = str(type(results[0][key]).__name__)
+            
+            # Format results as list of dictionaries
+            formatted_results = [dict(row) for row in results]
+            
+            # Execution time
+            end_time = time.time()
+            execution_time = end_time - start_time
+            
+            # Build final result
+            return {
+                "status": "success",
+                "data": formatted_results,
+                "execution_time": execution_time,
+                "pagination": pagination,
+                "column_types": column_types
+            }
+    except Exception as e:
+        logger.error(f"Error in execute_query_with_explicit_params: {str(e)}")
+        raise
+    finally:
+        # Return connection to pool
+        if conn and pg_pool:
+            pg_pool.putconn(conn)
 
 def execute_postgres_query(
     query: str, 
