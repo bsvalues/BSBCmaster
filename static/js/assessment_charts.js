@@ -11,7 +11,6 @@ class AssessmentCharts {
         console.log("AssessmentCharts constructor called");
         // Elements from the main chart widget
         this.chartContainer = document.getElementById('chartContainer');
-        this.toggleChartBtn = document.getElementById('toggleChartBtn');
         this.chartDataset = document.getElementById('chartDataset');
         this.chartType = document.getElementById('chartType');
         this.chartDimension = document.getElementById('chartDimension');
@@ -21,6 +20,7 @@ class AssessmentCharts {
         this.chartMessage = document.getElementById('chartMessage');
         this.chartLoading = document.getElementById('chartLoading');
         this.chartCanvas = document.getElementById('assessmentChart');
+        this.generateChartBtn = document.getElementById('generateChart');
         
         // Chart instance
         this.chart = null;
@@ -80,23 +80,17 @@ class AssessmentCharts {
     }
     
     init() {
-        if (!this.toggleChartBtn || !this.chartContainer) {
-            console.error('Chart elements not found');
+        if (!this.chartContainer) {
+            console.error('Chart container not found');
             return;
         }
         
-        // Initialize toggle button
-        this.toggleChartBtn.addEventListener('click', () => {
-            if (this.chartContainer.style.display === 'none') {
-                this.chartContainer.style.display = 'block';
-                this.toggleChartBtn.innerHTML = '<i class="bi bi-x-lg"></i> Hide Chart';
-                this.updateFieldOptions();
+        // Initialize generate chart button if available
+        if (this.generateChartBtn) {
+            this.generateChartBtn.addEventListener('click', () => {
                 this.generateChart();
-            } else {
-                this.chartContainer.style.display = 'none';
-                this.toggleChartBtn.innerHTML = '<i class="bi bi-bar-chart"></i> Show Chart';
-            }
-        });
+            });
+        }
         
         // Update field options when dataset changes
         if (this.chartDataset) {
