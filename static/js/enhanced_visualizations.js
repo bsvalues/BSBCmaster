@@ -1,319 +1,454 @@
 /**
- * Enhanced Visualizations JavaScript
+ * Enhanced Visualizations for MCP Assessor Agent API
  * 
- * This file provides advanced visualization capabilities for the MCP Assessor Agent API,
- * offering a dedicated interface for generating and customizing interactive charts.
+ * This file provides advanced visualization capabilities for assessment data.
  */
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Elements in the Visualizations tab
-    const vizDataset = document.getElementById('viz-dataset');
-    const vizChartType = document.getElementById('viz-chart-type');
-    const vizDimension = document.getElementById('viz-dimension');
-    const vizMeasure = document.getElementById('viz-measure');
-    const vizAggregation = document.getElementById('viz-aggregation');
-    const vizLimit = document.getElementById('viz-limit');
-    const vizColorScheme = document.getElementById('viz-color-scheme');
-    const applyVizBtn = document.getElementById('apply-viz-btn');
-    const vizAlert = document.getElementById('viz-alert');
-    const vizMessage = document.getElementById('viz-message');
-    const vizLoading = document.getElementById('viz-loading');
-    
-    // Chart instance
-    let vizChart = null;
-    
-    // Field mappings for each dataset
-    const fieldMappings = {
-        accounts: {
-            dimensions: [
-                { value: 'assessment_year', label: 'Assessment Year' },
-                { value: 'tax_status', label: 'Tax Status' },
-                { value: 'mailing_city', label: 'Mailing City' },
-                { value: 'mailing_state', label: 'Mailing State' },
-                { value: 'property_city', label: 'Property City' }
-            ],
-            measures: [
-                { value: 'assessed_value', label: 'Assessed Value' },
-                { value: 'tax_amount', label: 'Tax Amount' },
-                { value: 'id', label: 'Count' }
-            ]
-        },
-        property_images: {
-            dimensions: [
-                { value: 'image_type', label: 'Image Type' },
-                { value: 'file_format', label: 'File Format' },
-                { value: 'EXTRACT(YEAR FROM image_date)', label: 'Image Year' }
-            ],
-            measures: [
-                { value: 'file_size', label: 'File Size' },
-                { value: 'width', label: 'Width' },
-                { value: 'height', label: 'Height' },
-                { value: 'id', label: 'Count' }
-            ]
-        },
-        improvements: {
-            dimensions: [
-                { value: 'year_built', label: 'Year Built' },
-                { value: 'primary_use', label: 'Primary Use' },
-                { value: 'FLOOR(living_area / 500) * 500', label: 'Living Area Range' }
-            ],
-            measures: [
-                { value: 'value', label: 'Value' },
-                { value: 'living_area', label: 'Living Area' },
-                { value: 'stories', label: 'Stories' },
-                { value: 'id', label: 'Count' }
-            ]
-        },
-        combined: {
-            dimensions: [
-                { value: 'a.assessment_year', label: 'Assessment Year' },
-                { value: 'a.property_city', label: 'Property City' },
-                { value: 'i.primary_use', label: 'Primary Use' }
-            ],
-            measures: [
-                { value: 'a.assessed_value', label: 'Assessed Value' },
-                { value: 'a.tax_amount', label: 'Tax Amount' },
-                { value: 'i.value', label: 'Improvement Value' },
-                { value: 'i.living_area', label: 'Living Area' },
-                { value: 'p.file_size', label: 'Image Size' },
-                { value: 'a.id', label: 'Count' }
-            ]
-        }
-    };
-    
-    // Color schemes
-    const colorSchemes = {
-        default: ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#16a34a', '#ca8a04'],
-        viridis: ['#440154', '#433982', '#30678D', '#218F8B', '#36B677', '#8ED542', '#FDE725'],
-        plasma: ['#0D0887', '#5D01A6', '#9C179E', '#CC4678', '#ED7953', '#FDB32F', '#F0F921'],
-        inferno: ['#000004', '#320A5A', '#781C6D', '#BD3786', '#ED6925', '#FBB32F', '#FCFEA4'],
-        magma: ['#000004', '#2C105C', '#711F81', '#B63679', '#EE605E', '#FDAE78', '#FCFDBF']
-    };
-    
-    // Initialize field options when dataset changes
-    function updateFieldOptions() {
-        const dataset = vizDataset.value;
-        const fields = fieldMappings[dataset];
+class AssessmentDataVisualizer {
+    constructor() {
+        this.chartInstances = {};
+        this.availableDatasets = ['accounts', 'improvements', 'property_images', 'combined'];
+        this.availableChartTypes = ['bar', 'line', 'pie', 'scatter'];
+        this.dataCache = {};
+    }
+
+    /**
+     * Initialize visualization elements
+     * @param {string} containerId - ID of the container element
+     */
+    initialize(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return false;
+
+        // Create chart selection UI
+        this.createChartControls(container);
         
-        // Clear existing options
-        vizDimension.innerHTML = '';
-        vizMeasure.innerHTML = '';
+        return true;
+    }
+
+    /**
+     * Create chart selection and filtering UI
+     * @param {HTMLElement} container - Container element
+     */
+    createChartControls(container) {
+        // Create row for controls
+        const controlsRow = document.createElement('div');
+        controlsRow.className = 'row mb-4';
         
-        // Add dimension options
-        fields.dimensions.forEach(dim => {
+        // Dataset selection
+        const datasetCol = document.createElement('div');
+        datasetCol.className = 'col-md-3';
+        
+        const datasetGroup = document.createElement('div');
+        datasetGroup.className = 'form-group';
+        
+        const datasetLabel = document.createElement('label');
+        datasetLabel.textContent = 'Dataset';
+        datasetLabel.className = 'form-label';
+        
+        const datasetSelect = document.createElement('select');
+        datasetSelect.className = 'form-select';
+        datasetSelect.id = 'dataset-select';
+        
+        this.availableDatasets.forEach(dataset => {
             const option = document.createElement('option');
-            option.value = dim.value;
-            option.textContent = dim.label;
-            vizDimension.appendChild(option);
+            option.value = dataset;
+            option.textContent = dataset.charAt(0).toUpperCase() + dataset.slice(1);
+            datasetSelect.appendChild(option);
         });
         
-        // Add measure options
-        fields.measures.forEach(measure => {
-            const option = document.createElement('option');
-            option.value = measure.value;
-            option.textContent = measure.label;
-            vizMeasure.appendChild(option);
-        });
-    }
-    
-    // Initial field options
-    if (vizDataset) {
-        updateFieldOptions();
+        datasetGroup.appendChild(datasetLabel);
+        datasetGroup.appendChild(datasetSelect);
+        datasetCol.appendChild(datasetGroup);
         
-        // Update options when dataset changes
-        vizDataset.addEventListener('change', updateFieldOptions);
+        // Chart type selection
+        const chartTypeCol = document.createElement('div');
+        chartTypeCol.className = 'col-md-3';
+        
+        const chartTypeGroup = document.createElement('div');
+        chartTypeGroup.className = 'form-group';
+        
+        const chartTypeLabel = document.createElement('label');
+        chartTypeLabel.textContent = 'Chart Type';
+        chartTypeLabel.className = 'form-label';
+        
+        const chartTypeSelect = document.createElement('select');
+        chartTypeSelect.className = 'form-select';
+        chartTypeSelect.id = 'chart-type-select';
+        
+        this.availableChartTypes.forEach(chartType => {
+            const option = document.createElement('option');
+            option.value = chartType;
+            option.textContent = chartType.charAt(0).toUpperCase() + chartType.slice(1);
+            chartTypeSelect.appendChild(option);
+        });
+        
+        chartTypeGroup.appendChild(chartTypeLabel);
+        chartTypeGroup.appendChild(chartTypeSelect);
+        chartTypeCol.appendChild(chartTypeGroup);
+        
+        // Dimension selection
+        const dimensionCol = document.createElement('div');
+        dimensionCol.className = 'col-md-3';
+        
+        const dimensionGroup = document.createElement('div');
+        dimensionGroup.className = 'form-group';
+        
+        const dimensionLabel = document.createElement('label');
+        dimensionLabel.textContent = 'Dimension';
+        dimensionLabel.className = 'form-label';
+        
+        const dimensionSelect = document.createElement('select');
+        dimensionSelect.className = 'form-select';
+        dimensionSelect.id = 'dimension-select';
+        
+        dimensionGroup.appendChild(dimensionLabel);
+        dimensionGroup.appendChild(dimensionSelect);
+        dimensionCol.appendChild(dimensionGroup);
+        
+        // Measure selection
+        const measureCol = document.createElement('div');
+        measureCol.className = 'col-md-3';
+        
+        const measureGroup = document.createElement('div');
+        measureGroup.className = 'form-group';
+        
+        const measureLabel = document.createElement('label');
+        measureLabel.textContent = 'Measure';
+        measureLabel.className = 'form-label';
+        
+        const measureSelect = document.createElement('select');
+        measureSelect.className = 'form-select';
+        measureSelect.id = 'measure-select';
+        
+        measureGroup.appendChild(measureLabel);
+        measureGroup.appendChild(measureSelect);
+        measureCol.appendChild(measureGroup);
+        
+        // Add all to controls row
+        controlsRow.appendChild(datasetCol);
+        controlsRow.appendChild(chartTypeCol);
+        controlsRow.appendChild(dimensionCol);
+        controlsRow.appendChild(measureCol);
+        
+        // Add controls row to container
+        container.appendChild(controlsRow);
+        
+        // Create canvas for chart
+        const chartRow = document.createElement('div');
+        chartRow.className = 'row';
+        
+        const chartCol = document.createElement('div');
+        chartCol.className = 'col-12';
+        
+        const chartCanvas = document.createElement('canvas');
+        chartCanvas.id = 'visualization-chart';
+        chartCanvas.style.width = '100%';
+        chartCanvas.style.height = '400px';
+        
+        chartCol.appendChild(chartCanvas);
+        chartRow.appendChild(chartCol);
+        container.appendChild(chartRow);
+        
+        // Add event listeners
+        datasetSelect.addEventListener('change', () => this.handleDatasetChange());
+        chartTypeSelect.addEventListener('change', () => this.updateVisualization());
+        dimensionSelect.addEventListener('change', () => this.updateVisualization());
+        measureSelect.addEventListener('change', () => this.updateVisualization());
+        
+        // Initial load of schema for first dataset
+        this.handleDatasetChange();
     }
-    
-    // Generate visualization on button click
-    if (applyVizBtn) {
-        applyVizBtn.addEventListener('click', generateVisualization);
+
+    /**
+     * Handle dataset change by loading schema
+     */
+    handleDatasetChange() {
+        const dataset = document.getElementById('dataset-select').value;
+        this.loadDatasetSchema(dataset);
     }
-    
-    // Generate visualization with current settings
-    function generateVisualization() {
-        if (!vizDataset || !vizChartType || !vizDimension || !vizMeasure) {
-            console.error('Visualization elements not found');
+
+    /**
+     * Load dataset schema to populate dimension and measure dropdowns
+     * @param {string} dataset - Selected dataset
+     */
+    loadDatasetSchema(dataset) {
+        // Mock schema data for demonstration
+        const schemaMap = {
+            'accounts': {
+                dimensions: ['owner_name', 'account_id', 'classification'],
+                measures: ['assessed_value', 'land_value', 'building_value']
+            },
+            'improvements': {
+                dimensions: ['improvement_type', 'year_built', 'quality'],
+                measures: ['square_footage', 'value', 'bed_count', 'bath_count']
+            },
+            'property_images': {
+                dimensions: ['image_type', 'capture_date', 'account_id'],
+                measures: ['image_count', 'file_size']
+            },
+            'combined': {
+                dimensions: ['owner_name', 'classification', 'improvement_type'],
+                measures: ['assessed_value', 'land_value', 'building_value', 'square_footage']
+            }
+        };
+        
+        // Get schema for selected dataset
+        const schema = schemaMap[dataset] || { dimensions: [], measures: [] };
+        
+        // Populate dimension dropdown
+        const dimensionSelect = document.getElementById('dimension-select');
+        dimensionSelect.innerHTML = '';
+        
+        schema.dimensions.forEach(dimension => {
+            const option = document.createElement('option');
+            option.value = dimension;
+            option.textContent = dimension.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+            dimensionSelect.appendChild(option);
+        });
+        
+        // Populate measure dropdown
+        const measureSelect = document.getElementById('measure-select');
+        measureSelect.innerHTML = '';
+        
+        schema.measures.forEach(measure => {
+            const option = document.createElement('option');
+            option.value = measure;
+            option.textContent = measure.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+            measureSelect.appendChild(option);
+        });
+        
+        // Update visualization
+        this.updateVisualization();
+    }
+
+    /**
+     * Update the visualization based on selected options
+     */
+    updateVisualization() {
+        const dataset = document.getElementById('dataset-select').value;
+        const chartType = document.getElementById('chart-type-select').value;
+        const dimension = document.getElementById('dimension-select').value;
+        const measure = document.getElementById('measure-select').value;
+        
+        // Check if we have all required selections
+        if (!dataset || !chartType || !dimension || !measure) {
             return;
         }
         
-        // Show loading indicator
-        vizAlert.style.display = 'none';
-        vizLoading.style.display = 'block';
+        // Fetch data and create visualization
+        this.fetchChartData(dataset, chartType, dimension, measure);
+    }
+
+    /**
+     * Fetch chart data from API
+     * @param {string} dataset - Selected dataset
+     * @param {string} chartType - Selected chart type
+     * @param {string} dimension - Selected dimension
+     * @param {string} measure - Selected measure
+     */
+    fetchChartData(dataset, chartType, dimension, measure) {
+        // Construct API URL
+        const apiUrl = `/api/chart-data?dataset=${dataset}&chart_type=${chartType}&dimension=${dimension}&measure=${measure}&aggregation=sum`;
         
-        // Get settings
-        const dataset = vizDataset.value;
-        const chartType = vizChartType.value;
-        const dimension = vizDimension.value;
-        const measure = vizMeasure.value;
-        const aggregation = vizAggregation.value;
-        const limit = vizLimit.value;
-        const colorScheme = vizColorScheme.value;
+        // Show loading state
+        this.showLoading();
         
-        // Build query params
-        const params = new URLSearchParams({
-            dataset: dataset,
-            chart_type: chartType,
-            dimension: dimension,
-            measure: measure,
-            aggregation: aggregation,
-            limit: limit
-        });
-        
-        // Fetch data from API
-        fetch(`/api/chart-data?${params.toString()}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Failed to fetch chart data');
-                }
-                return response.json();
-            })
+        // Fetch data
+        fetch(apiUrl)
+            .then(response => response.json())
             .then(data => {
-                renderVisualizationChart(data, chartType, colorScheme);
-                vizLoading.style.display = 'none';
+                if (data.status === 'success') {
+                    // Cache the data
+                    this.dataCache[apiUrl] = data;
+                    
+                    // Create visualization
+                    this.createChart(chartType, data.data, dimension, measure);
+                } else {
+                    this.showError(data.message || 'Failed to load chart data');
+                }
             })
             .catch(error => {
                 console.error('Error fetching chart data:', error);
-                vizAlert.style.display = 'block';
-                vizMessage.textContent = 'Error loading chart data: ' + error.message;
-                vizLoading.style.display = 'none';
+                this.showError('An error occurred while fetching chart data');
             });
     }
-    
-    // Render chart with the provided data
-    function renderVisualizationChart(data, chartType, colorSchemeKey) {
-        const ctx = document.getElementById('visualizationChart').getContext('2d');
-        const colors = colorSchemes[colorSchemeKey] || colorSchemes.default;
+
+    /**
+     * Show loading state
+     */
+    showLoading() {
+        const canvas = document.getElementById('visualization-chart');
+        const ctx = canvas.getContext('2d');
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw loading text
+        ctx.font = '16px Arial';
+        ctx.fillStyle = '#888';
+        ctx.textAlign = 'center';
+        ctx.fillText('Loading...', canvas.width / 2, canvas.height / 2);
+    }
+
+    /**
+     * Show error message
+     * @param {string} message - Error message
+     */
+    showError(message) {
+        const canvas = document.getElementById('visualization-chart');
+        const ctx = canvas.getContext('2d');
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw error text
+        ctx.font = '16px Arial';
+        ctx.fillStyle = '#ff6666';
+        ctx.textAlign = 'center';
+        ctx.fillText(`Error: ${message}`, canvas.width / 2, canvas.height / 2);
+    }
+
+    /**
+     * Create chart visualization
+     * @param {string} chartType - Type of chart to create
+     * @param {Array} data - Chart data
+     * @param {string} dimension - Dimension field
+     * @param {string} measure - Measure field
+     */
+    createChart(chartType, data, dimension, measure) {
+        const canvas = document.getElementById('visualization-chart');
         
         // Destroy existing chart if any
-        if (vizChart) {
-            vizChart.destroy();
+        if (this.chartInstances['main']) {
+            this.chartInstances['main'].destroy();
         }
         
-        // Prepare chart data
-        const chartData = {
-            labels: data.labels,
-            datasets: [{
-                label: data.title,
-                data: data.values,
-                backgroundColor: chartType === 'line' ? colors[0] : 
-                    data.labels.map((_, i) => colors[i % colors.length]),
-                borderColor: chartType === 'line' ? colors[0] : 
-                    data.labels.map((_, i) => colors[i % colors.length]),
-                borderWidth: chartType === 'line' ? 2 : 1,
-                fill: chartType === 'line' ? false : undefined,
-                pointBackgroundColor: chartType === 'scatter' ? 
-                    data.values.map((_, i) => colors[i % colors.length]) : undefined,
-                pointBorderColor: chartType === 'scatter' ? 
-                    data.values.map((_, i) => colors[i % colors.length]) : undefined,
-                pointRadius: chartType === 'scatter' ? 6 : undefined,
-            }]
-        };
+        // Prepare data for chart
+        const labels = data.map(item => item[dimension] || 'Unknown');
+        const values = data.map(item => item[measure] || 0);
         
-        // Chart configuration
+        // Create color array
+        const colors = this.generateColors(data.length);
+        
+        // Create chart configuration
         const config = {
             type: chartType,
-            data: chartData,
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: measure.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+                    data: values,
+                    backgroundColor: colors.map(color => color.replace('1)', '0.7)')),
+                    borderColor: colors,
+                    borderWidth: 1
+                }]
+            },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
                     title: {
                         display: true,
-                        text: data.title,
-                        font: {
-                            size: 16,
-                            weight: 'bold'
-                        }
+                        text: `${measure.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')} by ${dimension.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}`
                     },
                     legend: {
-                        display: chartType === 'pie',
-                        position: 'right'
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                let label = context.label || '';
-                                if (label) {
-                                    label += ': ';
-                                }
-                                if (context.parsed.y !== undefined) {
-                                    label += formatValue(context.parsed.y, data.valueType);
-                                } else if (context.parsed !== undefined) {
-                                    label += formatValue(context.parsed, data.valueType);
-                                }
-                                return label;
-                            }
-                        }
+                        display: chartType === 'pie' || chartType === 'doughnut'
                     }
-                },
-                scales: chartType !== 'pie' ? {
-                    x: {
-                        title: {
-                            display: true,
-                            text: data.xAxisLabel || 'Category',
-                            font: {
-                                weight: 'bold'
-                            }
-                        },
-                        ticks: {
-                            maxRotation: 45,
-                            minRotation: 45
-                        }
-                    },
-                    y: {
-                        title: {
-                            display: true,
-                            text: data.yAxisLabel || 'Value',
-                            font: {
-                                weight: 'bold'
-                            }
-                        },
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return formatValue(value, data.valueType);
-                            }
-                        }
-                    }
-                } : undefined
+                }
             }
         };
         
-        // Create chart
-        vizChart = new Chart(ctx, config);
-    }
-    
-    // Format value based on its type
-    function formatValue(value, type) {
-        if (type === 'currency') {
-            return '$' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        } else if (type === 'number') {
-            return value.toLocaleString('en-US');
-        } else if (type === 'percent') {
-            return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
-        } else if (type === 'filesize') {
-            if (value >= 1048576) {
-                return (value / 1048576).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' MB';
-            } else if (value >= 1024) {
-                return (value / 1024).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' KB';
-            } else {
-                return value.toLocaleString('en-US') + ' bytes';
-            }
+        // Customize chart based on type
+        if (chartType === 'bar') {
+            config.options.scales = {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: measure.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: dimension.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+                    }
+                }
+            };
+        } else if (chartType === 'line') {
+            config.data.datasets[0].fill = false;
+            config.data.datasets[0].tension = 0.1;
+            config.options.scales = {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: measure.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: dimension.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+                    }
+                }
+            };
+        } else if (chartType === 'pie' || chartType === 'doughnut') {
+            // No scales for pie/doughnut charts
+            config.options.scales = undefined;
+        } else if (chartType === 'scatter') {
+            // For scatter plot, convert data to x/y coordinates
+            config.data.labels = null;
+            config.data.datasets[0].data = data.map((item, index) => ({
+                x: index + 1, // Use index as x-coordinate since we don't have another measure
+                y: item[measure] || 0
+            }));
+            config.options.scales = {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: measure.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: dimension.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+                    }
+                }
+            };
         }
-        return value;
+        
+        // Create the chart
+        this.chartInstances['main'] = new Chart(canvas, config);
     }
-    
-    // Visualization tab selection handler
-    const visualizationsTab = document.getElementById('visualizations-tab');
-    if (visualizationsTab) {
-        visualizationsTab.addEventListener('shown.bs.tab', function() {
-            // Update visualization options when tab is shown
-            updateFieldOptions();
-            
-            // If chart container exists but no chart yet, generate one with default settings
-            if (document.getElementById('visualizationChart') && !vizChart) {
-                generateVisualization();
-            }
-        });
+
+    /**
+     * Generate colors for chart elements
+     * @param {number} count - Number of colors needed
+     * @returns {Array} Array of color strings
+     */
+    generateColors(count) {
+        const colors = [];
+        for (let i = 0; i < count; i++) {
+            const hue = (i * 137) % 360; // Use golden angle for better distribution
+            colors.push(`rgba(${Math.floor(Math.random() * 200)}, ${Math.floor(Math.random() * 200)}, ${Math.floor(Math.random() * 200)}, 1)`);
+        }
+        return colors;
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if we're on the visualization page
+    const visualizationContainer = document.getElementById('visualization-container');
+    if (visualizationContainer) {
+        const visualizer = new AssessmentDataVisualizer();
+        visualizer.initialize('visualization-container');
+        
+        // Make available globally
+        window.assessmentVisualizer = visualizer;
     }
 });

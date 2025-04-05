@@ -12,7 +12,7 @@ import subprocess
 import time
 import json
 import datetime
-from sqlalchemy import func
+from sqlalchemy import func, text
 import requests
 from urllib.parse import urlparse
 from flask import jsonify, request, Blueprint, render_template
@@ -20,6 +20,8 @@ from flask import jsonify, request, Blueprint, render_template
 from app_setup import app, db, create_tables
 from routes import api_routes
 from models import Parcel, Property, Sale, Account, PropertyImage
+from app.db import execute_parameterized_query, parse_for_parameters, sql_to_natural_language
+from app.validators import validate_query
 
 # Register routes
 app.register_blueprint(api_routes)
@@ -662,10 +664,277 @@ def get_chart_data():
         }), 500
 
 
+@app.route('/api/query', methods=['POST'])
+def run_query():
+    """
+    Execute a SQL query against the database.
+    
+    Request JSON body:
+    {
+        "db": "postgres",  // Database to query
+        "query": "SELECT * FROM accounts LIMIT 10",  // SQL query to execute
+        "params": [],  // Optional list or dict of parameters
+        "param_style": "format",  // Optional parameter style
+        "page": 1,  // Optional page number for pagination
+        "page_size": 50,  // Optional page size for pagination
+        "security_level": "medium"  // Optional security validation level
+    }
+    
+    Returns:
+    {
+        "status": "success",
+        "data": [...],  // Query results
+        "execution_time": 0.123,  // Execution time in seconds
+        "pagination": {  // Pagination metadata if page_size is specified
+            "page": 1,
+            "page_size": 50,
+            "total_records": 1000,
+            "total_pages": 20,
+            "has_next": true,
+            "has_prev": false
+        }
+    }
+    """
+    try:
+        # Parse request JSON
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "No JSON data provided"
+            }), 400
+        
+        # Extract query parameters
+        db = data.get('db', 'postgres')
+        query = data.get('query')
+        params = data.get('params')
+        param_style = data.get('param_style', 'format')
+        page = data.get('page', 1)
+        page_size = data.get('page_size', 50)
+        security_level = data.get('security_level', 'medium')
+        
+        # Validate query is provided
+        if not query:
+            return jsonify({
+                "status": "error",
+                "message": "No SQL query provided"
+            }), 400
+        
+        # Log the query
+        logger.info(f"Executing query: {query[:100]}...")
+        
+        # If no params provided, try to extract them from the query
+        if params is None:
+            parsed_query, extracted_params = parse_for_parameters(query)
+            # Use the parsed query and extracted params if any were found
+            if extracted_params:
+                query = parsed_query
+                params = extracted_params
+                logger.info(f"Extracted {len(params)} parameters from query: {params}")
+        
+        # Execute the query
+        result = execute_parameterized_query(
+            db=db,
+            query=query,
+            params=params,
+            param_style=param_style,
+            page=page,
+            page_size=page_size,
+            security_level=security_level
+        )
+        
+        # Return the result
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error executing query: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Query execution failed: {str(e)}"
+        }), 500
+
+
+@app.route('/api/nl-to-sql', methods=['POST'])
+def nl_to_sql():
+    """
+    Convert natural language query to SQL.
+    
+    Request JSON body:
+    {
+        "query": "Find all accounts with property in Richland",
+        "db": "postgres"
+    }
+    
+    Returns:
+    {
+        "status": "success",
+        "sql": "SELECT * FROM accounts WHERE property_city = 'Richland'",
+        "explanation": "This query retrieves all account records where the property city is 'Richland'."
+    }
+    """
+    try:
+        # Parse request JSON
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "No JSON data provided"
+            }), 400
+        
+        # Extract query parameters
+        nl_query = data.get('query')
+        db = data.get('db', 'postgres')
+        
+        # Validate query is provided
+        if not nl_query:
+            return jsonify({
+                "status": "error",
+                "message": "No natural language query provided"
+            }), 400
+        
+        # Log the query
+        logger.info(f"Processing natural language query: {nl_query}")
+        
+        # For now, we'll just return a simple SQL query based on the natural language query
+        # In the future, this would use an AI model or more sophisticated NLP techniques
+        
+        # Example implementation (very basic pattern matching)
+        sql_query = ""
+        explanation = ""
+        
+        # Simple keyword matching for demonstration purposes
+        if "account" in nl_query.lower() or "accounts" in nl_query.lower():
+            table = "accounts"
+            if "richland" in nl_query.lower():
+                sql_query = f"SELECT * FROM {table} WHERE property_city = 'Richland'"
+                explanation = f"This query retrieves all account records where the property city is 'Richland'."
+            elif "owner" in nl_query.lower() and "name" in nl_query.lower():
+                sql_query = f"SELECT account_id, owner_name FROM {table}"
+                explanation = f"This query retrieves the account ID and owner name for all accounts."
+            else:
+                sql_query = f"SELECT * FROM {table} LIMIT 100"
+                explanation = f"This query retrieves up to 100 account records."
+        elif "property" in nl_query.lower() or "properties" in nl_query.lower():
+            table = "properties"
+            if "year" in nl_query.lower() and "built" in nl_query.lower():
+                sql_query = f"SELECT * FROM {table} WHERE year_built > 2000"
+                explanation = f"This query retrieves all properties built after the year 2000."
+            else:
+                sql_query = f"SELECT * FROM {table} LIMIT 100"
+                explanation = f"This query retrieves up to 100 property records."
+        elif "image" in nl_query.lower() or "images" in nl_query.lower():
+            table = "property_images"
+            sql_query = f"SELECT * FROM {table} LIMIT 100"
+            explanation = f"This query retrieves up to 100 property image records."
+        else:
+            # Default query
+            sql_query = "SELECT * FROM accounts LIMIT 10"
+            explanation = "This is a default query that retrieves up to 10 account records."
+        
+        # Get a natural language explanation of the SQL query
+        nl_explanation = sql_to_natural_language(sql_query)
+        
+        # Return the result
+        return jsonify({
+            "status": "success",
+            "sql": sql_query,
+            "explanation": nl_explanation or explanation
+        })
+        
+    except Exception as e:
+        logger.error(f"Error processing natural language query: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Natural language processing failed: {str(e)}"
+        }), 500
+
+
+@app.route('/api/parameterized-query', methods=['POST'])
+def parameterized_query():
+    """
+    Execute a parameterized SQL query with named parameters.
+    
+    Request JSON body:
+    {
+        "db": "postgres",
+        "query": "SELECT * FROM accounts WHERE account_id = :account_id",
+        "params": {
+            "account_id": "123456"
+        },
+        "param_style": "named",
+        "page": 1,
+        "page_size": 50
+    }
+    
+    Returns same structure as /api/query endpoint.
+    """
+    try:
+        # Parse request JSON
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "No JSON data provided"
+            }), 400
+        
+        # Extract query parameters
+        db = data.get('db', 'postgres')
+        query = data.get('query')
+        params = data.get('params')
+        param_style = data.get('param_style', 'named')
+        page = data.get('page', 1)
+        page_size = data.get('page_size', 50)
+        security_level = data.get('security_level', 'medium')
+        
+        # Validate query is provided
+        if not query:
+            return jsonify({
+                "status": "error",
+                "message": "No SQL query provided"
+            }), 400
+        
+        # Validate params is provided
+        if params is None:
+            return jsonify({
+                "status": "error",
+                "message": "No parameters provided for parameterized query"
+            }), 400
+        
+        # Log the query
+        logger.info(f"Executing parameterized query: {query[:100]}...")
+        
+        # Execute the query
+        result = execute_parameterized_query(
+            db=db,
+            query=query,
+            params=params,
+            param_style=param_style,
+            page=page,
+            page_size=page_size,
+            security_level=security_level
+        )
+        
+        # Return the result
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error executing parameterized query: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Parameterized query execution failed: {str(e)}"
+        }), 500
+
+
 @app.route('/')
 def index():
     """Handle the root route."""
     return render_template('index.html', title="MCP Assessor Agent API")
+
+
+@app.route('/query-builder')
+def query_builder():
+    """Render the query builder interface."""
+    return render_template('query_builder.html', title="SQL Query Builder")
 
 # This is called when the Flask app is run
 if __name__ == "__main__":

@@ -1,249 +1,300 @@
 /**
- * Query Visualization Helper Functions
- * This file contains functions for visualizing query results
+ * Query Visualization JavaScript
+ * 
+ * This file provides visualization capabilities for SQL query results.
  */
 
-// Create chart from query results
-function createVisualizationFromResults(data, container) {
-    if (!data || !data.data || data.data.length === 0) {
-        container.innerHTML = '<div class="alert alert-info">No data available for visualization</div>';
-        return;
+class QueryVisualizer {
+    constructor(canvasId = 'queryVisualization') {
+        this.canvas = document.getElementById(canvasId);
+        this.chart = null;
     }
-
-    // Check if data can be visualized
-    const numericColumns = getNumericColumns(data.data);
-    const dateColumns = getDateColumns(data.data);
-    const textColumns = getTextColumns(data.data);
-
-    // Clear container
-    container.innerHTML = '';
-
-    // Create visualization selector
-    const selectorDiv = document.createElement('div');
-    selectorDiv.className = 'mb-3';
-    selectorDiv.innerHTML = `
-        <div class="form-row">
-            <div class="col-md-4 mb-2">
-                <label for="chartType" class="form-label">Chart Type:</label>
-                <select id="chartType" class="form-select">
-                    <option value="bar">Bar Chart</option>
-                    <option value="line">Line Chart</option>
-                    <option value="pie">Pie Chart</option>
-                    <option value="scatter">Scatter Plot</option>
-                </select>
-            </div>
-            <div class="col-md-4 mb-2">
-                <label for="xAxis" class="form-label">X Axis:</label>
-                <select id="xAxis" class="form-select"></select>
-            </div>
-            <div class="col-md-4 mb-2">
-                <label for="yAxis" class="form-label">Y Axis:</label>
-                <select id="yAxis" class="form-select"></select>
-            </div>
-        </div>
-    `;
-    container.appendChild(selectorDiv);
-
-    // Create canvas for chart
-    const canvasDiv = document.createElement('div');
-    canvasDiv.className = 'mt-3';
-    canvasDiv.style.height = '400px';
-    canvasDiv.innerHTML = '<canvas id="resultChart"></canvas>';
-    container.appendChild(canvasDiv);
-
-    // Populate selectors
-    const xAxisSelect = document.getElementById('xAxis');
-    const yAxisSelect = document.getElementById('yAxis');
-    const chartTypeSelect = document.getElementById('chartType');
-
-    // Get column names
-    const columns = Object.keys(data.data[0]);
-
-    // Add options for X-axis (prefer text/date columns first)
-    [...textColumns, ...dateColumns, ...numericColumns, ...columns.filter(c => 
-        !textColumns.includes(c) && !dateColumns.includes(c) && !numericColumns.includes(c)
-    )].forEach(column => {
-        const option = document.createElement('option');
-        option.value = column;
-        option.textContent = column;
-        xAxisSelect.appendChild(option);
-    });
-
-    // Add options for Y-axis (prefer numeric columns first)
-    [...numericColumns, ...columns.filter(c => !numericColumns.includes(c))].forEach(column => {
-        const option = document.createElement('option');
-        option.value = column;
-        option.textContent = column;
-        yAxisSelect.appendChild(option);
-    });
-
-    // Set default selections if possible
-    if (textColumns.length > 0 && numericColumns.length > 0) {
-        xAxisSelect.value = textColumns[0];
-        yAxisSelect.value = numericColumns[0];
-    } else if (dateColumns.length > 0 && numericColumns.length > 0) {
-        xAxisSelect.value = dateColumns[0];
-        yAxisSelect.value = numericColumns[0];
-    } else if (columns.length >= 2) {
-        xAxisSelect.value = columns[0];
-        yAxisSelect.value = columns[1];
-    }
-
-    // Create initial chart
-    let chart = createChart(
-        data.data,
-        chartTypeSelect.value,
-        xAxisSelect.value,
-        yAxisSelect.value
-    );
-
-    // Add event listeners to update chart
-    chartTypeSelect.addEventListener('change', updateChart);
-    xAxisSelect.addEventListener('change', updateChart);
-    yAxisSelect.addEventListener('change', updateChart);
-
-    function updateChart() {
-        if (chart) {
-            chart.destroy();
+    
+    /**
+     * Analyze data to determine if it can be visualized
+     * 
+     * @param {Array} data - Array of objects (query results)
+     * @returns {Object} Visualization options including categorical and numerical columns
+     */
+    analyzeData(data) {
+        if (!data || data.length === 0) {
+            return {
+                canVisualize: false,
+                reason: 'No data to visualize'
+            };
         }
-        chart = createChart(
-            data.data,
-            chartTypeSelect.value,
-            xAxisSelect.value,
-            yAxisSelect.value
-        );
-    }
-}
-
-// Create a chart based on data and selected options
-function createChart(data, chartType, xAxisColumn, yAxisColumn) {
-    const ctx = document.getElementById('resultChart').getContext('2d');
-    
-    // Extract data for the chart
-    const labels = data.map(row => row[xAxisColumn]);
-    const values = data.map(row => row[yAxisColumn]);
-    
-    // Check if Y values are numeric
-    const areValuesNumeric = values.every(val => !isNaN(Number(val)));
-    
-    // If values are not numeric, count occurrences for bar/pie chart
-    let processedData;
-    let processedLabels;
-    
-    if (!areValuesNumeric && (chartType === 'bar' || chartType === 'pie')) {
-        const countMap = {};
-        values.forEach(val => {
-            countMap[val] = (countMap[val] || 0) + 1;
+        
+        // Get sample row and extract column information
+        const sampleRow = data[0];
+        const columns = Object.keys(sampleRow);
+        
+        // Analyze column types
+        const columnTypes = {};
+        const categoricalColumns = [];
+        const numericalColumns = [];
+        const dateColumns = [];
+        
+        // Analyze first row to determine potential column types
+        columns.forEach(col => {
+            const value = sampleRow[col];
+            
+            if (value === null || value === undefined) {
+                // Can't determine type from null/undefined
+                columnTypes[col] = 'unknown';
+            } else if (typeof value === 'number') {
+                columnTypes[col] = 'number';
+                numericalColumns.push(col);
+            } else if (typeof value === 'string') {
+                // Check if it's a date string
+                if (!isNaN(Date.parse(value)) && value.match(/^\d{4}-\d{2}-\d{2}|^\d{2}\/\d{2}\/\d{4}/)) {
+                    columnTypes[col] = 'date';
+                    dateColumns.push(col);
+                } else {
+                    // Count distinct values to determine if categorical
+                    const distinctValues = new Set(data.map(row => row[col])).size;
+                    
+                    // If number of distinct values is small relative to data size, it's likely categorical
+                    if (distinctValues <= Math.min(20, data.length / 5)) {
+                        columnTypes[col] = 'categorical';
+                        categoricalColumns.push(col);
+                    } else {
+                        columnTypes[col] = 'text';
+                    }
+                }
+            } else if (value instanceof Date) {
+                columnTypes[col] = 'date';
+                dateColumns.push(col);
+            } else {
+                columnTypes[col] = typeof value;
+            }
         });
         
-        processedLabels = Object.keys(countMap);
-        processedData = Object.values(countMap);
-    } else {
-        processedLabels = labels;
-        processedData = values.map(val => isNaN(Number(val)) ? 0 : Number(val));
+        // Determine if data is visualizable
+        const canVisualize = (
+            (categoricalColumns.length > 0 && numericalColumns.length > 0) || // Category + number
+            (dateColumns.length > 0 && numericalColumns.length > 0) // Time series
+        );
+        
+        return {
+            canVisualize,
+            columnTypes,
+            categoricalColumns,
+            numericalColumns,
+            dateColumns,
+            recommendedVisualizations: this.recommendVisualizations(categoricalColumns, numericalColumns, dateColumns, data.length)
+        };
     }
     
-    // Choose colors for the chart
-    const backgroundColors = [
-        'rgba(54, 162, 235, 0.5)',
-        'rgba(255, 99, 132, 0.5)',
-        'rgba(255, 206, 86, 0.5)',
-        'rgba(75, 192, 192, 0.5)',
-        'rgba(153, 102, 255, 0.5)',
-        'rgba(255, 159, 64, 0.5)',
-        'rgba(199, 199, 199, 0.5)',
-        'rgba(83, 102, 255, 0.5)',
-        'rgba(40, 159, 64, 0.5)',
-        'rgba(210, 199, 199, 0.5)',
-    ];
-    
-    // Create appropriate chart based on type
-    let chartConfig = {
-        type: chartType,
-        data: {
-            labels: processedLabels,
-            datasets: [{
-                label: yAxisColumn,
-                data: processedData,
-                backgroundColor: chartType === 'pie' || chartType === 'polarArea' 
-                    ? backgroundColors.slice(0, processedData.length) 
-                    : backgroundColors[0],
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true
+    /**
+     * Recommend visualization types based on data characteristics
+     */
+    recommendVisualizations(categoricalColumns, numericalColumns, dateColumns, rowCount) {
+        const recommendations = [];
+        
+        if (categoricalColumns.length > 0 && numericalColumns.length > 0) {
+            // Category + number: bar, pie, radar charts
+            recommendations.push({
+                type: 'bar',
+                suitability: 'high',
+                description: 'Bar chart comparing numerical values across categories',
+                dimensions: {
+                    x: categoricalColumns[0],
+                    y: numericalColumns[0]
                 }
+            });
+            
+            // Only recommend pie charts for limited categories
+            if (rowCount <= 10) {
+                recommendations.push({
+                    type: 'pie',
+                    suitability: 'medium',
+                    description: 'Pie chart showing proportion across categories',
+                    dimensions: {
+                        labels: categoricalColumns[0],
+                        values: numericalColumns[0]
+                    }
+                });
             }
         }
-    };
-    
-    // Remove scales for pie chart
-    if (chartType === 'pie') {
-        delete chartConfig.options.scales;
-    }
-    
-    return new Chart(ctx, chartConfig);
-}
-
-// Get numeric columns from data
-function getNumericColumns(data) {
-    const numericColumns = [];
-    if (!data || data.length === 0) return numericColumns;
-    
-    const firstRow = data[0];
-    for (const column in firstRow) {
-        // Check if all values in this column are numeric
-        const isNumeric = data.every(row => {
-            const val = row[column];
-            return val === null || val === undefined || !isNaN(Number(val));
-        });
         
-        if (isNumeric) numericColumns.push(column);
-    }
-    
-    return numericColumns;
-}
-
-// Get date columns from data
-function getDateColumns(data) {
-    const dateColumns = [];
-    if (!data || data.length === 0) return dateColumns;
-    
-    const firstRow = data[0];
-    for (const column in firstRow) {
-        // Check if column name suggests a date
-        if (column.toLowerCase().includes('date') || 
-            column.toLowerCase().includes('time') ||
-            column.toLowerCase().includes('created') ||
-            column.toLowerCase().includes('updated')) {
-            dateColumns.push(column);
+        if (dateColumns.length > 0 && numericalColumns.length > 0) {
+            // Time series: line, area charts
+            recommendations.push({
+                type: 'line',
+                suitability: 'high',
+                description: 'Line chart showing trends over time',
+                dimensions: {
+                    x: dateColumns[0],
+                    y: numericalColumns[0]
+                }
+            });
         }
+        
+        if (numericalColumns.length >= 2) {
+            // Two numerical columns: scatter plot
+            recommendations.push({
+                type: 'scatter',
+                suitability: 'medium',
+                description: 'Scatter plot showing relationship between two numerical variables',
+                dimensions: {
+                    x: numericalColumns[0],
+                    y: numericalColumns[1]
+                }
+            });
+        }
+        
+        return recommendations;
     }
     
-    return dateColumns;
+    /**
+     * Create a visualization based on the data and specified options
+     * 
+     * @param {Array} data - Array of objects (query results)
+     * @param {String} chartType - Type of chart to create
+     * @param {Object} options - Visualization options including dimensions
+     */
+    createVisualization(data, chartType = 'bar', options = {}) {
+        // Default options
+        const defaultOptions = {
+            xAxis: null,
+            yAxis: null,
+            limit: 50, // Limit number of data points
+            title: 'Query Results',
+            colors: [
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(255, 99, 132, 0.7)',
+                'rgba(54, 162, 235, 0.7)',
+                'rgba(255, 206, 86, 0.7)',
+                'rgba(153, 102, 255, 0.7)'
+            ]
+        };
+        
+        // Merge options
+        options = { ...defaultOptions, ...options };
+        
+        // Analyze data
+        const analysis = this.analyzeData(data);
+        
+        if (!analysis.canVisualize) {
+            console.error('Data cannot be visualized:', analysis.reason);
+            return null;
+        }
+        
+        // Default dimensions if not specified
+        if (!options.xAxis) {
+            options.xAxis = analysis.categoricalColumns.length > 0 ? 
+                analysis.categoricalColumns[0] : 
+                (analysis.dateColumns.length > 0 ? analysis.dateColumns[0] : null);
+        }
+        
+        if (!options.yAxis) {
+            options.yAxis = analysis.numericalColumns.length > 0 ? 
+                analysis.numericalColumns[0] : null;
+        }
+        
+        // If we can't determine axes, we can't visualize
+        if (!options.xAxis || !options.yAxis) {
+            console.error('Cannot determine axes for visualization');
+            return null;
+        }
+        
+        // Limit data points if needed
+        let visualData = data;
+        if (data.length > options.limit) {
+            visualData = data.slice(0, options.limit);
+        }
+        
+        // Extract axis values
+        const labels = visualData.map(row => row[options.xAxis]);
+        const values = visualData.map(row => row[options.yAxis]);
+        
+        // Destroy existing chart if any
+        if (this.chart) {
+            this.chart.destroy();
+        }
+        
+        // Create chart configuration
+        const chartConfig = {
+            type: chartType,
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: options.yAxis,
+                    data: values,
+                    backgroundColor: options.colors[0],
+                    borderColor: options.colors[0].replace('0.7', '1'),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: options.title
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${options.yAxis}: ${context.raw}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: options.yAxis
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: options.xAxis
+                        }
+                    }
+                }
+            }
+        };
+        
+        // Customize specific chart types
+        if (chartType === 'pie' || chartType === 'doughnut') {
+            // Pie charts don't have axes
+            delete chartConfig.options.scales;
+            
+            // Use all colors for different segments
+            chartConfig.data.datasets[0].backgroundColor = options.colors;
+            chartConfig.data.datasets[0].borderColor = options.colors.map(color => color.replace('0.7', '1'));
+        } else if (chartType === 'line') {
+            // Line charts need different styling
+            chartConfig.data.datasets[0].fill = false;
+            chartConfig.data.datasets[0].tension = 0.1;
+        } else if (chartType === 'scatter') {
+            // Scatter plots need special handling
+            chartConfig.data.labels = null; // No labels for scatter
+            chartConfig.data.datasets[0].data = visualData.map(row => ({
+                x: row[options.xAxis],
+                y: row[options.yAxis]
+            }));
+            chartConfig.options.scales.x.type = 'linear'; // Force linear scale
+        }
+        
+        // Create chart
+        const ctx = this.canvas.getContext('2d');
+        this.chart = new Chart(ctx, chartConfig);
+        
+        return this.chart;
+    }
 }
 
-// Get text columns from data
-function getTextColumns(data) {
-    const textColumns = [];
-    if (!data || data.length === 0) return textColumns;
-    
-    const firstRow = data[0];
-    for (const column in firstRow) {
-        // Check if column contains text values
-        const isText = data.some(row => {
-            const val = row[column];
-            return val !== null && typeof val === 'string' && isNaN(Number(val));
-        });
-        
-        if (isText) textColumns.push(column);
+// Initialize on load
+document.addEventListener('DOMContentLoaded', function() {
+    // Create global instance if canvas exists
+    const visualizationCanvas = document.getElementById('queryVisualization');
+    if (visualizationCanvas) {
+        window.queryVisualizer = new QueryVisualizer('queryVisualization');
     }
-    
-    return textColumns;
-}
+});

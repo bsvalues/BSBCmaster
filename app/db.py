@@ -1,568 +1,502 @@
 """
-This module handles database connections and SQL query execution.
+This module provides database connection and SQL query execution functionality.
+It handles parameter extraction, query validation, and secure execution against
+PostgreSQL and MSSQL databases.
 """
 
 import logging
-import os
 import re
 import time
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import psycopg2
 import psycopg2.extras
-from fastapi import HTTPException
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
+from flask import current_app
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, sessionmaker
 
-from app.settings import settings
+from app.validators import (DANGEROUS_KEYWORDS, SQL_INJECTION_PATTERNS,
+                           validate_query, validate_query_parameters)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global connection pools
-pg_pool = None
-flask_db = None
+# Initialize SQLAlchemy base class
+Base = declarative_base()
 
-def get_flask_db():
-    """Get the Flask SQLAlchemy instance to ensure consistency."""
-    global flask_db
-    if flask_db is None:
-        try:
-            # Import the db from app_setup to ensure we use the same instance
-            from app_setup import db as app_setup_db
-            flask_db = app_setup_db
-            logger.info("Using Flask SQLAlchemy instance from app_setup")
-        except ImportError:
-            logger.warning("Could not import db from app_setup, will use direct database connection")
-    return flask_db
 
-async def initialize_db():
-    """Initialize database connection pools on application startup."""
-    global pg_pool
-    try:
-        # First, try to get the Flask DB instance for model operations
-        flask_db = get_flask_db()
-        
-        # Initialize PostgreSQL connection pool for raw queries
-        db_url = os.environ.get("DATABASE_URL")
-        if not db_url:
-            logger.warning("No DATABASE_URL environment variable found")
-            db_url = os.environ.get("DB_POSTGRES_URL")
-        
-        if db_url:
-            logger.info("Using database URL for PostgreSQL connection")
-            import psycopg2.pool
-            pg_pool = psycopg2.pool.SimpleConnectionPool(
-                1, 10, db_url
-            )
-            logger.info("PostgreSQL connection pool initialized successfully")
-        else:
-            logger.warning("No PostgreSQL connection URL available")
-    except Exception as e:
-        logger.error(f"Error initializing database connections: {str(e)}")
-        # Don't raise the exception, just log it
-        logger.error("Continuing without database connection")
-
-async def close_db_connections():
-    """Close database connections on application shutdown."""
-    global pg_pool
-    if pg_pool:
-        pg_pool.closeall()
-        logger.info("PostgreSQL connection pool closed")
-
-async def get_db_pool(db_type):
+def get_connection_string(db: str = "postgres") -> str:
     """
-    Get the appropriate database connection pool.
+    Get database connection string from environment variables.
     
     Args:
-        db_type: The database type (postgres, mssql)
+        db: The database type ('postgres' or 'mssql')
         
     Returns:
-        Database connection pool or None if unavailable
+        str: Database connection string
     """
-    global pg_pool
-    
-    # Initialize the pool if needed
-    if not pg_pool:
-        try:
-            await initialize_db()
-        except Exception as e:
-            logger.error(f"Failed to initialize database pool: {str(e)}")
-            return None
-    
-    # Return the appropriate pool based on database type
-    if db_type == "postgres" or getattr(db_type, "value", "") == "postgres":
-        return pg_pool
+    if db == "postgres":
+        # Use the DATABASE_URL environment variable
+        conn_string = current_app.config.get("SQLALCHEMY_DATABASE_URI")
+        if not conn_string:
+            raise ValueError("DATABASE_URL environment variable not set")
+        return conn_string
+    elif db == "mssql":
+        # Construct MSSQL connection string from environment variables
+        from os import environ
+        server = environ.get("MSSQL_SERVER")
+        database = environ.get("MSSQL_DATABASE")
+        username = environ.get("MSSQL_USERNAME")
+        password = environ.get("MSSQL_PASSWORD")
+        
+        if not all([server, database, username, password]):
+            raise ValueError("MSSQL environment variables not set")
+            
+        return f"mssql+pyodbc://{username}:{password}@{server}/{database}?driver=ODBC+Driver+17+for+SQL+Server"
     else:
-        logger.warning(f"Unsupported database type: {db_type}")
-        return None
+        raise ValueError(f"Unsupported database type: {db}")
 
-def get_postgres_connection():
-    """Get a connection from the PostgreSQL connection pool."""
-    global pg_pool
-    if not pg_pool:
-        raise HTTPException(
-            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Database connection not initialized",
-        )
-    
-    try:
-        conn = pg_pool.getconn()
-        return conn
-    except Exception as e:
-        logger.error(f"Error getting PostgreSQL connection: {str(e)}")
-        raise HTTPException(
-            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Database connection error: {str(e)}",
-        )
-        
-def get_pg_connection():
+
+def create_db_engine(db: str = "postgres"):
     """
-    Alias for get_postgres_connection for consistency with query_executor module.
-    """
-    return get_postgres_connection()
-    
-def close_pg_connection(conn):
-    """
-    Return a PostgreSQL connection to the connection pool.
+    Create SQLAlchemy engine for the specified database.
     
     Args:
-        conn: The PostgreSQL connection to return to the pool
-    """
-    global pg_pool
-    if conn and pg_pool:
-        try:
-            pg_pool.putconn(conn)
-        except Exception as e:
-            logger.error(f"Error returning PostgreSQL connection to pool: {str(e)}")
-
-def is_safe_query(query: str) -> bool:
-    """
-    Basic SQL injection prevention by checking for unsafe SQL operations.
-    
-    Args:
-        query: The SQL query to validate
+        db: The database type ('postgres' or 'mssql')
         
     Returns:
-        bool: True if the query appears safe, False otherwise
+        Engine: SQLAlchemy engine object
     """
-    # Normalize the query - lowercase, remove extra whitespace
-    normalized_query = ' '.join(query.lower().split())
-    
-    # Check for potentially harmful SQL operations
-    unsafe_patterns = [
-        r'\bdrop\s+(?:table|database|schema|view|index|user)\b',
-        r'\btruncate\s+(?:table)\b',
-        r'\bdelete\s+(?:from\b|[^;]+;)',  # Only block full DELETE operations
-        r'\balter\s+(?:table|database|schema|system)\b',
-        r'\bcreate\s+(?:table|database|schema|view|user)\b',
-        r'\binsert\s+into\b',
-        r'\bupdate\s+(?:[^;]+set)\b',
-        r'\bgrant\b',
-        r'\brevoke\b',
-        r'\bcopy\b',
-        r'(?:--|#|\/\*).*',  # SQL comments that might hide code
-        r';\s*(?:\w+)',      # Multiple statements
-        r'(?:exec|execute|call|xp_cmdshell)',  # Execute commands
-        r'(?:union\s+(?:all\s+)?select)',  # UNION-based injection
-        r'(?:into\s+(?:outfile|dumpfile))',  # File operations
-        r'(?:load_file|benchmark|sleep)',  # Functions used in injection
-    ]
-    
-    # Check for unsafe patterns
-    for pattern in unsafe_patterns:
-        if re.search(pattern, normalized_query):
-            return False
-    
-    # If no unsafe patterns were found, consider it safe
-    return True
+    conn_string = get_connection_string(db)
+    engine = create_engine(
+        conn_string,
+        pool_pre_ping=True,
+        pool_recycle=300
+    )
+    return engine
 
-def execute_parameterized_query(
-    db: str, 
-    query: str, 
-    params: Optional[List[Any]] = None,
-    page: int = 1,
-    page_size: Optional[int] = None
-) -> Dict[str, Any]:
+
+def parse_for_parameters(sql_query: str) -> Tuple[str, List[Any]]:
     """
-    Execute a parameterized SQL query on the specified database with pagination support.
+    Extract parameters from a SQL query and replace them with placeholders.
     
     Args:
-        db: Database to use ('mssql' or 'postgres')
-        query: SQL query with parameter placeholders (? for MSSQL, %s for PostgreSQL)
-        params: List of parameter values to be sanitized and inserted
-        page: Page number for paginated results (starting from 1)
-        page_size: Number of records per page, if None uses settings.MAX_RESULTS
-        
-    Returns:
-        Dictionary containing:
-            - data: List of dictionaries representing the query results
-            - pagination: Dictionary with pagination metadata
-            - count: Total number of records matching the query
-            
-    Raises:
-        HTTPException: If a database error occurs
-    """
-    # Get MAX_RESULTS from settings or use default
-    max_results = 100  # Default value
-    try:
-        from app.settings import settings
-        if hasattr(settings, 'MAX_RESULTS'):
-            max_results = settings.MAX_RESULTS
-    except (ImportError, AttributeError):
-        logger.warning("Could not get MAX_RESULTS from settings, using default of 100")
-    
-    # Set default page size if not provided
-    if page_size is None:
-        page_size = max_results
-    
-    # Validate inputs
-    if page < 1:
-        page = 1
-    if page_size < 1 or page_size > max_results:
-        page_size = max_results
-    
-    # Safety check
-    if not is_safe_query(query):
-        logger.warning(f"Unsafe query detected: {query}")
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail="Query contains potentially unsafe operations and was rejected.",
-        )
-    
-    # Start timing for performance measurement
-    start_time = time.time()
-    
-    # If params is None, use empty list for consistency
-    if params is None:
-        params = []
-    
-    # Execute query based on database type
-    if db.lower() == 'postgres':
-        try:
-            result = execute_postgres_query(query, params, page, page_size, start_time)
-            return result
-        except Exception as e:
-            logger.error(f"PostgreSQL query error: {str(e)}, Query: {query}, Params: {params}")
-            raise HTTPException(
-                status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Database error: {str(e)}",
-            )
-    else:
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported database type: {db}",
-        )
-
-def execute_query_with_explicit_params(
-    db: str,
-    query: str,
-    params: Any,
-    page: int = 1,
-    page_size: int = 50
-) -> Dict[str, Any]:
-    """
-    Execute a query with explicit parameter handling, particularly useful for 
-    PostgreSQL with various parameter styles.
-    
-    This function uses direct mogrification to safely substitute parameter values,
-    which is especially useful for PostgreSQL when dealing with ? placeholders or
-    :named parameters that need to be converted to PostgreSQL's %s style.
-    
-    Args:
-        db: Database type (postgres, mssql)
-        query: SQL query with ? or :name placeholders
-        params: List or Dict of parameter values
-        page: Page number for pagination (starting from 1)
-        page_size: Number of results per page
-        
-    Returns:
-        Dict containing query results and metadata
-    """
-    import time
-    start_time = time.time()
-    
-    if db.lower() != "postgres":
-        raise ValueError("This function is only for PostgreSQL queries")
-    
-    # Handle different parameter styles
-    postgres_query = query
-    postgres_params = params
-    
-    # Convert parameters based on their type
-    if isinstance(params, dict):
-        # For named parameters, convert :name to %s and build a parameter list
-        named_params = []
-        import re
-        
-        # Find all parameter names in the query
-        param_names = re.findall(r':([a-zA-Z0-9_]+)', query)
-        
-        # Build the parameter list in order of appearance
-        for name in param_names:
-            if name in params:
-                named_params.append(params[name])
-            else:
-                raise ValueError(f"Named parameter '{name}' not found in params dictionary")
-        
-        # Replace :name with %s placeholders
-        postgres_query = re.sub(r':([a-zA-Z0-9_]+)', '%s', query)
-        postgres_params = named_params
-        
-        logger.info(f"Converted named parameters query: {postgres_query}")
-        logger.info(f"Parameter list: {postgres_params}")
-    else:
-        # For positional parameters (qmark style), just replace ? with %s
-        postgres_query = query.replace('?', '%s')
-        logger.info(f"Converted query placeholders: {postgres_query}")
-    
-    # For PostgreSQL, use direct safe SQL execution with mogrify
-    conn = None
-    try:
-        # Get connection from pool
-        conn = get_postgres_connection()
-        
-        # Create cursor
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-            # Set a timeout for long-running queries
-            cursor.execute("SET statement_timeout TO 30000")  # 30 seconds
-            
-            # First prepare the main query with pagination
-            offset = (page - 1) * page_size
-            paginated_query = f"{postgres_query} LIMIT {page_size} OFFSET {offset}"
-            
-            try:
-                # Log the mogrified query (with parameters substituted) for debugging
-                if postgres_params:
-                    debug_query = cursor.mogrify(paginated_query, postgres_params).decode('utf-8')
-                    logger.info(f"Executing: {debug_query}")
-            except Exception as e:
-                logger.warning(f"Could not create debug query: {str(e)}")
-            
-            # Execute the paginated query safely with parameters
-            cursor.execute(paginated_query, postgres_params)
-            results = cursor.fetchall()
-            
-            # Now get total count with a separate query
-            # We use tuple params to ensure parameters are properly passed to the subquery
-            count_query = f"SELECT COUNT(*) AS total FROM ({postgres_query}) AS count_subquery"
-            
-            try:
-                if postgres_params:
-                    debug_count = cursor.mogrify(count_query, postgres_params).decode('utf-8')
-                    logger.info(f"Count query: {debug_count}")
-            except Exception as e:
-                logger.warning(f"Could not create debug count query: {str(e)}")
-            
-            # Execute the count query safely
-            cursor.execute(count_query, postgres_params)
-            count_result = cursor.fetchone()
-            total_count = count_result["total"] if count_result else 0
-            
-            # Create pagination metadata
-            total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
-            has_next = page < total_pages
-            has_prev = page > 1
-            
-            pagination = {
-                "page": page,
-                "pages": total_pages,
-                "page_size": page_size,
-                "total": total_count,
-                "has_next": has_next,
-                "has_prev": has_prev,
-            }
-            
-            # Get column types
-            column_types = {}
-            if results:
-                for key in results[0].keys():
-                    column_types[key] = str(type(results[0][key]).__name__)
-            
-            # Format results as list of dictionaries
-            formatted_results = [dict(row) for row in results]
-            
-            # Execution time
-            end_time = time.time()
-            execution_time = end_time - start_time
-            
-            # Build final result
-            return {
-                "status": "success",
-                "data": formatted_results,
-                "execution_time": execution_time,
-                "pagination": pagination,
-                "column_types": column_types
-            }
-    except Exception as e:
-        logger.error(f"Error in execute_query_with_explicit_params: {str(e)}")
-        raise
-    finally:
-        # Return connection to pool
-        if conn and pg_pool:
-            pg_pool.putconn(conn)
-
-def execute_postgres_query(
-    query: str, 
-    params: Optional[List[Any]], 
-    page: int, 
-    page_size: int,
-    start_time: float
-) -> Dict[str, Any]:
-    """Execute a query on PostgreSQL with pagination."""
-    conn = None
-    try:
-        # Get connection from pool
-        conn = get_postgres_connection()
-        
-        # Create cursor with dictionary results
-        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
-            # Set query timeout (default to 30 seconds if not in settings)
-            timeout_seconds = 30  # Default timeout
-            try:
-                from app.settings import settings
-                if hasattr(settings, 'TIMEOUT_SECONDS'):
-                    timeout_seconds = settings.TIMEOUT_SECONDS
-            except (ImportError, AttributeError):
-                logger.warning("Could not get TIMEOUT_SECONDS from settings, using default of 30 seconds")
-                
-            cursor.execute(f"SET statement_timeout TO {timeout_seconds * 1000}")
-            
-            try:
-                # Check if the query is expected to return results (not a schema query)
-                if "information_schema.columns" in query or "information_schema.tables" in query:
-                    # For schema queries, skip the count and just execute the main query
-                    cursor.execute(query, params)
-                    results = cursor.fetchall()
-                    
-                    # No pagination for schema queries
-                    pagination = {
-                        "page": 1,
-                        "pages": 1,
-                        "page_size": len(results),
-                        "total": len(results),
-                        "has_next": False,
-                        "has_prev": False,
-                    }
-                else:
-                    # Regular query with pagination
-                    # Execute count query first (for pagination metadata)
-                    count_query = f"SELECT COUNT(*) AS total FROM ({query}) AS subquery"
-                    cursor.execute(count_query, params)
-                    count_result = cursor.fetchone()
-                    total_count = count_result["total"] if count_result else 0
-                    
-                    # Calculate pagination
-                    offset = (page - 1) * page_size
-                    paginated_query = f"{query} LIMIT {page_size} OFFSET {offset}"
-                    
-                    # Execute main query with pagination
-                    cursor.execute(paginated_query, params)
-                    results = cursor.fetchall()
-                    
-                    # Calculate pagination metadata
-                    total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 1
-                    has_next = page < total_pages
-                    has_prev = page > 1
-                    
-                    # Create pagination info
-                    pagination = {
-                        "page": page,
-                        "pages": total_pages,
-                        "page_size": page_size,
-                        "total": total_count,
-                        "has_next": has_next,
-                        "has_prev": has_prev,
-                    }
-                
-                # Format results as list of dictionaries
-                formatted_results = [dict(row) for row in results]
-                
-                # Calculate query execution time
-                execution_time = time.time() - start_time
-                
-                return {
-                    "status": "success",
-                    "data": formatted_results,
-                    "execution_time": execution_time,
-                    "pagination": pagination
-                }
-            except Exception as e:
-                logger.error(f"Error executing query: {str(e)}")
-                # Print more detailed error information for debugging
-                import traceback
-                logger.error(f"Traceback: {traceback.format_exc()}")
-                raise
-    finally:
-        # Return connection to pool
-        if conn and pg_pool:
-            pg_pool.putconn(conn)
-
-def parse_for_parameters(query: str) -> Tuple[str, List[Any]]:
-    """
-    Parse a raw SQL query to extract potential parameters.
-    This implementation handles common SQL literals including strings and numbers.
-    
-    Args:
-        query: Raw SQL query with potential literal values
+        sql_query: The SQL query to parse
         
     Returns:
         Tuple containing:
-            - Modified query with parameter placeholders
+            - The SQL query with string literals replaced by placeholders
             - List of extracted parameter values
     """
-    # Initialize parameters list
-    params = []
+    # Regular expressions for different types of literals
+    string_pattern = r"'([^'\\]*(\\.[^'\\]*)*)'"  # Matches string literals with proper escape handling
+    numeric_pattern = r"\b(\d+\.?\d*)\b"  # Matches numeric literals
     
-    # First, handle string literals (quoted values)
-    def replace_string_literals(match):
-        # Extract the string content (without quotes)
-        string_content = match.group(1)
-        params.append(string_content)
-        return "%s"  # PostgreSQL parameter placeholder
+    # Extract and replace string literals
+    string_params = re.findall(string_pattern, sql_query)
+    string_values = [match[0] for match in string_params]  # Extract the matched string values
     
-    # Handle single-quoted strings
-    query = re.sub(r"'([^']*)'", replace_string_literals, query)
+    # Replace string literals with placeholders
+    modified_query = sql_query
+    for value in string_values:
+        escaped_value = value.replace('\\', '\\\\').replace('.', '\\.').replace('+', '\\+')
+        modified_query = re.sub(f"'{escaped_value}'", "%s", modified_query, 1)
     
-    # Handle numeric literals
-    def replace_numeric_literals(match):
-        # Extract the numeric value
-        numeric_value = match.group(1)
-        # Convert to appropriate numeric type
-        if '.' in numeric_value:
-            value = float(numeric_value)
+    # Extract and replace numeric literals after WHERE, AND, OR, IN, etc.
+    # This is a heuristic to avoid replacing table names, column references, etc.
+    condition_keywords = r"\b(WHERE|AND|OR|IN|=|>|<|>=|<=|!=|<>|BETWEEN)\b"
+    potential_params = []
+    
+    # Match all numbers following a condition keyword, allowing for whitespace
+    number_matches = re.finditer(rf"{condition_keywords}\s+{numeric_pattern}", modified_query, re.IGNORECASE)
+    
+    for match in number_matches:
+        keyword_end = match.start(2)  # End of the keyword
+        number_start = match.start(3)  # Start of the number
+        number_end = match.end(3)  # End of the number
+        
+        # Extract the number
+        number_str = match.group(3)
+        
+        # Convert to appropriate type
+        if "." in number_str:
+            value = float(number_str)
         else:
-            value = int(numeric_value)
-        params.append(value)
-        return "%s"  # PostgreSQL parameter placeholder
+            value = int(number_str)
+        
+        potential_params.append((number_start, number_end, value))
     
-    # Replace numeric literals, but skip parameter placeholders
-    query = re.sub(r'(?<![%\w])([-+]?\d+(\.\d+)?)', replace_numeric_literals, query)
+    # Sort in reverse order to avoid index shifting when replacing
+    potential_params.sort(reverse=True)
+    
+    # Replace the numbers with placeholders
+    for start, end, value in potential_params:
+        modified_query = modified_query[:start] + "%s" + modified_query[end:]
+        string_values.append(value)
+    
+    return modified_query, string_values
+
+
+def convert_param_style(query: str, params: Union[List[Any], Dict[str, Any]], param_style: str) -> Tuple[str, Union[List[Any], Dict[str, Any]]]:
+    """
+    Convert between different SQL parameter styles.
+    
+    Args:
+        query: SQL query string
+        params: Query parameters (list or dict)
+        param_style: Parameter style ('named', 'qmark', 'format', 'numeric')
+        
+    Returns:
+        Tuple containing:
+            - The SQL query with appropriate parameter style
+            - Parameters in the appropriate format
+    """
+    if param_style == "named":  # :param style
+        # If params is a list, convert to a dict with autogenerated parameter names
+        if isinstance(params, list):
+            named_params = {f"p{i}": val for i, val in enumerate(params)}
+            query_with_named = query
+            for i, _ in enumerate(params):
+                query_with_named = query_with_named.replace("?", f":p{i}", 1)
+            return query_with_named, named_params
+        # For PostgreSQL, convert :param to %(param)s
+        converted_query = query
+        for param_name in params.keys():
+            pattern = rf':({param_name})\b'
+            converted_query = re.sub(pattern, r'%(\1)s', converted_query)
+        return converted_query, params
+        
+    elif param_style == "qmark":  # ? style
+        if isinstance(params, dict):
+            # Extract parameter names in order of appearance in the query
+            param_names = []
+            for param_name in params.keys():
+                pattern = rf':({param_name})\b'
+                if re.search(pattern, query):
+                    param_names.append(param_name)
+                    
+            # Convert to positional parameters
+            positional_params = [params[name] for name in param_names]
+            query_with_qmarks = query
+            for param_name in param_names:
+                query_with_qmarks = query_with_qmarks.replace(f":{param_name}", "?", 1)
+            return query_with_qmarks, positional_params
+        return query, params
+        
+    elif param_style == "format":  # %s style
+        if isinstance(params, dict):
+            # Similar to named, but converting to %s format for psycopg2
+            positional_params = []
+            # Extract parameter names in order of appearance
+            for param_name in params.keys():
+                pattern = rf':({param_name})\b'
+                matches = re.findall(pattern, query)
+                positional_params.extend([params[param_name]] * len(matches))
+            
+            # Replace named parameters with %s
+            converted_query = query
+            for param_name in params.keys():
+                pattern = rf':({param_name})\b'
+                converted_query = re.sub(pattern, '%s', converted_query)
+            return converted_query, positional_params
+        # For PostgreSQL, leave as %s format
+        return query, params
+        
+    elif param_style == "numeric":  # :1, :2, etc. style
+        if isinstance(params, list):
+            # Convert list to numeric style
+            converted_query = query
+            for i, _ in enumerate(params):
+                converted_query = converted_query.replace("?", f":{i+1}", 1)
+            return converted_query, params
+        # If dict, convert to list based on numeric placeholders
+        numeric_params = []
+        max_param_num = 0
+        # Find the highest parameter number
+        for match in re.finditer(r':(\d+)', query):
+            param_num = int(match.group(1))
+            max_param_num = max(max_param_num, param_num)
+            
+        # Create a list with the right size
+        numeric_params = [None] * max_param_num
+        # Fill in values from dict
+        for param_name, value in params.items():
+            if param_name.isdigit():
+                numeric_params[int(param_name) - 1] = value
+                
+        return query, numeric_params
     
     return query, params
 
-def test_db_connections() -> Dict[str, bool]:
-    """Test connections to configured databases."""
-    results = {
-        "postgres": False,
-        "mssql": False
-    }
+
+def execute_parameterized_query(db: str, query: str, params: Optional[Union[List[Any], Dict[str, Any]]] = None, 
+                              param_style: str = "format", page: int = 1, page_size: Optional[int] = None,
+                              security_level: str = "medium") -> Dict[str, Any]:
+    """
+    Execute a parameterized SQL query with security validation and pagination.
     
-    # Test PostgreSQL connection
-    if pg_pool:
-        try:
-            conn = get_postgres_connection()
-            with conn.cursor() as cursor:
-                cursor.execute("SELECT 1")
-                cursor.fetchone()
-            if pg_pool:
-                pg_pool.putconn(conn)
-            results["postgres"] = True
-        except Exception as e:
-            logger.error(f"PostgreSQL connection test failed: {str(e)}")
-    else:
-        logger.warning("PostgreSQL connection pool not initialized")
+    Args:
+        db: Database type ('postgres' or 'mssql')
+        query: SQL query to execute
+        params: Query parameters (list or dict)
+        param_style: Parameter style ('named', 'qmark', 'format', 'numeric')
+        page: Page number for pagination (1-based)
+        page_size: Number of records per page (None for all)
+        security_level: Security validation level ('high', 'medium', 'low', 'none')
+        
+    Returns:
+        Dict containing:
+            - status: 'success' or 'error'
+            - data: List of result records as dictionaries
+            - execution_time: Time taken to execute the query
+            - pagination: Pagination metadata
+                - page: Current page number
+                - page_size: Number of records per page
+                - total_records: Total number of records
+                - total_pages: Total number of pages
+                - has_next: Whether there is a next page
+                - has_prev: Whether there is a previous page
+    """
+    start_time = time.time()
     
-    # MSSQL connection would be tested here if implemented
+    try:
+        # Validate query for security vulnerabilities
+        if security_level != "none":
+            validation_result = validate_query(query, security_level)
+            if not validation_result["is_safe"]:
+                return {
+                    "status": "error",
+                    "message": f"Query validation failed: {validation_result['reason']}",
+                    "execution_time": time.time() - start_time
+                }
+        
+        # Convert parameter style if needed
+        if params:
+            query, params = convert_param_style(query, params, param_style)
+            
+            # Validate parameters
+            param_validation_result = validate_query_parameters(params)
+            if not param_validation_result["is_valid"]:
+                return {
+                    "status": "error",
+                    "message": f"Parameter validation failed: {param_validation_result['reason']}",
+                    "execution_time": time.time() - start_time
+                }
+        
+        # Add pagination if page_size is specified
+        original_query = query
+        count_query = None
+        
+        if page_size:
+            # For PostgreSQL
+            if db == "postgres":
+                # Create a count query to get total records
+                count_query = f"SELECT COUNT(*) AS total_count FROM ({original_query}) AS count_subquery"
+                
+                # Add pagination to the original query
+                offset = (page - 1) * page_size
+                query = f"{original_query} LIMIT {page_size} OFFSET {offset}"
+            
+            # For MSSQL (using SQL Server 2012+ pagination)
+            elif db == "mssql":
+                # Need to make sure the query has an ORDER BY clause for OFFSET/FETCH
+                if "ORDER BY" not in query.upper():
+                    # Add a default ORDER BY on the first column
+                    query = f"{query} ORDER BY 1"
+                
+                # Add pagination
+                offset = (page - 1) * page_size
+                query = f"{query} OFFSET {offset} ROWS FETCH NEXT {page_size} ROWS ONLY"
+                
+                # Create a count query
+                count_query = f"SELECT COUNT(*) AS total_count FROM ({original_query}) AS count_subquery"
+                
+        # Execute query using the appropriate database driver
+        if db == "postgres":
+            # Prepare connection
+            conn_string = get_connection_string(db)
+            
+            # Strip sqlalchemy prefix if present
+            if conn_string.startswith('postgresql://'):
+                conn_string = conn_string.replace('postgresql://', '')
+            elif conn_string.startswith('postgresql+psycopg2://'):
+                conn_string = conn_string.replace('postgresql+psycopg2://', '')
+                
+            # Create connection
+            conn = psycopg2.connect(conn_string)
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Execute the query
+            try:
+                if params:
+                    cursor.execute(query, params)
+                else:
+                    cursor.execute(query)
+                
+                # Fetch results
+                results = cursor.fetchall()
+                
+                # Get the column names
+                column_names = [desc[0] for desc in cursor.description]
+                
+                # Execute count query if pagination is enabled
+                total_records = None
+                total_pages = None
+                
+                if count_query:
+                    cursor.execute(count_query, params)
+                    count_result = cursor.fetchone()
+                    total_records = count_result["total_count"]
+                    total_pages = (total_records + page_size - 1) // page_size
+                
+            finally:
+                cursor.close()
+                conn.close()
+            
+        elif db == "mssql":
+            # Use SQLAlchemy for MSSQL
+            engine = create_db_engine(db)
+            with engine.connect() as connection:
+                # Execute the main query
+                if params:
+                    if isinstance(params, list):
+                        result = connection.execute(text(query), params)
+                    else:
+                        result = connection.execute(text(query), **params)
+                else:
+                    result = connection.execute(text(query))
+                
+                # Fetch results
+                results = [dict(row) for row in result]
+                
+                # Execute count query if pagination is enabled
+                total_records = None
+                total_pages = None
+                
+                if count_query:
+                    if params:
+                        if isinstance(params, list):
+                            count_result = connection.execute(text(count_query), params)
+                        else:
+                            count_result = connection.execute(text(count_query), **params)
+                    else:
+                        count_result = connection.execute(text(count_query))
+                    
+                    total_records = count_result.fetchone()[0]
+                    total_pages = (total_records + page_size - 1) // page_size
+        
+        # Calculate execution time
+        execution_time = time.time() - start_time
+        
+        # Prepare pagination metadata
+        pagination = None
+        if page_size:
+            pagination = {
+                "page": page,
+                "page_size": page_size,
+                "total_records": total_records,
+                "total_pages": total_pages,
+                "has_next": page < total_pages if total_pages else False,
+                "has_prev": page > 1
+            }
+        
+        # Return results
+        return {
+            "status": "success",
+            "data": results,
+            "execution_time": execution_time,
+            "pagination": pagination
+        }
+        
+    except Exception as e:
+        logger.error(f"Error executing query: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Query execution failed: {str(e)}",
+            "execution_time": time.time() - start_time
+        }
+
+
+def sql_to_natural_language(sql_query: str) -> str:
+    """
+    Convert SQL query to a natural language description.
     
-    return results
+    Args:
+        sql_query: SQL query to convert
+        
+    Returns:
+        Natural language description of the query
+    """
+    # This is a simplified implementation
+    # A more comprehensive implementation would use a proper SQL parser
+    
+    # Normalize whitespace and convert to uppercase for easier pattern matching
+    query = re.sub(r'\s+', ' ', sql_query).strip()
+    
+    # Extract main components
+    select_match = re.search(r'SELECT\s+(.*?)\s+FROM', query, re.IGNORECASE)
+    from_match = re.search(r'FROM\s+(.*?)(?:\s+WHERE|\s+GROUP BY|\s+ORDER BY|\s+LIMIT|\s*$)', query, re.IGNORECASE)
+    where_match = re.search(r'WHERE\s+(.*?)(?:\s+GROUP BY|\s+ORDER BY|\s+LIMIT|\s*$)', query, re.IGNORECASE)
+    group_by_match = re.search(r'GROUP BY\s+(.*?)(?:\s+ORDER BY|\s+LIMIT|\s*$)', query, re.IGNORECASE)
+    order_by_match = re.search(r'ORDER BY\s+(.*?)(?:\s+LIMIT|\s*$)', query, re.IGNORECASE)
+    limit_match = re.search(r'LIMIT\s+(\d+)(?:\s+OFFSET\s+(\d+))?', query, re.IGNORECASE)
+    join_matches = re.finditer(r'(INNER|LEFT|RIGHT|FULL)?\s*JOIN\s+(.*?)\s+ON\s+(.*?)(?:\s+(?:INNER|LEFT|RIGHT|FULL)?\s*JOIN|\s+WHERE|\s+GROUP BY|\s+ORDER BY|\s+LIMIT|\s*$)', query, re.IGNORECASE)
+    
+    # Basic structure
+    description = "This query"
+    
+    # FROM clause
+    if from_match:
+        tables = from_match.group(1).strip()
+        description += f" retrieves data from {tables}"
+    
+    # JOIN clauses
+    join_descriptions = []
+    for join_match in join_matches:
+        join_type = join_match.group(1) or "INNER"
+        join_table = join_match.group(2).strip()
+        join_condition = join_match.group(3).strip()
+        join_descriptions.append(f"joins with {join_table} on {join_condition}")
+    
+    if join_descriptions:
+        description += " and " + ", ".join(join_descriptions)
+    
+    # SELECT clause
+    if select_match:
+        columns = select_match.group(1).strip()
+        if columns == '*':
+            description += ", selecting all columns"
+        else:
+            description += f", selecting {columns}"
+    
+    # WHERE clause
+    if where_match:
+        conditions = where_match.group(1).strip()
+        description += f", filtered by {conditions}"
+    
+    # GROUP BY clause
+    if group_by_match:
+        grouping = group_by_match.group(1).strip()
+        description += f", grouped by {grouping}"
+    
+    # ORDER BY clause
+    if order_by_match:
+        ordering = order_by_match.group(1).strip()
+        description += f", ordered by {ordering}"
+    
+    # LIMIT clause
+    if limit_match:
+        limit = limit_match.group(1)
+        offset = limit_match.group(2)
+        if offset:
+            description += f", returning {limit} records starting from record {offset}"
+        else:
+            description += f", returning up to {limit} records"
+    
+    description += "."
+    
+    return description

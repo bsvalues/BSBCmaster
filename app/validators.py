@@ -39,152 +39,174 @@ DANGEROUS_KEYWORDS = {
     ]
 }
 
-def is_valid_sql_query(query: str) -> Dict[str, Any]:
+
+def validate_query(query: str, security_level: str = "medium") -> Dict[str, Any]:
     """
-    Validate a SQL query for potential security issues.
+    Validate a SQL query for security concerns.
     
     Args:
-        query: SQL query string
+        query: SQL query to validate
+        security_level: Security level ('high', 'medium', 'low', 'none')
         
     Returns:
-        Dict with validation results:
-            - valid: True if no issues found, False otherwise
-            - issues: List of detected issues
-            - severity: 'high', 'medium', 'low', or 'none'
+        Dictionary containing validation result:
+            - is_safe: Boolean indicating whether the query is safe
+            - reason: Reason for failure if not safe
     """
-    issues = []
-    severity = "none"
+    query = query.strip()
     
-    # Check for SQL injection patterns
+    # Skip validation for 'none' security level
+    if security_level == "none":
+        return {"is_safe": True}
+    
+    # Check for basic SQL injection patterns (all security levels)
     for pattern in SQL_INJECTION_PATTERNS:
         if re.search(pattern, query):
-            issues.append(f"Detected potentially harmful pattern: {pattern}")
-            severity = "high"
+            reason = f"Query contains potential SQL injection pattern: {pattern}"
+            logger.warning(f"SQL validation failed: {reason}")
+            return {"is_safe": False, "reason": reason}
     
-    # Check for dangerous keywords
-    for category, keywords in DANGEROUS_KEYWORDS.items():
-        for keyword in keywords:
+    # Check for write operations (medium and high security)
+    if security_level in ["medium", "high"]:
+        for keyword in DANGEROUS_KEYWORDS["write_operations"]:
             if re.search(rf'\b{keyword}\b', query, re.IGNORECASE):
-                issues.append(f"Detected potentially dangerous keyword: {keyword}")
-                severity = max(severity, "medium")
+                reason = f"Query contains write operation: {keyword}"
+                logger.warning(f"SQL validation failed: {reason}")
+                return {"is_safe": False, "reason": reason}
     
-    # Normalize whitespace for better pattern matching
-    normalized_query = re.sub(r'\s+', ' ', query.strip())
+    # Check for system operations and information disclosure (high security only)
+    if security_level == "high":
+        # System operations
+        for keyword in DANGEROUS_KEYWORDS["system_operations"]:
+            if re.search(rf'\b{keyword}\b', query, re.IGNORECASE):
+                reason = f"Query contains system operation: {keyword}"
+                logger.warning(f"SQL validation failed: {reason}")
+                return {"is_safe": False, "reason": reason}
+        
+        # Information disclosure
+        for keyword in DANGEROUS_KEYWORDS["information_disclosure"]:
+            if re.search(rf'\b{keyword}\b', query, re.IGNORECASE):
+                reason = f"Query contains potential information disclosure: {keyword}"
+                logger.warning(f"SQL validation failed: {reason}")
+                return {"is_safe": False, "reason": reason}
     
-    # Check for stacked queries (multiple statements)
-    if re.search(r';[ \t\r\n]*[a-zA-Z]', normalized_query):
-        issues.append("Multiple SQL statements detected")
-        severity = max(severity, "high")
+    # Check query structure for common issues (all security levels)
+    # 1. No query provided
+    if not query:
+        return {"is_safe": False, "reason": "Empty query provided"}
     
-    # Check for unbalanced quotes or comments
-    single_quotes = len(re.findall(r"'", query)) % 2
-    double_quotes = len(re.findall(r'"', query)) % 2
-    comment_start = len(re.findall(r'/\*', query))
-    comment_end = len(re.findall(r'\*/', query))
+    # 2. Simple validation that the query looks like a SELECT statement
+    if not query.lstrip().upper().startswith("SELECT"):
+        reason = "Query must start with SELECT"
+        logger.warning(f"SQL validation failed: {reason}")
+        return {"is_safe": False, "reason": reason}
     
-    if single_quotes != 0:
-        issues.append("Unbalanced single quotes")
-        severity = max(severity, "medium")
-    
-    if double_quotes != 0:
-        issues.append("Unbalanced double quotes")
-        severity = max(severity, "medium")
-    
-    if comment_start != comment_end:
-        issues.append("Unbalanced comment blocks")
-        severity = max(severity, "medium")
-    
-    return {
-        "valid": len(issues) == 0,
-        "issues": issues,
-        "severity": severity
-    }
+    # All checks passed
+    return {"is_safe": True}
 
-def validate_natural_language_prompt(prompt: str) -> Dict[str, Any]:
+
+def validate_query_parameters(params: Union[List[Any], Dict[str, Any]]) -> Dict[str, Any]:
     """
-    Validate a natural language prompt for potential issues.
+    Validate query parameters for security concerns.
     
     Args:
-        prompt: Natural language prompt string
+        params: Query parameters (list or dict)
         
     Returns:
-        Dict with validation results:
-            - valid: True if no issues found, False otherwise
-            - issues: List of detected issues
-            - severity: 'high', 'medium', 'low', or 'none'
+        Dictionary containing validation result:
+            - is_valid: Boolean indicating whether the parameters are valid
+            - reason: Reason for failure if not valid
     """
-    issues = []
-    severity = "none"
+    if params is None:
+        return {"is_valid": True}
     
-    # Check for empty or too short prompts
-    if not prompt or len(prompt.strip()) < 5:
-        issues.append("Prompt is too short")
-        severity = "low"
+    # Check parameter types
+    if not isinstance(params, (list, dict)):
+        return {
+            "is_valid": False,
+            "reason": f"Parameters must be a list or dictionary, got {type(params).__name__}"
+        }
     
-    # Check for potential code injection
-    if re.search(r'<script|<iframe|<img|<a\s+', prompt, re.IGNORECASE):
-        issues.append("Potential HTML/JavaScript injection detected")
-        severity = "high"
+    # For dictionary parameters
+    if isinstance(params, dict):
+        # Check all parameter names
+        for key in params.keys():
+            # Only allow alphanumeric and underscore in parameter names
+            if not re.match(r'^[a-zA-Z0-9_]+$', str(key)):
+                return {
+                    "is_valid": False,
+                    "reason": f"Invalid parameter name: {key}. Only alphanumeric and underscore are allowed."
+                }
+            
+            # Check parameter values
+            param_value = params[key]
+            validation_result = validate_parameter_value(param_value)
+            if not validation_result["is_valid"]:
+                return validation_result
     
-    # Check for SQL injection patterns (in case they're trying to trick the system)
-    for pattern in SQL_INJECTION_PATTERNS:
-        if re.search(pattern, prompt):
-            issues.append("SQL patterns detected in natural language prompt")
-            severity = "medium"
+    # For list parameters
+    elif isinstance(params, list):
+        # Check each parameter value
+        for i, param_value in enumerate(params):
+            validation_result = validate_parameter_value(param_value)
+            if not validation_result["is_valid"]:
+                return validation_result
     
-    # Check for prompts that are just SQL commands
-    if re.search(r'^SELECT\s+|\bFROM\b|\bWHERE\b', prompt, re.IGNORECASE):
-        issues.append("Prompt appears to be a SQL query instead of natural language")
-        severity = "low"
-    
-    return {
-        "valid": len(issues) == 0 or severity == "low",  # Allow low severity issues
-        "issues": issues,
-        "severity": severity
-    }
+    # All checks passed
+    return {"is_valid": True}
 
-def validate_pagination_params(page: int, page_size: int, max_page_size: int = 100) -> Dict[str, Any]:
+
+def validate_parameter_value(value: Any) -> Dict[str, Any]:
     """
-    Validate pagination parameters.
+    Validate an individual parameter value.
     
     Args:
-        page: Page number
-        page_size: Page size
-        max_page_size: Maximum allowed page size
+        value: Parameter value to validate
         
     Returns:
-        Dict with validation results:
-            - valid: True if no issues found, False otherwise
-            - issues: List of detected issues
-            - severity: 'high', 'medium', 'low', or 'none'
-            - corrected_page: Corrected page number if needed
-            - corrected_page_size: Corrected page size if needed
+        Dictionary containing validation result:
+            - is_valid: Boolean indicating whether the value is valid
+            - reason: Reason for failure if not valid
     """
-    issues = []
-    severity = "none"
-    corrected_page = page
-    corrected_page_size = page_size
+    # Allow None values
+    if value is None:
+        return {"is_valid": True}
     
-    # Validate page number
-    if page < 1:
-        issues.append(f"Page number cannot be less than 1, using page=1 instead of {page}")
-        corrected_page = 1
-        severity = "low"
+    # Check for allowed primitive types
+    if isinstance(value, (str, int, float, bool)):
+        # For strings, perform additional validation
+        if isinstance(value, str):
+            # Check for potential SQL injection in string values
+            for pattern in SQL_INJECTION_PATTERNS:
+                if re.search(pattern, value):
+                    return {
+                        "is_valid": False,
+                        "reason": f"Parameter value contains potential SQL injection pattern: {pattern}"
+                    }
+            
+            # Check for excessively long strings (potential DoS)
+            if len(value) > 1000000:  # 1MB limit
+                return {
+                    "is_valid": False,
+                    "reason": f"Parameter value is too long: {len(value)} characters"
+                }
+                
+        # Numeric value within reasonable limits
+        if isinstance(value, (int, float)):
+            if abs(value) > 1e20:  # Arbitrary large number limit
+                return {
+                    "is_valid": False,
+                    "reason": f"Parameter value is too large: {value}"
+                }
+                
+        return {"is_valid": True}
     
-    # Validate page size
-    if page_size < 1:
-        issues.append(f"Page size cannot be less than 1, using page_size=10 instead of {page_size}")
-        corrected_page_size = 10
-        severity = "low"
-    elif page_size > max_page_size:
-        issues.append(f"Page size cannot exceed {max_page_size}, using page_size={max_page_size} instead of {page_size}")
-        corrected_page_size = max_page_size
-        severity = "low"
+    # Check for date/datetime objects
+    if hasattr(value, 'isoformat'):  # datetime-like objects
+        return {"is_valid": True}
     
+    # Disallow complex types that could lead to injection
     return {
-        "valid": len(issues) == 0,
-        "issues": issues,
-        "severity": severity,
-        "corrected_page": corrected_page,
-        "corrected_page_size": corrected_page_size
+        "is_valid": False,
+        "reason": f"Unsupported parameter type: {type(value).__name__}"
     }
