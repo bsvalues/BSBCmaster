@@ -412,21 +412,27 @@
     </footer>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Initialize charts
-            initializeCharts();
+        // We'll use window.onload instead of DOMContentLoaded to avoid conflicts
+        // with the chart libraries that also use DOMContentLoaded
+        window.onload = function() {
+            console.log("Window loaded in visualize.html");
+            
+            // Initialize charts - this is now handled by the JS libraries
+            // initializeCharts();
             
             // Load summary statistics
-            loadSummaryStats();
+            if (typeof loadSummaryStats === 'function') {
+                loadSummaryStats();
+            }
             
             // Initialize map
-            initializeMap();
-            
-            // Set up filter button
-            document.getElementById('applyFilters').addEventListener('click', function() {
-                applyFilters();
-            });
-        });
+            if (typeof initializeMap === 'function') {
+                initializeMap();
+            }
+        };
+                initializeMap();
+            }
+        };
 
         function formatCurrency(value) {
             return new Intl.NumberFormat('en-US', {

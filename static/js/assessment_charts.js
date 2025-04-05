@@ -7,8 +7,8 @@
 console.log("Assessment Charts JS loaded");
 
 class AssessmentCharts {
-console.log("AssessmentCharts constructor called");
     constructor() {
+        console.log("AssessmentCharts constructor called");
         // Elements from the main chart widget
         this.chartContainer = document.getElementById('chartContainer');
         this.toggleChartBtn = document.getElementById('toggleChartBtn');
@@ -311,6 +311,39 @@ console.log("AssessmentCharts constructor called");
         
         // Create chart
         this.chart = new Chart(ctx, config);
+    }
+    
+    getBackgroundColors(chartType, count) {
+        if (chartType === 'line' || chartType === 'radar') {
+            // For line charts, use semi-transparent color
+            return this.colors[0] + '40'; // Add alpha transparency
+        } else if (chartType === 'scatter') {
+            // For scatter plots, use semi-transparent colors for all points
+            return Array(count).fill().map((_, i) => this.colors[i % this.colors.length] + '80');
+        } else {
+            // For other charts, use the color palette
+            return Array(count).fill().map((_, i) => this.colors[i % this.colors.length]);
+        }
+    }
+    
+    getBorderColors(chartType, count) {
+        if (chartType === 'line' || chartType === 'radar') {
+            return this.colors[0];
+        } else if (chartType === 'scatter') {
+            return Array(count).fill().map((_, i) => this.colors[i % this.colors.length]);
+        } else {
+            return Array(count).fill().map((_, i) => this.colors[i % this.colors.length]);
+        }
+    }
+    
+    getBorderWidth(chartType) {
+        if (chartType === 'line' || chartType === 'radar') {
+            return 3;
+        } else if (chartType === 'scatter') {
+            return 2;
+        } else {
+            return 1;
+        }
     }
 }
 

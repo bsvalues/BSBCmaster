@@ -6,11 +6,9 @@
  */
 console.log("Enhanced Charts JS loaded");
 
-console.log("Enhanced Charts JS loaded");
-console.log("EnhancedAssessmentCharts constructor called");
-
 class EnhancedAssessmentCharts {
     constructor() {
+        console.log("EnhancedAssessmentCharts constructor called");
         // Elements from the main chart widget
         this.chartContainer = document.getElementById('chartContainer');
         this.chartDataset = document.getElementById('chartDataset');
@@ -104,6 +102,7 @@ class EnhancedAssessmentCharts {
     }
     
     init() {
+        console.log("EnhancedAssessmentCharts init() called");
         if (!this.generateChartBtn || !this.chartContainer) {
             console.error('Chart elements not found');
             return;
@@ -175,6 +174,7 @@ class EnhancedAssessmentCharts {
     }
     
     generateChart() {
+        console.log("generateChart called");
         if (!this.chartDataset || !this.chartType || !this.chartDimension || !this.chartMeasure) {
             console.error('Chart form elements not found');
             return;
@@ -303,6 +303,7 @@ class EnhancedAssessmentCharts {
     }
     
     renderChart(data, chartType) {
+        console.log("renderChart called with data:", data);
         if (!this.chartCanvas) {
             console.error('Chart canvas not found');
             return;
@@ -434,80 +435,82 @@ class EnhancedAssessmentCharts {
             }
         };
         
+        console.log("Creating chart with config:", config);
+        
         // Create chart
-        this.chart = new Chart(ctx, config);
+        try {
+            this.chart = new Chart(ctx, config);
+            console.log("Chart created successfully");
+        } catch (err) {
+            console.error("Error creating chart:", err);
+            this.chartAlert.style.display = 'block';
+            this.chartMessage.textContent = 'Error creating chart: ' + err.message;
+            this.chartLoading.style.display = 'none';
+        }
     }
     
     exportChart(format) {
         if (!this.chart) {
-            console.error('No chart to export');
+            alert('Please generate a chart first');
             return;
         }
         
-        const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
-        const quality = format === 'jpg' ? 0.9 : 1.0;
+        // Get chart as data URL
+        const dataURL = this.chart.toBase64Image(format === 'jpg' ? 'image/jpeg' : 'image/png');
         
-        // Create a link and trigger download
+        // Create a download link
         const link = document.createElement('a');
-        link.download = `assessment-chart-${new Date().toISOString().split('T')[0]}.${format}`;
-        link.href = this.chart.toBase64Image(mime, quality);
+        link.download = `assessment_chart.${format}`;
+        link.href = dataURL;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     }
     
     exportChartData() {
-        if (!this.currentChartData || !this.currentChartData.chart_data) {
-            console.error('No chart data to export');
+        if (!this.currentChartData) {
+            alert('Please generate a chart first');
             return;
         }
         
-        const data = this.currentChartData.chart_data.data;
-        if (!data || !Array.isArray(data)) {
-            console.error('Invalid chart data format');
-            return;
+        // Create CSV content
+        let csvContent = 'data:text/csv;charset=utf-8,';
+        
+        // Add header row
+        csvContent += 'Category,Value\n';
+        
+        // Add data rows
+        if (this.currentChartData.chart_data && this.currentChartData.chart_data.data) {
+            this.currentChartData.chart_data.data.forEach(item => {
+                csvContent += `${item.dimension},${item.value}\n`;
+            });
+        } else if (this.currentChartData.labels && this.currentChartData.values) {
+            for (let i = 0; i < this.currentChartData.labels.length; i++) {
+                csvContent += `${this.currentChartData.labels[i]},${this.currentChartData.values[i]}\n`;
+            }
         }
         
-        // Convert to CSV
-        const headers = ['Dimension', 'Value'];
-        const csvContent = [
-            headers.join(','),
-            ...data.map(item => {
-                const dimension = item.dimension ? `"${item.dimension.replace(/"/g, '""')}"` : '""';
-                const value = item.value !== undefined ? item.value : '';
-                return `${dimension},${value}`;
-            })
-        ].join('\n');
-        
-        // Create a Blob and trigger download
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        // Create a download link
+        const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `chart-data-${new Date().toISOString().split('T')[0]}.csv`;
+        link.download = 'chart_data.csv';
+        link.href = encodedUri;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(link.href), 100);
     }
 }
 
 // Helper function to format values
 function formatValue(value, type) {
+    if (!value && value !== 0) return 'N/A';
+    
     if (type === 'currency') {
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0
-        }).format(value);
+        return '$' + value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     } else if (type === 'number') {
-        return new Intl.NumberFormat('en-US').format(value);
+        return value.toLocaleString('en-US');
     } else if (type === 'percent') {
-        return new Intl.NumberFormat('en-US', {
-            style: 'percent',
-            minimumFractionDigits: 1,
-            maximumFractionDigits: 1
-        }).format(value / 100);
+        return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
     } else if (type === 'filesize') {
         if (value >= 1048576) {
             return (value / 1048576).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' MB';
@@ -522,6 +525,7 @@ function formatValue(value, type) {
 
 // Initialize charts when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
+    console.log("DOMContentLoaded in enhanced_charts.js");
     // Initialize enhanced assessment charts
     const enhancedCharts = new EnhancedAssessmentCharts();
     
