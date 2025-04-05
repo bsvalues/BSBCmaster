@@ -502,6 +502,161 @@ def export_combined_data_endpoint(format):
             "message": str(e)
         }), 500
 
+@app.route('/api/chart-data', methods=['GET'])
+def get_chart_data():
+    """
+    Get data for visualization charts with filtering and aggregation.
+    
+    Query parameters:
+    - dataset: The dataset to use (accounts, improvements, property_images, combined)
+    - chart_type: Type of chart (bar, line, pie, scatter)
+    - dimension: The dimension to group by
+    - measure: The measure to aggregate
+    - aggregation: How to aggregate (count, sum, avg, min, max)
+    - limit: Maximum number of data points (default: 25)
+    - filters: JSON encoded filters to apply
+    """
+    try:
+        # Get query parameters
+        dataset = request.args.get('dataset', 'accounts')
+        chart_type = request.args.get('chart_type', 'bar')
+        dimension = request.args.get('dimension', None)
+        measure = request.args.get('measure', None)
+        aggregation = request.args.get('aggregation', 'count')
+        limit = min(int(request.args.get('limit', 25)), 50)  # Cap at 50 data points
+        
+        # Handle filters if provided
+        filters = {}
+        try:
+            import json
+            filters_param = request.args.get('filters', '{}')
+            if filters_param:
+                filters = json.loads(filters_param)
+        except json.JSONDecodeError:
+            logger.warning(f"Invalid filters JSON: {request.args.get('filters')}")
+            
+        logger.info(f"Chart request: dataset={dataset}, dimension={dimension}, measure={measure}, agg={aggregation}")
+        
+        # Choose the right model based on dataset
+        if dataset == 'accounts':
+            model = Account
+            default_dimension = 'property_city'
+            default_measure = 'assessed_value'
+        elif dataset == 'improvements':
+            from sqlalchemy import text
+            default_dimension = 'IMPR_CODE'
+            default_measure = 'IMPR_VALUE'
+        elif dataset == 'property_images':
+            model = PropertyImage
+            default_dimension = 'image_type'
+            default_measure = 'id'
+        else:
+            # Default to accounts
+            model = Account
+            default_dimension = 'property_city'
+            default_measure = 'assessed_value'
+            
+        # Use defaults if not specified
+        dimension = dimension or default_dimension
+        measure = measure or default_measure
+            
+        # Start building the query based on the model
+        with app.app_context():
+            if dataset == 'improvements':
+                # Handle improvements table separately with raw SQL
+                agg_func = {
+                    'count': 'COUNT(*)',
+                    'sum': f'SUM(CAST("IMPR_VALUE" AS FLOAT))',
+                    'avg': f'AVG(CAST("IMPR_VALUE" AS FLOAT))',
+                    'min': f'MIN(CAST("IMPR_VALUE" AS FLOAT))',
+                    'max': f'MAX(CAST("IMPR_VALUE" AS FLOAT))'
+                }.get(aggregation, 'COUNT(*)')
+                
+                # Build WHERE clause from filters
+                where_clauses = []
+                for key, value in filters.items():
+                    where_clauses.append(f'"{key}" = \'{value}\'')
+                
+                where_sql = ''
+                if where_clauses:
+                    where_sql = ' WHERE ' + ' AND '.join(where_clauses)
+                
+                # Execute the aggregation query
+                query = text(f'''
+                    SELECT "{dimension}" as dimension, {agg_func} as value
+                    FROM improvements {where_sql}
+                    GROUP BY "{dimension}"
+                    ORDER BY value DESC
+                    LIMIT :limit
+                ''')
+                
+                result = db.session.execute(query, {'limit': limit})
+                data = [{'dimension': row.dimension, 'value': float(row.value)} for row in result]
+                
+            else:
+                # Handle standard SQLAlchemy models
+                from sqlalchemy import func, case, cast, Float
+                
+                # Define the aggregation function
+                if aggregation == 'count':
+                    agg_value = func.count(getattr(model, measure))
+                elif aggregation == 'sum':
+                    agg_value = func.sum(cast(getattr(model, measure), Float))
+                elif aggregation == 'avg':
+                    agg_value = func.avg(cast(getattr(model, measure), Float))
+                elif aggregation == 'min':
+                    agg_value = func.min(cast(getattr(model, measure), Float))
+                elif aggregation == 'max':
+                    agg_value = func.max(cast(getattr(model, measure), Float))
+                else:
+                    agg_value = func.count(getattr(model, measure))
+                
+                # Start building the query
+                query = db.session.query(
+                    getattr(model, dimension).label('dimension'),
+                    agg_value.label('value')
+                )
+                
+                # Apply filters
+                for key, value in filters.items():
+                    if hasattr(model, key):
+                        query = query.filter(getattr(model, key) == value)
+                
+                # Apply aggregation
+                query = query.group_by(getattr(model, dimension))
+                
+                # Sort by the aggregated value in descending order
+                query = query.order_by(agg_value.desc())
+                
+                # Apply limit
+                query = query.limit(limit)
+                
+                # Execute the query and convert to list of dictionaries
+                data = [
+                    {'dimension': row.dimension, 'value': float(row.value) if row.value is not None else 0}
+                    for row in query.all()
+                ]
+            
+            # Return chart data with appropriate metadata
+            return jsonify({
+                "status": "success",
+                "chart_data": {
+                    "dataset": dataset,
+                    "chart_type": chart_type,
+                    "dimension": dimension,
+                    "measure": measure,
+                    "aggregation": aggregation,
+                    "data": data
+                }
+            })
+            
+    except Exception as e:
+        logger.error(f"Error generating chart data: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to generate chart data: {str(e)}"
+        }), 500
+
 
 @app.route('/')
 def index():
