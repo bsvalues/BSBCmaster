@@ -98,6 +98,11 @@
                 Improvements
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="visualizations-tab" data-bs-toggle="tab" data-bs-target="#visualizations-content" type="button" role="tab" aria-controls="visualizations-content" aria-selected="false">
+                Visualizations
+            </button>
+        </li>
     </ul>
 
     <!-- Tab content -->
@@ -311,6 +316,98 @@
             <!-- Error indicator -->
             <div class="alert alert-danger text-center d-none" id="improvements-error">
                 Error loading improvements data. Please try again later.
+            </div>
+        </div>
+        <!-- Visualizations tab -->
+        <div class="tab-pane fade" id="visualizations-content" role="tabpanel" aria-labelledby="visualizations-tab">
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card bg-dark border-light">
+                        <div class="card-header">
+                            <h5 class="mb-0">Advanced Data Visualization</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <label for="viz-dataset" class="form-label">Dataset:</label>
+                                    <select id="viz-dataset" class="form-select">
+                                        <option value="accounts">Accounts</option>
+                                        <option value="property_images">Property Images</option>
+                                        <option value="improvements">Improvements</option>
+                                        <option value="combined">Combined Data</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="viz-chart-type" class="form-label">Chart Type:</label>
+                                    <select id="viz-chart-type" class="form-select">
+                                        <option value="bar">Bar Chart</option>
+                                        <option value="line">Line Chart</option>
+                                        <option value="pie">Pie Chart</option>
+                                        <option value="scatter">Scatter Plot</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="viz-dimension" class="form-label">Group By:</label>
+                                    <select id="viz-dimension" class="form-select">
+                                        <!-- Options will be populated by JavaScript -->
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="viz-measure" class="form-label">Measure:</label>
+                                    <select id="viz-measure" class="form-select">
+                                        <!-- Options will be populated by JavaScript -->
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <label for="viz-aggregation" class="form-label">Aggregation:</label>
+                                    <select id="viz-aggregation" class="form-select">
+                                        <option value="count">Count</option>
+                                        <option value="sum">Sum</option>
+                                        <option value="avg">Average</option>
+                                        <option value="min">Minimum</option>
+                                        <option value="max">Maximum</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="viz-limit" class="form-label">Data Points:</label>
+                                    <input type="number" id="viz-limit" class="form-control" min="5" max="100" value="25">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="viz-color-scheme" class="form-label">Color Scheme:</label>
+                                    <select id="viz-color-scheme" class="form-select">
+                                        <option value="default">Default</option>
+                                        <option value="viridis">Viridis</option>
+                                        <option value="plasma">Plasma</option>
+                                        <option value="inferno">Inferno</option>
+                                        <option value="magma">Magma</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3 d-flex align-items-end">
+                                    <button id="apply-viz-btn" class="btn btn-primary w-100">
+                                        <i class="fas fa-chart-line me-1"></i> Generate Visualization
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div id="viz-alert" class="alert alert-info mb-3" style="display: none;">
+                                        <span id="viz-message">Loading chart data...</span>
+                                    </div>
+                                    <div id="viz-loading" class="text-center mb-3" style="display: none;">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </div>
+                                    <div class="chart-container" style="position: relative; height: 500px;">
+                                        <canvas id="visualizationChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -832,4 +929,6 @@
         document.body.appendChild(scriptElement);
     });
 </script>
+    <!-- Enhanced Visualizations Script -->
+    <script src="{{ url_for('static', filename='js/enhanced_visualizations.js') }}"></script>
 {% endblock %}
