@@ -46,18 +46,38 @@ def openapi_schema():
 def health_check():
     """Health check endpoint for the API."""
     try:
-        # Check FastAPI health
+        # Check database connection
         try:
-            response = requests.get(f"{FASTAPI_URL}/health", timeout=2)
-            api_health = response.json() if response.status_code == 200 else {"status": "error"}
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error connecting to FastAPI: {str(e)}")
-            api_health = {"status": "error", "detail": str(e)}
+            from app_setup import db
+            db.session.execute("SELECT 1").first()
+            db_status = "healthy"
+        except Exception as e:
+            logger.error(f"Error connecting to database: {str(e)}")
+            db_status = "degraded"
+        
+        # Check for imported data
+        try:
+            from app_setup import db
+            from models import Account, PropertyImage
+            
+            accounts_count = db.session.query(Account).count()
+            images_count = db.session.query(PropertyImage).count()
+            
+            data_status = "active" if accounts_count > 0 or images_count > 0 else "empty"
+            data_details = {
+                "accounts": accounts_count,
+                "property_images": images_count
+            }
+        except Exception as e:
+            logger.error(f"Error checking imported data: {str(e)}")
+            data_status = "unknown"
+            data_details = {"error": str(e)}
         
         result = {
-            "status": "operational",
-            "flask_api": {"status": "running"},
-            "fastapi_service": api_health,
+            "status": "operational" if db_status == "healthy" else "degraded",
+            "api": {"status": "running"},
+            "database": {"status": db_status},
+            "imported_data": {"status": data_status, "details": data_details},
             "timestamp": datetime.datetime.utcnow().isoformat()
         }
         
