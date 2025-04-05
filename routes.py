@@ -49,7 +49,8 @@ def health_check():
         # Check database connection
         try:
             from app_setup import db
-            db.session.execute("SELECT 1").first()
+            from sqlalchemy import text
+            db.session.execute(text("SELECT 1")).first()
             db_status = "healthy"
         except Exception as e:
             logger.error(f"Error connecting to database: {str(e)}")
@@ -90,58 +91,72 @@ def health_check():
             "timestamp": datetime.datetime.utcnow().isoformat()
         }), 500
 
-# Proxy routes for FastAPI endpoints
+# Direct API endpoints for database querying
 @api_routes.route('/api/run-query', methods=['POST'])
-def proxy_run_query():
-    """Proxy for the FastAPI run-query endpoint."""
+def run_query():
+    """Execute a custom SQL query against the database."""
     try:
-        # Forward the request to FastAPI
-        headers = {
-            'Content-Type': 'application/json',
-            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
-        }
-        response = requests.post(
-            f"{FASTAPI_URL}/api/run-query",
-            json=request.json,
-            headers=headers
-        )
+        from app_setup import db
+        from sqlalchemy import text
         
-        # Return the response from FastAPI
-        return jsonify(response.json()), response.status_code
+        # Get the query from the request
+        data = request.json
+        sql_query = data.get('query')
+        
+        if not sql_query:
+            return jsonify({
+                "status": "error",
+                "message": "No query provided"
+            }), 400
+        
+        # Execute the query directly using SQLAlchemy
+        result = db.session.execute(text(sql_query))
+        
+        # Format the result
+        columns = result.keys()
+        rows = [dict(zip(columns, row)) for row in result.fetchall()]
+        
+        return jsonify({
+            "status": "success",
+            "columns": columns,
+            "rows": rows
+        })
     except Exception as e:
-        logger.error(f"Error proxying run-query: {str(e)}")
+        logger.error(f"Error executing query: {str(e)}")
         return jsonify({
             "status": "error",
-            "message": f"Failed to proxy request: {str(e)}"
+            "message": f"Failed to execute query: {str(e)}"
         }), 500
 
 @api_routes.route('/api/nl-to-sql', methods=['POST'])
-def proxy_nl_to_sql():
-    """Proxy for the FastAPI natural language to SQL endpoint."""
+def nl_to_sql():
+    """Convert natural language to SQL using OpenAI (placeholder)."""
     try:
-        # Forward the request to FastAPI
-        headers = {
-            'Content-Type': 'application/json',
-            'X-API-Key': request.headers.get('X-API-Key', os.environ.get('API_KEY', ''))
-        }
-        response = requests.post(
-            f"{FASTAPI_URL}/api/nl-to-sql",
-            json=request.json,
-            headers=headers
-        )
+        data = request.json
+        natural_language_query = data.get('query')
         
-        # Return the response from FastAPI
-        return jsonify(response.json()), response.status_code
-    except Exception as e:
-        logger.error(f"Error proxying nl-to-sql: {str(e)}")
+        if not natural_language_query:
+            return jsonify({
+                "status": "error",
+                "message": "No natural language query provided"
+            }), 400
+        
+        # TODO: Implement OpenAI integration for NL to SQL conversion
+        # For now, return a placeholder response
         return jsonify({
             "status": "error",
-            "message": f"Failed to proxy request: {str(e)}"
+            "message": "Natural language to SQL conversion is not yet implemented in direct database access mode"
+        }), 501
+    except Exception as e:
+        logger.error(f"Error processing natural language query: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to process natural language query: {str(e)}"
         }), 500
         
-# Proxy routes for imported data endpoints
+# Direct database access routes for imported data
 @api_routes.route('/api/imported-data/accounts', methods=['GET'])
-def proxy_imported_accounts():
+def get_imported_accounts():
     """Get imported account data directly from the database."""
     try:
         # Get query parameters
@@ -200,7 +215,7 @@ def proxy_imported_accounts():
         }), 500
 
 @api_routes.route('/api/imported-data/accounts/<account_id>', methods=['GET'])
-def proxy_imported_account(account_id):
+def get_imported_account(account_id):
     """Get details for a specific account directly from the database."""
     try:
         # Build query
@@ -245,7 +260,7 @@ def proxy_imported_account(account_id):
         }), 500
 
 @api_routes.route('/api/imported-data/property-images', methods=['GET'])
-def proxy_imported_property_images():
+def get_property_images():
     """Get property images data directly from the database."""
     try:
         # Get query parameters
@@ -304,7 +319,7 @@ def proxy_imported_property_images():
         }), 500
 
 @api_routes.route('/api/imported-data/improvements', methods=['GET'])
-def proxy_imported_improvements():
+def get_improvements():
     """Get property improvements data directly from the database."""
     try:
         # Get query parameters
@@ -379,38 +394,54 @@ def proxy_imported_improvements():
 @api_routes.route('/query-builder')
 def query_builder():
     """Render the interactive query builder interface."""
-    # Get database schema for the query builder
+    # Get database schema directly from SQLAlchemy
     try:
-        # Get schema from FastAPI
-        headers = {'X-API-Key': os.environ.get('API_KEY', '')}
-        schema_response = requests.get(
-            f"{FASTAPI_URL}/api/discover-schema?db=postgres", 
-            headers=headers
-        )
+        from app_setup import db
+        from sqlalchemy import text, inspect
         
-        if schema_response.status_code == 200:
-            schema_data = schema_response.json()
-        else:
-            schema_data = {"status": "error", "db_schema": []}
-            logger.error(f"Error fetching schema: {schema_response.text}")
+        # Create an inspector to get database schema information
+        inspector = inspect(db.engine)
+        
+        # Get all tables and their schema details
+        db_schema = []
+        for table_name in inspector.get_table_names():
+            # Get column details
+            for column in inspector.get_columns(table_name):
+                # Get primary key info
+                primary_keys = inspector.get_pk_constraint(table_name).get('constrained_columns', [])
+                is_primary_key = column['name'] in primary_keys
+                
+                # Get foreign key info
+                foreign_keys = inspector.get_foreign_keys(table_name)
+                is_foreign_key = any(column['name'] in fk.get('constrained_columns', []) for fk in foreign_keys)
+                
+                # Add column info to schema
+                db_schema.append({
+                    'table_name': table_name,
+                    'column_name': column['name'],
+                    'data_type': str(column['type']),
+                    'is_nullable': column.get('nullable', True),
+                    'is_primary_key': is_primary_key,
+                    'is_foreign_key': is_foreign_key
+                })
+        
+        # Transform schema data into a more usable format for the UI
+        tables = {}
+        for item in db_schema:
+            table_name = item.get("table_name")
+            if table_name not in tables:
+                tables[table_name] = {"columns": []}
+            
+            tables[table_name]["columns"].append({
+                "name": item.get("column_name"),
+                "data_type": item.get("data_type"),
+                "is_nullable": item.get("is_nullable", True),
+                "is_primary_key": item.get("is_primary_key", False),
+                "is_foreign_key": item.get("is_foreign_key", False)
+            })
     except Exception as e:
-        schema_data = {"status": "error", "db_schema": []}
         logger.error(f"Error fetching schema for query builder: {str(e)}")
-    
-    # Transform schema data into a more usable format for the UI
-    tables = {}
-    for item in schema_data.get("db_schema", []):
-        table_name = item.get("table_name")
-        if table_name not in tables:
-            tables[table_name] = {"columns": []}
-        
-        tables[table_name]["columns"].append({
-            "name": item.get("column_name"),
-            "data_type": item.get("data_type"),
-            "is_nullable": item.get("is_nullable", True),
-            "is_primary_key": item.get("is_primary_key", False),
-            "is_foreign_key": item.get("is_foreign_key", False)
-        })
+        tables = {}
     
     return render_template(
         'query_builder.html',

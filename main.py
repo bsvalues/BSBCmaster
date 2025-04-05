@@ -15,7 +15,7 @@ import datetime
 from sqlalchemy import func
 import requests
 from urllib.parse import urlparse
-from flask import jsonify, request, Blueprint
+from flask import jsonify, request, Blueprint, render_template
 
 from app_setup import app, db, create_tables
 from routes import api_routes
@@ -37,11 +37,9 @@ def seed_database_if_needed():
     from import_attached_data import import_all_data
     # Check if we have any data
     with app.app_context():
-        from sqlalchemy import text
         try:
-            # Try to query the accounts table
-            result = text("SELECT COUNT(*) FROM accounts")
-            count = db.session.execute(result).scalar()
+            # Try to query the accounts table using the Account model
+            count = db.session.query(Account).count()
             
             if count == 0:
                 logger.info("No data found in accounts table, importing sample data")
@@ -127,9 +125,8 @@ def health():
     """Health check endpoint for the API."""
     try:
         with app.app_context():
-            # Check database connection
-            from sqlalchemy import text
-            db.session.execute(text("SELECT 1"))
+            # Check database connection using ORM query
+            db.session.query(Account).limit(1).all()  # Just run a simple query
             db_status = True
     except Exception as e:
         logger.error(f"Database health check failed: {str(e)}")
@@ -324,39 +321,54 @@ def get_imported_improvements():
             limit = request.args.get('limit', 100, type=int)
             property_id = request.args.get('property_id', '')
             
-            # Since we don't have a dedicated model for improvements,
-            # we'll query the database directly
-            from sqlalchemy import text
+            # Build query using Property model
+            query = db.session.query(Property)
             
-            # Build query conditions
-            conditions = ""
+            # Apply filters
             if property_id:
-                conditions = f" WHERE property_id LIKE '%{property_id}%'"
+                # Filter by matching parcel ID
+                parcel = db.session.query(Parcel).filter(Parcel.parcel_id.ilike(f'%{property_id}%')).first()
+                if parcel:
+                    query = query.filter(Property.parcel_id == parcel.id)
+                else:
+                    # No matching parcel, return empty result
+                    return jsonify({
+                        'status': 'success',
+                        'total': 0,
+                        'improvements': [],
+                        'pagination': {
+                            'offset': offset,
+                            'limit': limit,
+                            'total': 0
+                        }
+                    })
             
             # Get total count
-            count_query = f"SELECT COUNT(*) FROM improvements{conditions}"
-            count_result = db.session.execute(text(count_query))
-            total_count = count_result.scalar() or 0
+            total_count = query.count()
             
-            # Query improvements with pagination
-            query = f"""
-                SELECT * FROM improvements{conditions}
-                LIMIT {limit} OFFSET {offset}
-            """
-            result = db.session.execute(text(query))
+            # Apply pagination
+            properties = query.order_by(Property.id).offset(offset).limit(limit).all()
             
-            # Convert to list of dictionaries
+            # Prepare improvement data from properties
             improvements = []
-            for row in result:
-                # Convert row to dict
-                improvement = dict(row._mapping)
-                
-                # Handle numeric values
-                for key, value in improvement.items():
-                    if hasattr(value, 'quantize'):  # Check if it's a Decimal
-                        improvement[key] = float(value)
-                
-                improvements.append(improvement)
+            for prop in properties:
+                # Get associated parcel for property value
+                parcel = db.session.query(Parcel).filter(Parcel.id == prop.parcel_id).first()
+                if parcel:
+                    improvement = {
+                        'id': prop.id,
+                        'property_id': parcel.parcel_id if parcel else None,
+                        'improvement_id': f"I-{prop.id}",  # Generate an improvement ID
+                        'description': f"{prop.property_type} structure",
+                        'improvement_value': float(parcel.improvement_value) if parcel and parcel.improvement_value else 0,
+                        'living_area': prop.square_footage,
+                        'stories': prop.stories,
+                        'year_built': prop.year_built,
+                        'primary_use': prop.property_type,
+                        'created_at': prop.created_at.isoformat() if prop.created_at else None,
+                        'updated_at': prop.updated_at.isoformat() if prop.updated_at else None
+                    }
+                    improvements.append(improvement)
             
             return jsonify({
                 "status": "success",
@@ -564,33 +576,25 @@ def get_chart_data():
         with app.app_context():
             if dataset == 'improvements':
                 # Handle improvements table separately with raw SQL
-                agg_func = {
-                    'count': 'COUNT(*)',
-                    'sum': f'SUM(CAST("IMPR_VALUE" AS FLOAT))',
-                    'avg': f'AVG(CAST("IMPR_VALUE" AS FLOAT))',
-                    'min': f'MIN(CAST("IMPR_VALUE" AS FLOAT))',
-                    'max': f'MAX(CAST("IMPR_VALUE" AS FLOAT))'
-                }.get(aggregation, 'COUNT(*)')
+                # Use Property model instead since we don't have a direct improvements model
+                property_query = db.session.query(
+                    Property.property_type.label('dimension'),
+                    func.count(Property.id).label('value')
+                )
                 
-                # Build WHERE clause from filters
-                where_clauses = []
-                for key, value in filters.items():
-                    where_clauses.append(f'"{key}" = \'{value}\'')
+                # Apply filters if any
+                if filters:
+                    for key, value in filters.items():
+                        if hasattr(Property, key):
+                            property_query = property_query.filter(getattr(Property, key) == value)
                 
-                where_sql = ''
-                if where_clauses:
-                    where_sql = ' WHERE ' + ' AND '.join(where_clauses)
+                # Group by dimension and order by count
+                property_query = property_query.group_by(Property.property_type)
+                property_query = property_query.order_by(func.count(Property.id).desc())
+                property_query = property_query.limit(limit)
                 
-                # Execute the aggregation query
-                query = text(f'''
-                    SELECT "{dimension}" as dimension, {agg_func} as value
-                    FROM improvements {where_sql}
-                    GROUP BY "{dimension}"
-                    ORDER BY value DESC
-                    LIMIT :limit
-                ''')
-                
-                result = db.session.execute(query, {'limit': limit})
+                # Execute the query
+                result = property_query.all()
                 data = [{'dimension': row.dimension, 'value': float(row.value)} for row in result]
                 
             else:
