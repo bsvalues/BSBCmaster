@@ -62,7 +62,7 @@ def start_fastapi():
         nonlocal fastapi_process
         cmd = [
             sys.executable, "-m", "uvicorn", 
-            "asgi:app", 
+            "app:app", 
             "--host", "0.0.0.0", 
             "--port", str(FASTAPI_PORT),
             "--reload"

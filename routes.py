@@ -6,8 +6,8 @@ import os
 import logging
 import requests
 import datetime
-from flask import render_template, jsonify, request, Blueprint
-from models import Parcel, Property, Sale
+from flask import render_template, jsonify, request, Blueprint, make_response, send_file
+from models import Parcel, Property, Sale, Account, PropertyImage
 from sqlalchemy import func
 
 # Configure logging
@@ -298,6 +298,28 @@ def imported_data():
         version="1.0.0",
         description="View and analyze imported property assessment data"
     )
+
+# Data export endpoints
+@api_routes.route('/api/export/accounts/<format>')
+def export_accounts_route(format):
+    """Export account data to CSV or Excel."""
+    from export_data import export_accounts
+    limit = request.args.get('limit', 1000, type=int)
+    return export_accounts(format=format, limit=limit)
+
+@api_routes.route('/api/export/improvements/<format>')
+def export_improvements_route(format):
+    """Export improvement data to CSV or Excel."""
+    from export_data import export_improvements
+    limit = request.args.get('limit', 1000, type=int)
+    return export_improvements(format=format, limit=limit)
+
+@api_routes.route('/api/export/property-images/<format>')
+def export_property_images_route(format):
+    """Export property image data to CSV or Excel."""
+    from export_data import export_property_images
+    limit = request.args.get('limit', 1000, type=int)
+    return export_property_images(format=format, limit=limit)
 
 # API endpoints for visualization data
 @api_routes.route('/api/visualization-data/summary')

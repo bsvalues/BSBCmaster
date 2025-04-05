@@ -172,7 +172,7 @@
         <!-- Improvements tab -->
         <div class="tab-pane fade" id="improvements-content" role="tabpanel" aria-labelledby="improvements-tab">
             <div class="row mb-3">
-                <div class="col-md-5">
+                <div class="col-md-6">
                     <div class="input-group">
                         <input type="text" id="improvement-property-id-search" class="form-control" placeholder="Search by property ID...">
                         <button class="btn btn-primary" type="button" id="search-improvements-btn">
@@ -180,17 +180,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="col-md-4">
-                    <div class="btn-group" role="group">
-                        <a href="/api/export/improvements/csv" class="btn btn-success">
-                            <i class="fas fa-file-csv"></i> Export CSV
-                        </a>
-                        <a href="/api/export/improvements/excel" class="btn btn-success">
-                            <i class="fas fa-file-excel"></i> Export Excel
-                        </a>
-                    </div>
-                </div>
-                <div class="col-md-3 text-end">
+                <div class="col-md-6 text-end">
                     <div class="btn-group" role="group">
                         <button type="button" class="btn btn-outline-secondary" id="prev-improvements-page" disabled>
                             <i class="fas fa-chevron-left"></i> Previous
@@ -409,83 +399,81 @@
     // Load accounts data
     function loadAccounts() {
         const tableBody = document.getElementById('accounts-table-body');
-        const loadingIndicator = document.getElementById('accounts-loading');
-        const noResultsIndicator = document.getElementById('accounts-no-results');
-        const errorIndicator = document.getElementById('accounts-error');
+        const loading = document.getElementById('accounts-loading');
+        const noResults = document.getElementById('accounts-no-results');
+        const error = document.getElementById('accounts-error');
         const paginationInfo = document.getElementById('accounts-pagination-info');
         const prevButton = document.getElementById('prev-accounts-page');
         const nextButton = document.getElementById('next-accounts-page');
         
-        // Show loading indicator
+        // Show loading, hide other states
+        loading.classList.remove('d-none');
+        noResults.classList.add('d-none');
+        error.classList.add('d-none');
         tableBody.innerHTML = '';
-        loadingIndicator.classList.remove('d-none');
-        noResultsIndicator.classList.add('d-none');
-        errorIndicator.classList.add('d-none');
         
-        // Build query params
-        let params = new URLSearchParams();
-        params.append('offset', accountsOffset);
-        params.append('limit', accountsLimit);
+        // Build URL with parameters
+        let url = `/api/imported-data/accounts?limit=${accountsLimit}&offset=${accountsOffset}`;
         if (accountsSearchTerm) {
-            params.append('owner_name', accountsSearchTerm);
+            url += `&search=${encodeURIComponent(accountsSearchTerm)}`;
         }
         
-        // Fetch data from API
-        fetch(`/api/imported-data/accounts?${params.toString()}`)
+        // Fetch data
+        fetch(url)
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
+                    throw new Error('Network response was not ok');
                 }
                 return response.json();
             })
             .then(data => {
-                // Hide loading indicator
-                loadingIndicator.classList.add('d-none');
+                // Hide loading
+                loading.classList.add('d-none');
                 
-                // Update accounts count
+                // Update total count for pagination
                 accountsTotalCount = data.total;
                 
-                // Update pagination info
+                // Check if we have results
+                if (data.accounts.length === 0) {
+                    noResults.classList.remove('d-none');
+                    paginationInfo.textContent = 'Showing 0-0 of 0';
+                    prevButton.disabled = true;
+                    nextButton.disabled = true;
+                    return;
+                }
+                
+                // Update pagination
                 const start = accountsOffset + 1;
                 const end = Math.min(accountsOffset + accountsLimit, accountsTotalCount);
                 paginationInfo.textContent = `Showing ${start}-${end} of ${accountsTotalCount}`;
                 
-                // Update pagination buttons
+                // Update prev/next buttons
                 prevButton.disabled = accountsOffset === 0;
-                nextButton.disabled = end >= accountsTotalCount;
+                nextButton.disabled = accountsOffset + accountsLimit >= accountsTotalCount;
                 
-                // Check if we have results
-                if (data.accounts.length === 0) {
-                    noResultsIndicator.classList.remove('d-none');
-                    return;
-                }
-                
-                // Render accounts
+                // Populate table
                 data.accounts.forEach(account => {
                     const row = document.createElement('tr');
                     
-                    // Format assessed value and tax amount
-                    const assessedValue = new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'USD'
-                    }).format(account.assessed_value || 0);
-                    
-                    const taxAmount = new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'USD'
-                    }).format(account.tax_amount || 0);
+                    // Format currency values
+                    const assessedValue = account.assessed_value ? 
+                        new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(account.assessed_value) : 
+                        'N/A';
+                    const taxAmount = account.tax_amount ? 
+                        new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(account.tax_amount) : 
+                        'N/A';
                     
                     row.innerHTML = `
-                        <td>${account.account_id || '-'}</td>
-                        <td>${account.owner_name || '-'}</td>
-                        <td>${account.property_address || '-'}</td>
-                        <td>${account.property_city || '-'}</td>
-                        <td>${account.assessment_year || '-'}</td>
+                        <td>${account.account_id}</td>
+                        <td>${account.owner_name || 'N/A'}</td>
+                        <td>${account.property_address || 'N/A'}</td>
+                        <td>${account.property_city || 'N/A'}</td>
+                        <td>${account.assessment_year || 'N/A'}</td>
                         <td>${assessedValue}</td>
                         <td>${taxAmount}</td>
-                        <td>${account.tax_status || '-'}</td>
+                        <td>${account.tax_status || 'N/A'}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary view-account-details" data-account-id="${account.account_id}">
+                            <button class="btn btn-sm btn-outline-primary view-account-btn" data-account-id="${account.account_id}">
                                 View Details
                             </button>
                         </td>
@@ -494,260 +482,270 @@
                     tableBody.appendChild(row);
                 });
                 
-                // Add event listeners to detail buttons
-                document.querySelectorAll('.view-account-details').forEach(button => {
+                // Add event listeners to view buttons
+                document.querySelectorAll('.view-account-btn').forEach(button => {
                     button.addEventListener('click', function() {
                         const accountId = this.getAttribute('data-account-id');
                         showAccountDetails(accountId);
                     });
                 });
             })
-            .catch(error => {
-                console.error('Error loading accounts:', error);
-                loadingIndicator.classList.add('d-none');
-                errorIndicator.classList.remove('d-none');
-            });
-    }
-    
-    // Show account details in modal
-    function showAccountDetails(accountId) {
-        const loadingIndicator = document.getElementById('account-detail-loading');
-        const contentContainer = document.getElementById('account-detail-content');
-        const errorIndicator = document.getElementById('account-detail-error');
-        const modal = new bootstrap.Modal(document.getElementById('accountDetailModal'));
-        
-        // Reset modal content
-        loadingIndicator.classList.remove('d-none');
-        contentContainer.classList.add('d-none');
-        errorIndicator.classList.add('d-none');
-        
-        // Show modal
-        modal.show();
-        
-        // Fetch account details
-        fetch(`/api/imported-data/accounts/${accountId}`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (!data.account) {
-                    throw new Error('Account not found');
-                }
-                
-                // Hide loading indicator
-                loadingIndicator.classList.add('d-none');
-                contentContainer.classList.remove('d-none');
-                
-                // Format currency values
-                const assessedValue = new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD'
-                }).format(data.account.assessed_value || 0);
-                
-                const taxAmount = new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD'
-                }).format(data.account.tax_amount || 0);
-                
-                // Update modal content
-                document.getElementById('detail-account-id').textContent = data.account.account_id || '-';
-                document.getElementById('detail-owner-name').textContent = data.account.owner_name || '-';
-                document.getElementById('detail-assessment-year').textContent = data.account.assessment_year || '-';
-                document.getElementById('detail-assessed-value').textContent = assessedValue;
-                document.getElementById('detail-tax-amount').textContent = taxAmount;
-                document.getElementById('detail-tax-status').textContent = data.account.tax_status || '-';
-                
-                document.getElementById('detail-property-address').textContent = data.account.property_address || '-';
-                document.getElementById('detail-property-city').textContent = data.account.property_city || '-';
-                document.getElementById('detail-legal-description').textContent = data.account.legal_description || '-';
-                
-                document.getElementById('detail-mailing-address').textContent = data.account.mailing_address || '-';
-                document.getElementById('detail-mailing-city').textContent = data.account.mailing_city || '-';
-                document.getElementById('detail-mailing-state').textContent = data.account.mailing_state || '-';
-                document.getElementById('detail-mailing-zip').textContent = data.account.mailing_zip || '-';
-            })
-            .catch(error => {
-                console.error('Error loading account details:', error);
-                loadingIndicator.classList.add('d-none');
-                errorIndicator.classList.remove('d-none');
+            .catch(err => {
+                console.error('Error fetching accounts:', err);
+                loading.classList.add('d-none');
+                error.classList.remove('d-none');
+                error.textContent = `Error loading accounts data: ${err.message}`;
             });
     }
     
     // Load property images
     function loadPropertyImages() {
         const gallery = document.getElementById('images-gallery');
-        const loadingIndicator = document.getElementById('images-loading');
-        const noResultsIndicator = document.getElementById('images-no-results');
-        const errorIndicator = document.getElementById('images-error');
+        const loading = document.getElementById('images-loading');
+        const noResults = document.getElementById('images-no-results');
+        const error = document.getElementById('images-error');
         const paginationInfo = document.getElementById('images-pagination-info');
         const prevButton = document.getElementById('prev-images-page');
         const nextButton = document.getElementById('next-images-page');
         
-        // Show loading indicator
+        // Show loading, hide other states
+        loading.classList.remove('d-none');
+        noResults.classList.add('d-none');
+        error.classList.add('d-none');
         gallery.innerHTML = '';
-        loadingIndicator.classList.remove('d-none');
-        noResultsIndicator.classList.add('d-none');
-        errorIndicator.classList.add('d-none');
         
-        // Build query params
-        let params = new URLSearchParams();
-        params.append('offset', imagesOffset);
-        params.append('limit', imagesLimit);
+        // Build URL with parameters
+        let url = `/api/imported-data/property-images?limit=${imagesLimit}&offset=${imagesOffset}`;
         if (imagesPropertyId) {
-            params.append('property_id', imagesPropertyId);
+            url += `&property_id=${encodeURIComponent(imagesPropertyId)}`;
         }
         if (imagesType) {
-            params.append('image_type', imagesType);
+            url += `&image_type=${encodeURIComponent(imagesType)}`;
         }
         
-        // Fetch data from API
-        fetch(`/api/imported-data/property-images?${params.toString()}`)
+        // Fetch data
+        fetch(url)
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
+                    throw new Error('Network response was not ok');
                 }
                 return response.json();
             })
             .then(data => {
-                // Hide loading indicator
-                loadingIndicator.classList.add('d-none');
+                // Hide loading
+                loading.classList.add('d-none');
                 
-                // Update images count
+                // Update total count for pagination
                 imagesTotalCount = data.total;
                 
-                // Update pagination info
+                // Check if we have results
+                if (data.property_images.length === 0) {
+                    noResults.classList.remove('d-none');
+                    paginationInfo.textContent = 'Showing 0-0 of 0';
+                    prevButton.disabled = true;
+                    nextButton.disabled = true;
+                    return;
+                }
+                
+                // Update pagination
                 const start = imagesOffset + 1;
                 const end = Math.min(imagesOffset + imagesLimit, imagesTotalCount);
                 paginationInfo.textContent = `Showing ${start}-${end} of ${imagesTotalCount}`;
                 
-                // Update pagination buttons
+                // Update prev/next buttons
                 prevButton.disabled = imagesOffset === 0;
-                nextButton.disabled = end >= imagesTotalCount;
+                nextButton.disabled = imagesOffset + imagesLimit >= imagesTotalCount;
                 
-                // Check if we have results
-                if (data.images.length === 0) {
-                    noResultsIndicator.classList.remove('d-none');
-                    return;
-                }
-                
-                // Render image cards
-                data.images.forEach(image => {
+                // Populate gallery
+                data.property_images.forEach(image => {
                     const col = document.createElement('div');
-                    col.className = 'col-md-3 col-sm-6 mb-4';
+                    col.className = 'col-md-3 mb-4';
                     
-                    const imageUrl = image.image_url || 'https://via.placeholder.com/250x200?text=No+Image';
-                    const imageDate = image.image_date ? new Date(image.image_date).toLocaleDateString() : 'Unknown';
+                    const dimensions = image.width && image.height ? 
+                        `${image.width} x ${image.height}` : 'Dimensions unknown';
                     
-                    col.innerHTML = `
+                    const card = `
                         <div class="card h-100">
-                            <img src="${imageUrl}" class="card-img-top" alt="Property image" style="height: 200px; object-fit: cover;">
+                            <div class="card-img-top bg-light text-center py-3" style="height: 200px;">
+                                ${image.image_url ? 
+                                    `<img src="${image.image_url}" class="img-fluid h-100" alt="Property image" style="object-fit: contain;">` : 
+                                    `<i class="fas fa-image fa-5x text-secondary"></i>`
+                                }
+                            </div>
                             <div class="card-body">
-                                <h5 class="card-title">Property ID: ${image.property_id}</h5>
+                                <h6 class="card-title">Property ID: ${image.property_id}</h6>
                                 <p class="card-text">
-                                    <strong>Type:</strong> ${image.image_type || 'Unknown'}<br>
-                                    <strong>Date:</strong> ${imageDate}<br>
-                                    <strong>Size:</strong> ${image.width || '?'}×${image.height || '?'} px<br>
-                                    <strong>Format:</strong> ${image.file_format || 'Unknown'}
+                                    <small class="text-muted">
+                                        Type: ${image.image_type || 'Unknown'}<br>
+                                        Format: ${image.file_format || 'Unknown'}<br>
+                                        Size: ${image.file_size ? Math.round(image.file_size / 1024) + ' KB' : 'Unknown'}<br>
+                                        Dimensions: ${dimensions}<br>
+                                        Date: ${image.image_date || 'Unknown'}
+                                    </small>
                                 </p>
                             </div>
                         </div>
                     `;
                     
+                    col.innerHTML = card;
                     gallery.appendChild(col);
                 });
             })
-            .catch(error => {
-                console.error('Error loading property images:', error);
-                loadingIndicator.classList.add('d-none');
-                errorIndicator.classList.remove('d-none');
+            .catch(err => {
+                console.error('Error fetching property images:', err);
+                loading.classList.add('d-none');
+                error.classList.remove('d-none');
+                error.textContent = `Error loading property images: ${err.message}`;
             });
     }
     
-    // Load improvements data
+    // Load improvements
     function loadImprovements() {
         const tableBody = document.getElementById('improvements-table-body');
-        const loadingIndicator = document.getElementById('improvements-loading');
-        const noResultsIndicator = document.getElementById('improvements-no-results');
-        const errorIndicator = document.getElementById('improvements-error');
+        const loading = document.getElementById('improvements-loading');
+        const noResults = document.getElementById('improvements-no-results');
+        const error = document.getElementById('improvements-error');
         const paginationInfo = document.getElementById('improvements-pagination-info');
         const prevButton = document.getElementById('prev-improvements-page');
         const nextButton = document.getElementById('next-improvements-page');
         
-        // Show loading indicator
+        // Show loading, hide other states
+        loading.classList.remove('d-none');
+        noResults.classList.add('d-none');
+        error.classList.add('d-none');
         tableBody.innerHTML = '';
-        loadingIndicator.classList.remove('d-none');
-        noResultsIndicator.classList.add('d-none');
-        errorIndicator.classList.add('d-none');
         
-        // Build query params
-        let params = new URLSearchParams();
-        params.append('offset', improvementsOffset);
-        params.append('limit', improvementsLimit);
+        // Build URL with parameters
+        let url = `/api/imported-data/improvements?limit=${improvementsLimit}&offset=${improvementsOffset}`;
         if (improvementsPropertyId) {
-            params.append('property_id', improvementsPropertyId);
+            url += `&property_id=${encodeURIComponent(improvementsPropertyId)}`;
         }
         
-        // Fetch data from API
-        fetch(`/api/imported-data/improvements?${params.toString()}`)
+        // Fetch data
+        fetch(url)
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
+                    throw new Error('Network response was not ok');
                 }
                 return response.json();
             })
             .then(data => {
-                // Hide loading indicator
-                loadingIndicator.classList.add('d-none');
+                // Hide loading
+                loading.classList.add('d-none');
                 
-                // Update improvements count
+                // Update total count for pagination
                 improvementsTotalCount = data.total;
                 
-                // Update pagination info
+                // Check if we have results
+                if (data.improvements.length === 0) {
+                    noResults.classList.remove('d-none');
+                    paginationInfo.textContent = 'Showing 0-0 of 0';
+                    prevButton.disabled = true;
+                    nextButton.disabled = true;
+                    return;
+                }
+                
+                // Update pagination
                 const start = improvementsOffset + 1;
                 const end = Math.min(improvementsOffset + improvementsLimit, improvementsTotalCount);
                 paginationInfo.textContent = `Showing ${start}-${end} of ${improvementsTotalCount}`;
                 
-                // Update pagination buttons
+                // Update prev/next buttons
                 prevButton.disabled = improvementsOffset === 0;
-                nextButton.disabled = end >= improvementsTotalCount;
+                nextButton.disabled = improvementsOffset + improvementsLimit >= improvementsTotalCount;
                 
-                // Check if we have results
-                if (data.improvements.length === 0) {
-                    noResultsIndicator.classList.remove('d-none');
-                    return;
-                }
-                
-                // Render improvements
+                // Populate table
                 data.improvements.forEach(improvement => {
                     const row = document.createElement('tr');
                     
-                    // Format improvement value
-                    const value = new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'USD'
-                    }).format(improvement.improvement_value || 0);
+                    // Format currency values
+                    const value = improvement.value ? 
+                        new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(improvement.value) : 
+                        'N/A';
                     
                     row.innerHTML = `
-                        <td>${improvement.property_id || '-'}</td>
-                        <td>${improvement.improvement_id || '-'}</td>
-                        <td>${improvement.description || '-'}</td>
+                        <td>${improvement.property_id}</td>
+                        <td>${improvement.improvement_id}</td>
+                        <td>${improvement.description || 'N/A'}</td>
                         <td>${value}</td>
-                        <td>${improvement.living_area ? improvement.living_area + ' sq ft' : '-'}</td>
-                        <td>${improvement.stories || '-'}</td>
-                        <td>${improvement.year_built || '-'}</td>
-                        <td>${improvement.primary_use || '-'}</td>
+                        <td>${improvement.living_area || 'N/A'}</td>
+                        <td>${improvement.stories || 'N/A'}</td>
+                        <td>${improvement.year_built || 'N/A'}</td>
+                        <td>${improvement.primary_use_code || 'N/A'}</td>
                     `;
                     
                     tableBody.appendChild(row);
                 });
             })
-            .catch(error => {
-                console.error('Error loading improvements:', error);
-                loadingIndicator.classList.add('d-none');
-                errorIndicator.classList.remove('d-none');
+            .catch(err => {
+                console.error('Error fetching improvements:', err);
+                loading.classList.add('d-none');
+                error.classList.remove('d-none');
+                error.textContent = `Error loading improvements data: ${err.message}`;
+            });
+    }
+    
+    // Show account details in modal
+    function showAccountDetails(accountId) {
+        const modal = new bootstrap.Modal(document.getElementById('accountDetailModal'));
+        const loading = document.getElementById('account-detail-loading');
+        const content = document.getElementById('account-detail-content');
+        const error = document.getElementById('account-detail-error');
+        
+        // Reset modal state
+        loading.classList.remove('d-none');
+        content.classList.add('d-none');
+        error.classList.add('d-none');
+        
+        // Show the modal
+        modal.show();
+        
+        // Fetch account details
+        fetch(`/api/imported-data/accounts/${accountId}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(account => {
+                // Hide loading
+                loading.classList.add('d-none');
+                content.classList.remove('d-none');
+                
+                // Format currency values
+                const assessedValue = account.assessed_value ? 
+                    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(account.assessed_value) : 
+                    'N/A';
+                const taxAmount = account.tax_amount ? 
+                    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(account.tax_amount) : 
+                    'N/A';
+                
+                // Update modal title
+                document.getElementById('accountDetailModalLabel').textContent = `Account Details: ${account.account_id}`;
+                
+                // Fill in account details
+                document.getElementById('detail-account-id').textContent = account.account_id;
+                document.getElementById('detail-owner-name').textContent = account.owner_name || 'N/A';
+                document.getElementById('detail-assessment-year').textContent = account.assessment_year || 'N/A';
+                document.getElementById('detail-assessed-value').textContent = assessedValue;
+                document.getElementById('detail-tax-amount').textContent = taxAmount;
+                document.getElementById('detail-tax-status').textContent = account.tax_status || 'N/A';
+                
+                document.getElementById('detail-property-address').textContent = account.property_address || 'N/A';
+                document.getElementById('detail-property-city').textContent = account.property_city || 'N/A';
+                document.getElementById('detail-legal-description').textContent = account.legal_description || 'N/A';
+                
+                document.getElementById('detail-mailing-address').textContent = account.mailing_address || 'N/A';
+                document.getElementById('detail-mailing-city').textContent = account.mailing_city || 'N/A';
+                document.getElementById('detail-mailing-state').textContent = account.mailing_state || 'N/A';
+                document.getElementById('detail-mailing-zip').textContent = account.mailing_zip || 'N/A';
+            })
+            .catch(err => {
+                console.error('Error fetching account details:', err);
+                loading.classList.add('d-none');
+                error.classList.remove('d-none');
+                error.textContent = `Error loading account details: ${err.message}`;
             });
     }
 </script>

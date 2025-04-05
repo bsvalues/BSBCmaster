@@ -25,4 +25,5 @@ dependencies = [
     "faker>=37.1.0",
     "sqlalchemy>=2.0.40",
     "pandas>=2.2.3",
+    "xlsxwriter>=3.2.2",
 ]
