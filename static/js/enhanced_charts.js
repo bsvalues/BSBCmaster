@@ -4,6 +4,10 @@
  * This file provides advanced chart functionality for the MCP Assessor Agent API,
  * supporting multiple chart types, interactive filtering, and chart exports.
  */
+console.log("Enhanced Charts JS loaded");
+
+console.log("Enhanced Charts JS loaded");
+console.log("EnhancedAssessmentCharts constructor called");
 
 class EnhancedAssessmentCharts {
     constructor() {

@@ -4,8 +4,10 @@
  * This file provides interactive data visualization capabilities for the MCP Assessor Agent API,
  * supporting dynamic chart generation for assessment data.
  */
+console.log("Assessment Charts JS loaded");
 
 class AssessmentCharts {
+console.log("AssessmentCharts constructor called");
     constructor() {
         // Elements from the main chart widget
         this.chartContainer = document.getElementById('chartContainer');
