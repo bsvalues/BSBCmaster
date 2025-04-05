@@ -46,13 +46,18 @@
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <div class="btn-group" role="group">
-                        <a href="/api/export/accounts/csv" class="btn btn-success">
-                            <i class="fas fa-file-csv"></i> Export CSV
-                        </a>
-                        <a href="/api/export/accounts/excel" class="btn btn-success">
-                            <i class="fas fa-file-excel"></i> Export Excel
-                        </a>
+                    <div class="dropdown">
+                        <button class="btn btn-success dropdown-toggle" type="button" id="accountExportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-file-export"></i> Export Options
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="accountExportDropdown">
+                            <li><a class="dropdown-item" href="/api/export/accounts/csv">CSV (Basic)</a></li>
+                            <li><a class="dropdown-item" href="/api/export/accounts/excel">Excel (Basic)</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#accountsExportModal">Advanced Export Options...</button></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/api/export/combined/excel">Combined Data Export</a></li>
+                        </ul>
                     </div>
                 </div>
                 <div class="col-md-3 text-end">
