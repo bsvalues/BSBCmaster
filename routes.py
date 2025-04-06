@@ -9,6 +9,7 @@ import datetime
 from flask import render_template, jsonify, request, Blueprint, make_response, send_file
 from models import Parcel, Property, Sale, Account, PropertyImage
 from sqlalchemy import func
+from app.api.statistics import get_property_statistics
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -907,6 +908,17 @@ def visualization_value_trends():
                 "status": "error",
                 "message": f"Failed to generate value trends data: {str(e)}"
             }), 500
+
+# Statistics routes
+@api_routes.route('/statistics-dashboard')
+def statistics_dashboard():
+    """Render the property statistics dashboard page."""
+    return render_template('statistics_dashboard.html', title="Property Statistics Dashboard")
+
+@api_routes.route('/api/statistics')
+def statistics_data():
+    """API endpoint to get property statistics data."""
+    return get_property_statistics()
 
 @api_routes.route('/api/visualization-data/property-locations')
 def visualization_property_locations():

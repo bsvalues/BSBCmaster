@@ -1,0 +1,582 @@
+{% extends "base.html" %}
+
+{% block title %}Property Statistics Dashboard - MCP Assessor Agent API{% endblock %}
+
+{% block head %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<style>
+    .stats-card {
+        border-radius: 8px;
+        background-color: rgba(255, 255, 255, 0.05);
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .stats-card-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .stats-card-body {
+        padding: 20px;
+    }
+    
+    .stat-value {
+        font-size: 2.2rem;
+        font-weight: 600;
+    }
+    
+    .stat-label {
+        color: #adb5bd;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05rem;
+    }
+    
+    .chart-container {
+        position: relative;
+        height: 250px;
+        width: 100%;
+    }
+    
+    .city-stat-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .city-stat-item:last-child {
+        border-bottom: none;
+    }
+    
+    .filter-section {
+        background-color: rgba(255, 255, 255, 0.05);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    
+    .stats-summary-box {
+        background-color: var(--bs-dark);
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .summary-value {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--bs-primary);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h1>Property Statistics Dashboard</h1>
+            <p class="lead">Comprehensive analytics and visualizations of property assessment data.</p>
+        </div>
+    </div>
+    
+    <!-- Summary Statistics Row -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stats-summary-box">
+                <div class="stat-label">Total Properties</div>
+                <div class="summary-value" id="total-properties">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-summary-box">
+                <div class="stat-label">Average Value</div>
+                <div class="summary-value" id="average-value">$0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-summary-box">
+                <div class="stat-label">Total Cities</div>
+                <div class="summary-value" id="total-cities">0</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stats-summary-box">
+                <div class="stat-label">Image Coverage</div>
+                <div class="summary-value" id="image-coverage">0%</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts Row -->
+    <div class="row">
+        <!-- Property Type Distribution -->
+        <div class="col-md-6">
+            <div class="stats-card">
+                <div class="stats-card-header">
+                    <h5 class="mb-0">Property Type Distribution</h5>
+                </div>
+                <div class="stats-card-body">
+                    <div class="chart-container">
+                        <canvas id="property-type-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Value Distribution -->
+        <div class="col-md-6">
+            <div class="stats-card">
+                <div class="stats-card-header">
+                    <h5 class="mb-0">Value Distribution</h5>
+                </div>
+                <div class="stats-card-body">
+                    <div class="chart-container">
+                        <canvas id="value-distribution-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <!-- City Statistics -->
+        <div class="col-md-6">
+            <div class="stats-card">
+                <div class="stats-card-header">
+                    <h5 class="mb-0">City Statistics</h5>
+                </div>
+                <div class="stats-card-body">
+                    <div class="chart-container">
+                        <canvas id="city-comparison-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Property Value by Type -->
+        <div class="col-md-6">
+            <div class="stats-card">
+                <div class="stats-card-header">
+                    <h5 class="mb-0">Average Property Value by Type</h5>
+                </div>
+                <div class="stats-card-body">
+                    <div class="chart-container">
+                        <canvas id="value-by-type-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Detailed Statistics Table -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="stats-card">
+                <div class="stats-card-header">
+                    <h5 class="mb-0">Detailed Statistics</h5>
+                </div>
+                <div class="stats-card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Property Type</th>
+                                    <th>Count</th>
+                                    <th>Average Value</th>
+                                    <th>Median Value</th>
+                                    <th>Min Value</th>
+                                    <th>Max Value</th>
+                                </tr>
+                            </thead>
+                            <tbody id="property-stats-table">
+                                <!-- Property statistics will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Format currency
+    function formatCurrency(value) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            maximumFractionDigits: 0
+        }).format(value);
+    }
+    
+    // Format percentage
+    function formatPercentage(value) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'percent',
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1
+        }).format(value / 100);
+    }
+    
+    // Chart colors
+    const chartColors = {
+        residential: '#4CAF50',
+        commercial: '#2196F3',
+        agricultural: '#FFC107',
+        industrial: '#F44336',
+        other: '#9E9E9E',
+        valueRanges: ['#E3F2FD', '#90CAF9', '#42A5F5', '#1E88E5', '#0D47A1']
+    };
+    
+    // Load statistics data
+    function loadStatistics() {
+        fetch('/api/statistics')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateSummaryStatistics(data.statistics);
+                    createPropertyTypeChart(data.statistics);
+                    createValueDistributionChart(data.statistics);
+                    createCityComparisonChart(data.statistics);
+                    createValueByTypeChart(data.statistics);
+                    populateStatisticsTable(data.statistics);
+                } else {
+                    console.error('Error loading statistics data:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching statistics data:', error);
+            });
+    }
+    
+    // Update summary statistics
+    function updateSummaryStatistics(stats) {
+        const totalProperties = stats.data_summary.total_properties;
+        document.getElementById('total-properties').textContent = totalProperties.toLocaleString();
+        
+        // Calculate average value across all property types
+        let totalValue = 0;
+        let propertyCount = 0;
+        
+        for (const propType in stats.property_type_statistics) {
+            const typeStats = stats.property_type_statistics[propType];
+            totalValue += typeStats.average_value * typeStats.count;
+            propertyCount += typeStats.count;
+        }
+        
+        const avgValue = propertyCount > 0 ? totalValue / propertyCount : 0;
+        document.getElementById('average-value').textContent = formatCurrency(avgValue);
+        
+        // Set city count
+        document.getElementById('total-cities').textContent = stats.data_summary.cities_count.toLocaleString();
+        
+        // Set image coverage percentage
+        const imageCoverage = stats.image_statistics.image_availability_percentage || 0;
+        document.getElementById('image-coverage').textContent = `${imageCoverage.toFixed(1)}%`;
+    }
+    
+    // Create property type distribution chart
+    function createPropertyTypeChart(stats) {
+        const propertyTypes = Object.keys(stats.property_type_statistics);
+        const propertyCounts = propertyTypes.map(type => stats.property_type_statistics[type].count);
+        const backgroundColors = propertyTypes.map(type => {
+            switch(type.toLowerCase()) {
+                case 'residential': return chartColors.residential;
+                case 'commercial': return chartColors.commercial;
+                case 'agricultural': return chartColors.agricultural;
+                case 'industrial': return chartColors.industrial;
+                default: return chartColors.other;
+            }
+        });
+        
+        const ctx = document.getElementById('property-type-chart').getContext('2d');
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: propertyTypes,
+                datasets: [{
+                    data: propertyCounts,
+                    backgroundColor: backgroundColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: '#adb5bd'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw || 0;
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = total > 0 ? (value / total * 100).toFixed(1) : 0;
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Create value distribution chart
+    function createValueDistributionChart(stats) {
+        const valueRanges = Object.keys(stats.value_distribution);
+        const valueCounts = valueRanges.map(range => stats.value_distribution[range]);
+        
+        const ctx = document.getElementById('value-distribution-chart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: valueRanges,
+                datasets: [{
+                    label: 'Property Count',
+                    data: valueCounts,
+                    backgroundColor: chartColors.valueRanges,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: '#adb5bd'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            color: '#adb5bd'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+    
+    // Create city comparison chart
+    function createCityComparisonChart(stats) {
+        const cities = Object.keys(stats.city_statistics);
+        const averageValues = cities.map(city => stats.city_statistics[city].average_value);
+        const propertyCounts = cities.map(city => stats.city_statistics[city].count);
+        
+        const ctx = document.getElementById('city-comparison-chart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: cities,
+                datasets: [{
+                    label: 'Average Property Value',
+                    data: averageValues,
+                    backgroundColor: '#3498db',
+                    borderWidth: 1,
+                    yAxisID: 'y',
+                    order: 2
+                },
+                {
+                    label: 'Property Count',
+                    data: propertyCounts,
+                    type: 'line',
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'y1',
+                    order: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Average Value ($)',
+                            color: '#adb5bd'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            },
+                            color: '#adb5bd'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Property Count',
+                            color: '#adb5bd'
+                        },
+                        ticks: {
+                            color: '#adb5bd'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            color: '#adb5bd'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#adb5bd'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.dataset.label || '';
+                                const value = context.raw || 0;
+                                if (label === 'Average Property Value') {
+                                    return `${label}: ${formatCurrency(value)}`;
+                                } else {
+                                    return `${label}: ${value}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Create value by type chart
+    function createValueByTypeChart(stats) {
+        const propertyTypes = Object.keys(stats.property_type_statistics);
+        const averageValues = propertyTypes.map(type => stats.property_type_statistics[type].average_value);
+        const medianValues = propertyTypes.map(type => stats.property_type_statistics[type].median_value);
+        
+        const ctx = document.getElementById('value-by-type-chart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: propertyTypes,
+                datasets: [{
+                    label: 'Average Value',
+                    data: averageValues,
+                    backgroundColor: '#3498db',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Median Value',
+                    data: medianValues,
+                    backgroundColor: '#2ecc71',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            },
+                            color: '#adb5bd'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            color: '#adb5bd'
+                        },
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#adb5bd'
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.dataset.label || '';
+                                const value = context.raw || 0;
+                                return `${label}: ${formatCurrency(value)}`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Populate statistics table
+    function populateStatisticsTable(stats) {
+        const tableBody = document.getElementById('property-stats-table');
+        tableBody.innerHTML = '';
+        
+        for (const propType in stats.property_type_statistics) {
+            const typeStats = stats.property_type_statistics[propType];
+            const row = document.createElement('tr');
+            
+            row.innerHTML = `
+                <td>${propType}</td>
+                <td>${typeStats.count.toLocaleString()}</td>
+                <td>${formatCurrency(typeStats.average_value)}</td>
+                <td>${formatCurrency(typeStats.median_value)}</td>
+                <td>${formatCurrency(typeStats.min_value)}</td>
+                <td>${formatCurrency(typeStats.max_value)}</td>
+            `;
+            
+            tableBody.appendChild(row);
+        }
+    }
+    
+    // Initialize when document is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        loadStatistics();
+    });
+</script>
+{% endblock %}
