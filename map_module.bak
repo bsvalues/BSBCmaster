@@ -522,53 +522,6 @@ def calculate_property_statistics(property_values: List[float]) -> Dict[str, Any
     return stats
 
 def calculate_map_boundaries(properties: List[Dict[str, Any]]) -> Dict[str, float]:
-    """
-    Calculate map boundaries based on property coordinates.
-    
-    Args:
-        properties: List of property dictionaries with latitude and longitude
-        
-    Returns:
-        Dictionary with north, south, east, west boundaries
-    """
-    # Use default bounds if no properties with coordinates
-    if not properties:
-        return DEFAULT_BOUNDS
-    
-    # Filter properties with valid coordinates
-    valid_properties = [p for p in properties if p.get('latitude') and p.get('longitude')]
-    
-    if not valid_properties:
-        return DEFAULT_BOUNDS
-    
-    # Initialize with first property
-    north = south = valid_properties[0]['latitude']
-    east = west = valid_properties[0]['longitude']
-    
-    # Update boundaries based on all properties
-    for prop in valid_properties:
-        lat = prop['latitude']
-        lng = prop['longitude']
-        
-        north = max(north, lat)
-        south = min(south, lat)
-        east = max(east, lng)
-        west = min(west, lng)
-    
-    # Add padding to boundaries
-    padding = 0.02
-    north += padding
-    south -= padding
-    east += padding
-    west -= padding
-    
-    return {
-        'north': north,
-        'south': south,
-        'east': east,
-        'west': west
-    }
-
 def get_map_data():
     """Handle GET request for map data with enhanced visualization options."""
     data_source = request.args.get('data_source', 'accounts')
@@ -601,6 +554,66 @@ def get_map_data():
             'bounds': bounds,
             'heatmap': heatmap_data,
             'geojson': geojson,
+            'visualization': 'heatmap'
+        }
+    elif visualization_mode == 'clusters' or (clustering and len(properties) > 20):
+        # Generate clusters for better performance with large datasets
+        geojson = generate_clusters(properties, grid_size)
+        response_data = {
+            'statistics': stats,
+            'bounds': bounds,
+            'geojson': geojson,
+            'visualization': 'clusters'
+        }
+    else:
+        # Convert to regular GeoJSON for small datasets or marker mode
+        geojson = convert_to_geojson(properties)
+        response_data = {
+            'statistics': stats,
+            'bounds': bounds,
+            'geojson': geojson,
+            'visualization': 'markers'
+        }
+    
+    # Return JSON response
+    return jsonify(response_data)
+    
+    return {
+        'north': north,
+        'south': south,
+        'east': east,
+        'west': west
+    }
+
+def get_map_data():
+    """Handle GET request for map data with enhanced visualization options."""
+    data_source = request.args.get('data_source', 'accounts')
+    value_filter = request.args.get('value_filter', 'all')
+    city = request.args.get('city', None)
+    visualization_mode = request.args.get('visualization', 'markers')
+    clustering = request.args.get('clustering', 'false').lower() == 'true'
+    grid_size = float(request.args.get('grid_size', '0.01'))
+    
+    # Get property types if provided
+    property_types_param = request.args.get('property_types', None)
+    property_types = property_types_param.split(',') if property_types_param else None
+    
+    # Get property data with filters
+    stats, bounds, properties = get_property_data(
+        data_source=data_source,
+        value_filter=value_filter,
+        city=city,
+        property_types=property_types
+    )
+    
+    # Generate response based on visualization mode
+    if visualization_mode == 'heatmap':
+        # Generate heatmap data
+        heatmap_data = prepare_heatmap_data(properties)
+        response_data = {
+            'statistics': stats,
+            'bounds': bounds,
+            'heatmap': heatmap_data,
             'visualization': 'heatmap'
         }
     elif visualization_mode == 'clusters' or (clustering and len(properties) > 20):

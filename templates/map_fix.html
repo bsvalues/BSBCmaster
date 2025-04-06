@@ -1,0 +1,127 @@
+            // Get selected filters
+            const dataSource = document.getElementById('data-source').value;
+            const valueFilter = document.getElementById('value-filter').value;
+            const cityFilter = document.getElementById('city-filter').value;
+            const useClustering = document.getElementById('clustering-toggle').checked;
+            const useAnimation = document.getElementById('animation-toggle').checked;
+            
+            // Get selected property types
+            const selectedPropertyTypes = [];
+            document.querySelectorAll('.property-type-checkbox:checked').forEach(checkbox => {
+                selectedPropertyTypes.push(checkbox.value);
+            });
+            
+            // Build URL with query parameters
+            const url = new URL('/api/map/data', window.location.origin);
+            url.searchParams.append('data_source', dataSource);
+            url.searchParams.append('value_filter', valueFilter);
+            url.searchParams.append('mode', currentMode);
+            if (cityFilter !== 'all') {
+                url.searchParams.append('city', cityFilter);
+            }
+            url.searchParams.append('clustering', useClustering.toString());
+            
+            // Fetch map data
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    // Clear existing layers
+                    propertyLayer.clearLayers();
+                    markerClusterGroup.clearLayers();
+                    visualizationsManager.clearAllLayers();
+                    
+                    if (!data.geojson) {
+                        console.error('No GeoJSON data returned from the server');
+                        document.getElementById('map-loading').style.display = 'none';
+                        return;
+                    }
+                    
+                    // Filter properties by selected property types if we have features
+                    const filteredFeatures = data.geojson.features.filter(feature => 
+                        selectedPropertyTypes.includes(feature.properties.property_type));
+                    
+                    // Create new GeoJSON with filtered features
+                    const filteredGeoJSON = {
+                        type: 'FeatureCollection',
+                        features: filteredFeatures
+                    };
+                    
+                    // Extract property data for visualizations
+                    const propertyData = filteredFeatures.map(feature => {
+                        return {
+                            latitude: feature.geometry.coordinates[1],
+                            longitude: feature.geometry.coordinates[0],
+                            assessed_value: feature.properties.assessed_value,
+                            property_type: feature.properties.property_type,
+                            property_address: feature.properties.property_address,
+                            account_id: feature.properties.account_id,
+                            owner_name: feature.properties.owner_name,
+                            property_city: feature.properties.property_city
+                        };
+                    });
+                    
+                    // Set data for visualization manager
+                    visualizationsManager.setPropertyData(propertyData);
+                    
+                    // Apply selected visualization mode
+                    switch (currentMode) {
+                        case 'heatmap':
+                            // Heat map mode
+                            if (data.heatmap) {
+                                // Use server-generated heatmap data if available
+                                const heatLayer = L.heatLayer(data.heatmap, {
+                                    radius: 25,
+                                    blur: 15,
+                                    maxZoom: 16,
+                                    gradient: {
+                                        0.2: '#ffffb2',
+                                        0.4: '#fed976',
+                                        0.6: '#feb24c',
+                                        0.8: '#fd8d3c',
+                                        0.9: '#f03b20',
+                                        1.0: '#bd0026'
+                                    }
+                                }).addTo(map);
+                                
+                                // Add to custom layer group for cleanup
+                                propertyLayer.addLayer(heatLayer);
+                            } else {
+                                // Fallback to client-side rendering
+                                visualizationsManager.showHeatmap('assessed_value');
+                            }
+                            
+                            // Add heat map legend
+                            const heatLegend = L.control({position: 'bottomright'});
+                            heatLegend.onAdd = function(map) {
+                                const div = L.DomUtil.create('div', 'property-legend property-value-legend');
+                                div.innerHTML = `
+                                    <h6>Property Values</h6>
+                                    <div class="legend-item">
+                                        <div class="legend-marker" style="background-color: #bd0026;"></div>
+                                        <span>Over $1,000,000</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <div class="legend-marker" style="background-color: #f03b20;"></div>
+                                        <span>$500,000 - $1,000,000</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <div class="legend-marker" style="background-color: #fd8d3c;"></div>
+                                        <span>$250,000 - $500,000</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <div class="legend-marker" style="background-color: #feb24c;"></div>
+                                        <span>$100,000 - $250,000</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <div class="legend-marker" style="background-color: #fed976;"></div>
+                                        <span>$50,000 - $100,000</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <div class="legend-marker" style="background-color: #ffffb2;"></div>
+                                        <span>Under $50,000</span>
+                                    </div>
+                                `;
+                                return div;
+                            }
+                            propertyLayer.addLayer(heatLegend.addTo(map));
+                            break;
