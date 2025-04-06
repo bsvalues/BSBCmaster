@@ -45,9 +45,27 @@ def import_csv_to_db(csv_path, table_name, chunk_size=5000, if_exists='replace')
         # Create a SQLAlchemy engine
         engine = create_engine(database_url)
         
+        # Try different encodings for the CSV file
+        encodings = ['utf-8', 'latin1', 'cp1252', 'ISO-8859-1']
+        successful_encoding = None
+        
+        for encoding in encodings:
+            try:
+                # Try to read the first few rows to test the encoding
+                test_df = pd.read_csv(csv_path, nrows=5, encoding=encoding)
+                successful_encoding = encoding
+                logger.info(f"Successfully read CSV with encoding: {encoding}")
+                break
+            except UnicodeDecodeError:
+                logger.warning(f"Failed to read CSV with encoding: {encoding}")
+        
+        if successful_encoding is None:
+            logger.error("Failed to read CSV with any of the attempted encodings")
+            return 0
+            
         # Read and import the CSV file in chunks
         total_rows = 0
-        for chunk in pd.read_csv(csv_path, chunksize=chunk_size):
+        for chunk in pd.read_csv(csv_path, chunksize=chunk_size, encoding=successful_encoding):
             # Convert column names to lowercase
             chunk.columns = [col.lower() for col in chunk.columns]
             
@@ -100,11 +118,29 @@ def import_account_data(filename='account.csv'):
             logger.error(f"File not found: {csv_path}")
             return 0
         
+        # Try different encodings for the CSV file
+        encodings = ['utf-8', 'latin1', 'cp1252', 'ISO-8859-1']
+        successful_encoding = None
+        
+        for encoding in encodings:
+            try:
+                # Try to read the first few rows to test the encoding
+                test_df = pd.read_csv(csv_path, nrows=5, encoding=encoding)
+                successful_encoding = encoding
+                logger.info(f"Successfully read CSV with encoding: {encoding}")
+                break
+            except UnicodeDecodeError:
+                logger.warning(f"Failed to read CSV with encoding: {encoding}")
+        
+        if successful_encoding is None:
+            logger.error("Failed to read CSV with any of the attempted encodings")
+            return 0
+            
         # Read CSV in chunks
         total_rows = 0
         chunk_size = 5000
         
-        for chunk in pd.read_csv(csv_path, chunksize=chunk_size):
+        for chunk in pd.read_csv(csv_path, chunksize=chunk_size, encoding=successful_encoding):
             # Convert column names to lowercase
             chunk.columns = [col.lower() for col in chunk.columns]
             
@@ -149,16 +185,126 @@ def import_account_data(filename='account.csv'):
 
 def import_improvement_data(filename='ftp_dl_imprv.csv'):
     """
-    Import property improvement data from the attached_assets directory.
+    Import property improvement data from the attached_assets directory
+    and create corresponding Parcel and Property records.
     
     Args:
         filename: Name of the improvements CSV file
         
     Returns:
-        Number of rows imported
+        Dictionary with counts of parcels and properties created
     """
+    from models import Parcel, Property
+    
     csv_path = os.path.join('attached_assets', filename)
-    return import_csv_to_db(csv_path, 'improvements')
+    logger.info(f"Importing improvements data from {csv_path}")
+    
+    if not os.path.exists(csv_path):
+        logger.error(f"File not found: {csv_path}")
+        return {'parcels': 0, 'properties': 0}
+    
+    try:
+        # Get database connection
+        database_url = app.config['SQLALCHEMY_DATABASE_URI']
+        engine = create_engine(database_url)
+        
+        # Try different encodings for the CSV file
+        encodings = ['utf-8', 'latin1', 'cp1252', 'ISO-8859-1']
+        df = None
+        
+        for encoding in encodings:
+            try:
+                df = pd.read_csv(csv_path, encoding=encoding)
+                logger.info(f"Successfully read CSV with encoding: {encoding}")
+                break
+            except UnicodeDecodeError:
+                logger.warning(f"Failed to read CSV with encoding: {encoding}")
+        
+        if df is None:
+            logger.error("Failed to read CSV with any of the attempted encodings")
+            return {'parcels': 0, 'properties': 0}
+            
+        logger.info(f"Read {len(df)} rows from {csv_path}")
+        
+        # Convert column names to lowercase
+        df.columns = [col.lower() for col in df.columns]
+        
+        # Track created parcels to avoid duplicates
+        created_parcels = {}
+        created_properties = 0
+        
+        with app.app_context():
+            # Process each row and create corresponding records
+            for _, row in df.iterrows():
+                prop_id = str(row.get('prop_id', ''))
+                imprv_id = str(row.get('imprv_id', ''))
+                imprv_desc = row.get('imprv_desc', '')
+                imprv_val = row.get('imprv_val', 0)
+                living_area = row.get('living_area', None)
+                primary_use_cd = row.get('primary_use_cd', '')
+                stories = row.get('stories', None)
+                actual_year_built = row.get('actual_year_built', None)
+                
+                # Skip rows with missing prop_id
+                if not prop_id:
+                    continue
+                
+                # Create or get parcel
+                if prop_id not in created_parcels:
+                    # Create a new parcel
+                    parcel = Parcel(
+                        parcel_id=prop_id,
+                        address=f"Property {prop_id}",  # Placeholder
+                        city="Unknown",                # Placeholder
+                        state="WA",                    # Assuming Washington state
+                        zip_code="99999",              # Placeholder
+                        land_value=0,
+                        improvement_value=0,
+                        total_value=0,
+                        assessment_year=datetime.now().year
+                    )
+                    db.session.add(parcel)
+                    db.session.flush()  # Flush to get the ID
+                    created_parcels[prop_id] = parcel.id
+                    
+                # Create a property record linked to the parcel
+                property_type = "Unknown"
+                if primary_use_cd == '81':
+                    property_type = "Residential"
+                elif primary_use_cd == '83':
+                    property_type = "Commercial"
+                
+                property = Property(
+                    parcel_id=created_parcels[prop_id],
+                    property_type=property_type,
+                    year_built=actual_year_built if actual_year_built else None,
+                    square_footage=living_area if living_area else None,
+                    stories=stories if stories else None
+                )
+                db.session.add(property)
+                created_properties += 1
+                
+                # Update parcel improvement value
+                parcel = db.session.query(Parcel).filter_by(id=created_parcels[prop_id]).first()
+                if parcel and imprv_val:
+                    try:
+                        imprv_val_float = float(imprv_val)
+                        parcel.improvement_value += imprv_val_float
+                        parcel.total_value += imprv_val_float
+                    except (ValueError, TypeError):
+                        pass
+            
+            # Commit all changes
+            db.session.commit()
+            
+            logger.info(f"Created {len(created_parcels)} parcels and {created_properties} properties")
+            return {'parcels': len(created_parcels), 'properties': created_properties}
+    
+    except Exception as e:
+        logger.error(f"Error importing improvements: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {'parcels': 0, 'properties': 0}
 
 def import_images_data(filename='images.csv'):
     """
@@ -191,11 +337,29 @@ def import_images_data(filename='images.csv'):
             logger.error(f"File not found: {csv_path}")
             return 0
         
+        # Try different encodings for the CSV file
+        encodings = ['utf-8', 'latin1', 'cp1252', 'ISO-8859-1']
+        successful_encoding = None
+        
+        for encoding in encodings:
+            try:
+                # Try to read the first few rows to test the encoding
+                test_df = pd.read_csv(csv_path, nrows=5, encoding=encoding)
+                successful_encoding = encoding
+                logger.info(f"Successfully read CSV with encoding: {encoding}")
+                break
+            except UnicodeDecodeError:
+                logger.warning(f"Failed to read CSV with encoding: {encoding}")
+        
+        if successful_encoding is None:
+            logger.error("Failed to read CSV with any of the attempted encodings")
+            return 0
+            
         # Read CSV in chunks
         total_rows = 0
         chunk_size = 1000
         
-        for chunk in pd.read_csv(csv_path, chunksize=chunk_size):
+        for chunk in pd.read_csv(csv_path, chunksize=chunk_size, encoding=successful_encoding):
             # Convert column names to lowercase
             chunk.columns = [col.lower() for col in chunk.columns]
             
