@@ -116,6 +116,10 @@ class Account(db.Model):
     property_city = db.Column(db.String(100), nullable=True)
     legal_description = db.Column(db.Text, nullable=True)
     
+    # Geographic coordinates
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    
     # Assessment details
     assessment_year = db.Column(db.Integer, nullable=True)
     assessed_value = db.Column(db.Numeric(12, 2), nullable=True)

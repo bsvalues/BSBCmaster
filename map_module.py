@@ -189,12 +189,13 @@ def get_property_images(account_id: str) -> List[Dict[str, Any]]:
         
         query = text("""
             SELECT 
-                image_id,
+                id,
                 account_id,
                 image_url,
+                image_path,
                 image_type,
                 image_date,
-                image_description
+                file_format
             FROM property_images
             WHERE account_id = :account_id
         """)
@@ -204,12 +205,13 @@ def get_property_images(account_id: str) -> List[Dict[str, Any]]:
         images = []
         for row in result:
             image_data = {
-                'image_id': row.image_id,
+                'image_id': row.id,
                 'account_id': row.account_id,
                 'image_url': row.image_url,
+                'image_path': row.image_path,
                 'image_type': row.image_type,
                 'image_date': row.image_date.isoformat() if hasattr(row.image_date, 'isoformat') else row.image_date,
-                'image_description': row.image_description
+                'file_format': row.file_format
             }
             images.append(image_data)
         
@@ -383,9 +385,11 @@ def get_cities():
         'cities': cities
     })
 
-def get_property_images_for_map():
+def get_property_images_for_map(account_id=None):
     """Handle GET request for property images by account ID."""
-    account_id = request.view_args.get('account_id')
+    if not account_id:
+        account_id = request.view_args.get('account_id')
+        
     if not account_id:
         return jsonify({
             'status': 'error',

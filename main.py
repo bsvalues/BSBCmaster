@@ -1185,7 +1185,8 @@ def map_cities():
 @app.route('/api/map/property-images/<account_id>', methods=['GET'])
 def map_property_images(account_id):
     """Get property images for a specific account."""
-    return map_module.get_property_images_for_map()
+    # Pass the account_id to the map module function
+    return map_module.get_property_images_for_map(account_id)
 
 
 # This is called when the Flask app is run
