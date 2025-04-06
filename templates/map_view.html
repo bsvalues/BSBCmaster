@@ -11,6 +11,22 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/custom_marker_cluster.css') }}" />
 <!-- Enhanced Marker Cluster Styling -->
 <link rel="stylesheet" href="{{ url_for('static', filename='css/enhanced_marker_cluster.css') }}" />
+<!-- Value Trends Styling --> 
+<link rel="stylesheet" href="{{ url_for('static', filename='css/value_trends.css') }}" /> 
+<!-- Real-time Updates Styling --> 
+<link rel="stylesheet" href="{{ url_for('static', filename='css/realtime_updates.css') }}" />
+<!-- Enhanced Filters Styling --> 
+<link rel="stylesheet" href="{{ url_for('static', filename='css/enhanced_filters.css') }}" />
+<!-- Font Awesome for icons --> 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+<!-- Value Trends Styling -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/value_trends.css') }}" />
+<!-- Real-time Updates Styling --> 
+<link rel="stylesheet" href="{{ url_for('static', filename='css/realtime_updates.css') }}" />
+<!-- Enhanced Filters Styling --> 
+<link rel="stylesheet" href="{{ url_for('static', filename='css/enhanced_filters.css') }}" />
+<!-- Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
 <style>
     #map-container {
         position: relative;
@@ -126,6 +142,9 @@
                         <button class="visualization-btn" data-mode="clusters">Clusters</button>
                         <button class="visualization-btn" data-mode="heatmap">Heat Map</button>
                         <button class="visualization-btn" data-mode="value">Value Map</button>
+                        <button class="visualization-btn" data-mode="trends">Time Trends</button>
+                        <button class="visualization-btn" data-mode="realtime">Real-time Updates</button>
+                        <button class="visualization-btn" data-mode="enhanced_filters">Enhanced Filters</button>
                     </div>
                 </div>
                 
@@ -251,6 +270,14 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
 <!-- Leaflet Heat plugin -->
 <script src="{{ url_for('static', filename='js/leaflet-heat.js') }}"></script>
+<!-- Chart.js for trend visualization --> 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script> 
+<!-- Property Value Trends Visualization --> 
+<script src="{{ url_for('static', filename='js/value_trends.js') }}"></script>
+<!-- Real-time Property Updates --> 
+<script src="{{ url_for('static', filename='js/realtime_updates.js') }}"></script>
+<!-- Enhanced Property Filters --> 
+<script src="{{ url_for('static', filename='js/enhanced_filters.js') }}"></script>
 <!-- Map Visualizations -->
 <script src="{{ url_for('static', filename='js/map_visualizations.js') }}"></script>
 
@@ -597,6 +624,21 @@
                                 return div;
                             }
                             propertyLayer.addLayer(heatLegend.addTo(map));
+                            break;
+                            
+                        case 'enhanced_filters':
+                            // Enhanced filters visualization
+                            visualizationsManager.showEnhancedFilters();
+                            break;
+                            
+                        case 'realtime':
+                            // Real-time updates visualization
+                            visualizationsManager.showRealtime();
+                            break;
+                            
+                        case 'trends':
+                            // Time trends visualization
+                            visualizationsManager.showTrends();
                             break;
                             
                         case 'value':

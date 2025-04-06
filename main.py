@@ -5,6 +5,11 @@ It serves as the main entry point for the application in Replit.
 
 import os
 import sys
+
+# Add app directory to path for imports
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import sys
 import signal
 import logging
 import threading
@@ -17,6 +22,7 @@ from sqlalchemy import func, text
 import requests
 from urllib.parse import urlparse
 from flask import jsonify, request, Blueprint, render_template
+from app.api.realtime import realtime_api
 import map_module
 
 from app_setup import app, db, create_tables

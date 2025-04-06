@@ -1,0 +1,282 @@
+/* Property Value Trends Visualization Styles */
+
+/* Timeline Control */
+.timeline-control {
+    background-color: rgba(255, 255, 255, 0.95);
+    border-radius: 4px;
+    padding: 10px 15px;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.25);
+    width: 320px;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 15px;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease-in-out;
+}
+
+.timeline-control:hover {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.timeline-header h6 {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0;
+    color: #2c3e50;
+}
+
+.timeline-date {
+    font-size: 12px;
+    color: #7f8c8d;
+}
+
+.current-date {
+    font-weight: 600;
+    color: #3498db;
+}
+
+/* Timeline Slider */
+.timeline-slider-container {
+    margin-bottom: 10px;
+}
+
+.timeline-slider {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: #e0e0e0;
+    outline: none;
+    transition: background 0.3s;
+}
+
+.timeline-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #3498db;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s;
+}
+
+.timeline-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #3498db;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s;
+}
+
+.timeline-slider::-webkit-slider-thumb:hover {
+    background: #2980b9;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.5);
+    transform: scale(1.1);
+}
+
+.timeline-slider::-moz-range-thumb:hover {
+    background: #2980b9;
+    box-shadow: 0 1px 5px rgba(0, 0, 0, 0.5);
+    transform: scale(1.1);
+}
+
+/* Timeline Controls */
+.timeline-controls {
+    display: flex;
+    align-items: center;
+}
+
+.timeline-play-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-right: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s;
+}
+
+.timeline-play-button:hover {
+    background-color: #2980b9;
+    transform: scale(1.1);
+}
+
+.timeline-play-button:active {
+    transform: scale(0.95);
+}
+
+.timeline-info {
+    flex-grow: 1;
+    text-align: right;
+    font-size: 12px;
+    color: #7f8c8d;
+}
+
+/* Property Popups */
+.property-popup {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 5px;
+}
+
+.property-popup h6 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    color: #2c3e50;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+.property-details {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+    font-size: 12px;
+}
+
+.property-details > div {
+    display: flex;
+    justify-content: space-between;
+}
+
+.property-details .label {
+    color: #7f8c8d;
+}
+
+.property-details .value {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.positive-change {
+    color: #27ae60;
+}
+
+.negative-change {
+    color: #e74c3c;
+}
+
+/* Trend Chart */
+.trend-chart-container {
+    position: relative;
+}
+
+.chart-title {
+    font-size: 14px;
+    margin: 0 0 10px 0;
+    text-align: center;
+    color: #2c3e50;
+}
+
+.chart-close-button {
+    opacity: 0.6;
+    transition: opacity 0.3s;
+}
+
+.chart-close-button:hover {
+    opacity: 1;
+}
+
+/* Properties with different trend patterns */
+.trend-high {
+    animation: pulse-high 1.5s infinite;
+}
+
+.trend-medium {
+    animation: pulse-medium 1.5s infinite;
+}
+
+.trend-low {
+    animation: pulse-low 1.5s infinite;
+}
+
+@keyframes pulse-high {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+@keyframes pulse-medium {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@keyframes pulse-low {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .timeline-control {
+        width: 280px;
+        padding: 8px 12px;
+    }
+    
+    .timeline-play-button {
+        width: 26px;
+        height: 26px;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .timeline-control {
+        background-color: rgba(30, 30, 30, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .timeline-header h6 {
+        color: #ecf0f1;
+    }
+    
+    .timeline-date,
+    .timeline-info {
+        color: #bdc3c7;
+    }
+    
+    .current-date {
+        color: #3498db;
+    }
+    
+    .timeline-slider {
+        background: #4a4a4a;
+    }
+    
+    .property-popup h6 {
+        color: #ecf0f1;
+        border-bottom: 1px solid #444;
+    }
+    
+    .property-details .label {
+        color: #bdc3c7;
+    }
+    
+    .property-details .value {
+        color: #ecf0f1;
+    }
+    
+    .chart-title {
+        color: #ecf0f1;
+    }
+}
