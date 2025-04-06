@@ -5,6 +5,10 @@
 {% block head %}
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<!-- Animate.css -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+<!-- Particle.js -->
+<script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
 <style>
     :root {
         --main-bg-color: #0a0e17;
@@ -16,14 +20,28 @@
         --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
         --secondary-gradient: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
         --glow-color: rgba(59, 130, 246, 0.3);
+        --glow-color-strong: rgba(59, 130, 246, 0.5);
         --text-primary: #f8fafc;
         --text-secondary: #94a3b8;
         --box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
         --subtle-border: 1px solid rgba(99, 102, 241, 0.1);
     }
     
+    /* Particles container */
+    #particles-js {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        z-index: -1;
+        opacity: 0.07;
+    }
+    
     .container-fluid {
         padding: 30px;
+        position: relative;
+        z-index: 1;
     }
     
     .dashboard-header {
@@ -34,12 +52,12 @@
     .dashboard-header h1 {
         font-size: 2.2rem;
         margin-bottom: 10px;
-        color: var(--text-primary);
         position: relative;
         display: inline-block;
+        color: var(--text-primary);
     }
     
-    .dashboard-header h1::after {
+    .dashboard-header h1::before {
         content: '';
         position: absolute;
         bottom: -10px;
@@ -50,11 +68,29 @@
         border-radius: 2px;
     }
     
+    .dashboard-header h1::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 0;
+        width: 30px;
+        height: 3px;
+        background: var(--secondary-gradient);
+        border-radius: 2px;
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { width: 30px; opacity: 1; }
+        50% { width: 80px; opacity: 0.7; }
+        100% { width: 30px; opacity: 1; }
+    }
+    
     .dashboard-header p {
         color: var(--text-secondary);
         font-weight: 300;
         font-size: 1.1rem;
-        margin-top: 15px;
+        margin-top: 20px;
     }
     
     .stats-card {
@@ -63,7 +99,7 @@
         margin-bottom: 25px;
         box-shadow: var(--box-shadow);
         border: var(--subtle-border);
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         overflow: hidden;
         position: relative;
     }
@@ -83,8 +119,8 @@
     }
     
     .stats-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+        transform: translateY(-5px) scale(1.01);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
     }
     
     .stats-card:hover::before {
@@ -117,6 +153,19 @@
         font-size: 1.1rem;
         color: var(--text-primary);
         letter-spacing: 0.5px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .stats-card-header h5::before {
+        content: '';
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        background: var(--accent-color-1);
+        border-radius: 50%;
+        margin-right: 10px;
+        box-shadow: 0 0 8px var(--glow-color-strong);
     }
     
     .stats-card-body {
@@ -178,12 +227,8 @@
         overflow: hidden;
         box-shadow: var(--box-shadow);
         border: var(--subtle-border);
-        transition: all 0.3s ease;
-    }
-    
-    .stats-summary-box:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        z-index: 1;
     }
     
     .stats-summary-box::before {
@@ -208,6 +253,11 @@
         box-shadow: 0 0 25px var(--glow-color);
         opacity: 0;
         transition: opacity 0.3s ease;
+    }
+    
+    .stats-summary-box:hover {
+        transform: translateY(-5px) scale(1.02);
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
     }
     
     .stats-summary-box:hover::after {
@@ -313,45 +363,141 @@
         background-position: 0 0;
         opacity: 0.015;
         pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    
+    /* Neon-like data highlights */
+    .neon-highlight {
+        position: relative;
+    }
+    
+    .neon-highlight::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        width: 100%;
+        height: 1px;
+        background: var(--accent-color-1);
+        box-shadow: 0 0 8px var(--glow-color-strong);
+        opacity: 0.7;
+    }
+    
+    /* Data panels fade-in animation */
+    .fade-in-panel {
+        opacity: 0;
+        transform: translateY(20px);
+        transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    
+    .fade-in-panel.visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    
+    /* Animated data counter */
+    @keyframes countUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .count-animation {
+        animation: countUp 0.5s ease-out forwards;
+    }
+    
+    /* Dynamic status indicator */
+    .status-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 8px;
+        background-color: var(--accent-color-2);
+        box-shadow: 0 0 10px var(--accent-color-2);
+        animation: pulse-status 2s infinite;
+    }
+    
+    @keyframes pulse-status {
+        0% { transform: scale(0.8); opacity: 0.7; }
+        50% { transform: scale(1.2); opacity: 1; }
+        100% { transform: scale(0.8); opacity: 0.7; }
+    }
+    
+    /* Responsive design adjustments */
+    @media (max-width: 992px) {
+        .stats-card, .stats-summary-box {
+            margin-bottom: 20px;
+        }
+        
+        .chart-container {
+            height: 250px;
+        }
+    }
+    
+    @media (max-width: 768px) {
+        .chart-container {
+            height: 220px;
+        }
+        
+        .summary-value {
+            font-size: 1.8rem;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
+<!-- Particles.js Background -->
+<div id="particles-js"></div>
+
 <div class="container-fluid">
-    <div class="dashboard-header">
+    <div class="dashboard-header animate__animated animate__fadeIn">
         <h1>Property Statistics Dashboard</h1>
         <p>Advanced analytics and real-time data insights for property assessment</p>
     </div>
     
     <!-- Summary Statistics Row -->
     <div class="row mb-4">
-        <div class="col-md-3">
+        <div class="col-md-3 fade-in-panel">
             <div class="stats-summary-box">
                 <div class="cyber-grid"></div>
                 <div class="stat-label">Total Properties</div>
                 <div class="summary-value" id="total-properties">0</div>
+                <div class="status-indicator"></div>
+                <span class="text-secondary">Updated in real-time</span>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 fade-in-panel">
             <div class="stats-summary-box">
                 <div class="cyber-grid"></div>
                 <div class="stat-label">Average Value</div>
                 <div class="summary-value" id="average-value">$0</div>
+                <div class="status-indicator"></div>
+                <span class="text-secondary">Updated in real-time</span>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 fade-in-panel">
             <div class="stats-summary-box">
                 <div class="cyber-grid"></div>
                 <div class="stat-label">Total Cities</div>
                 <div class="summary-value" id="total-cities">0</div>
+                <div class="status-indicator"></div>
+                <span class="text-secondary">Updated in real-time</span>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 fade-in-panel">
             <div class="stats-summary-box">
                 <div class="cyber-grid"></div>
                 <div class="stat-label">Image Coverage</div>
                 <div class="summary-value" id="image-coverage">0%</div>
+                <div class="status-indicator"></div>
+                <span class="text-secondary">Updated in real-time</span>
             </div>
         </div>
     </div>
@@ -359,7 +505,7 @@
     <!-- Charts Row -->
     <div class="row">
         <!-- Property Type Distribution -->
-        <div class="col-md-6">
+        <div class="col-md-6 fade-in-panel">
             <div class="stats-card">
                 <div class="cyber-grid"></div>
                 <div class="stats-card-header">
@@ -374,7 +520,7 @@
         </div>
         
         <!-- Value Distribution -->
-        <div class="col-md-6">
+        <div class="col-md-6 fade-in-panel">
             <div class="stats-card">
                 <div class="cyber-grid"></div>
                 <div class="stats-card-header">
@@ -391,7 +537,7 @@
     
     <div class="row mt-4">
         <!-- City Statistics -->
-        <div class="col-md-6">
+        <div class="col-md-6 fade-in-panel">
             <div class="stats-card">
                 <div class="cyber-grid"></div>
                 <div class="stats-card-header">
@@ -406,7 +552,7 @@
         </div>
         
         <!-- Property Value by Type -->
-        <div class="col-md-6">
+        <div class="col-md-6 fade-in-panel">
             <div class="stats-card">
                 <div class="cyber-grid"></div>
                 <div class="stats-card-header">
@@ -423,7 +569,7 @@
     
     <!-- Detailed Statistics Table -->
     <div class="row mt-4">
-        <div class="col-12">
+        <div class="col-12 fade-in-panel">
             <div class="stats-card">
                 <div class="cyber-grid"></div>
                 <div class="stats-card-header">
@@ -472,6 +618,154 @@
             minimumFractionDigits: 1,
             maximumFractionDigits: 1
         }).format(value / 100);
+    }
+    
+    // Initialize particles.js
+    function initParticles() {
+        particlesJS("particles-js", {
+            "particles": {
+                "number": {
+                    "value": 80,
+                    "density": {
+                        "enable": true,
+                        "value_area": 800
+                    }
+                },
+                "color": {
+                    "value": "#3b82f6"
+                },
+                "shape": {
+                    "type": "circle",
+                    "stroke": {
+                        "width": 0,
+                        "color": "#000000"
+                    },
+                    "polygon": {
+                        "nb_sides": 5
+                    }
+                },
+                "opacity": {
+                    "value": 0.3,
+                    "random": false,
+                    "anim": {
+                        "enable": false,
+                        "speed": 1,
+                        "opacity_min": 0.1,
+                        "sync": false
+                    }
+                },
+                "size": {
+                    "value": 3,
+                    "random": true,
+                    "anim": {
+                        "enable": false,
+                        "speed": 40,
+                        "size_min": 0.1,
+                        "sync": false
+                    }
+                },
+                "line_linked": {
+                    "enable": true,
+                    "distance": 150,
+                    "color": "#3b82f6",
+                    "opacity": 0.2,
+                    "width": 1
+                },
+                "move": {
+                    "enable": true,
+                    "speed": 0.8,
+                    "direction": "none",
+                    "random": false,
+                    "straight": false,
+                    "out_mode": "out",
+                    "bounce": false,
+                    "attract": {
+                        "enable": false,
+                        "rotateX": 600,
+                        "rotateY": 1200
+                    }
+                }
+            },
+            "interactivity": {
+                "detect_on": "canvas",
+                "events": {
+                    "onhover": {
+                        "enable": true,
+                        "mode": "grab"
+                    },
+                    "onclick": {
+                        "enable": true,
+                        "mode": "push"
+                    },
+                    "resize": true
+                },
+                "modes": {
+                    "grab": {
+                        "distance": 140,
+                        "line_linked": {
+                            "opacity": 0.3
+                        }
+                    },
+                    "bubble": {
+                        "distance": 400,
+                        "size": 40,
+                        "duration": 2,
+                        "opacity": 8,
+                        "speed": 3
+                    },
+                    "repulse": {
+                        "distance": 200,
+                        "duration": 0.4
+                    },
+                    "push": {
+                        "particles_nb": 4
+                    },
+                    "remove": {
+                        "particles_nb": 2
+                    }
+                }
+            },
+            "retina_detect": true
+        });
+    }
+    
+    // Animated counter
+    function animateCounter(element, target, duration = 1000, startDelay = 0) {
+        if (!element) return;
+        
+        const start = 0;
+        const startTime = Date.now() + startDelay;
+        const isPrice = element.id === 'average-value';
+        
+        function updateCounter() {
+            const now = Date.now();
+            
+            if (now < startTime) {
+                requestAnimationFrame(updateCounter);
+                return;
+            }
+            
+            const elapsedTime = now - startTime;
+            const progress = Math.min(elapsedTime / duration, 1);
+            const easedProgress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+            const currentCount = Math.floor(start + (target - start) * easedProgress);
+            
+            if (isPrice) {
+                element.textContent = formatCurrency(currentCount);
+            } else if (element.id === 'image-coverage') {
+                element.textContent = `${currentCount.toFixed(1)}%`;
+            } else {
+                element.textContent = currentCount.toLocaleString();
+            }
+            
+            if (progress < 1) {
+                requestAnimationFrame(updateCounter);
+            } else {
+                element.classList.add('count-animation');
+            }
+        }
+        
+        requestAnimationFrame(updateCounter);
     }
     
     // Chart colors and gradients
@@ -537,12 +831,16 @@
                     createValueByTypeChart(data.statistics);
                     populateStatisticsTable(data.statistics);
                     
-                    // Add animation classes after data is loaded
-                    setTimeout(() => {
-                        document.querySelectorAll('.stats-card, .stats-summary-box').forEach(el => {
-                            el.classList.add('loaded');
-                        });
-                    }, 100);
+                    // Display fade-in panels after data is loaded
+                    const panels = document.querySelectorAll('.fade-in-panel');
+                    let delay = 100;
+                    
+                    panels.forEach(panel => {
+                        setTimeout(() => {
+                            panel.classList.add('visible');
+                        }, delay);
+                        delay += 100;
+                    });
                 } else {
                     console.error('Error loading statistics data:', data.message);
                 }
@@ -555,7 +853,8 @@
     // Update summary statistics
     function updateSummaryStatistics(stats) {
         const totalProperties = stats.data_summary.total_properties;
-        document.getElementById('total-properties').textContent = totalProperties.toLocaleString();
+        const totalPropertiesEl = document.getElementById('total-properties');
+        animateCounter(totalPropertiesEl, totalProperties, 1500, 200);
         
         // Calculate average value across all property types
         let totalValue = 0;
@@ -568,14 +867,17 @@
         }
         
         const avgValue = propertyCount > 0 ? totalValue / propertyCount : 0;
-        document.getElementById('average-value').textContent = formatCurrency(avgValue);
+        const avgValueEl = document.getElementById('average-value');
+        animateCounter(avgValueEl, avgValue, 1500, 400);
         
         // Set city count
-        document.getElementById('total-cities').textContent = stats.data_summary.cities_count.toLocaleString();
+        const totalCitiesEl = document.getElementById('total-cities');
+        animateCounter(totalCitiesEl, stats.data_summary.cities_count, 1500, 600);
         
         // Set image coverage percentage
         const imageCoverage = stats.image_statistics.image_availability_percentage || 0;
-        document.getElementById('image-coverage').textContent = `${imageCoverage.toFixed(1)}%`;
+        const imageCoverageEl = document.getElementById('image-coverage');
+        animateCounter(imageCoverageEl, imageCoverage, 1500, 800);
     }
     
     // Create property type distribution chart
@@ -656,6 +958,12 @@
                             }
                         }
                     }
+                },
+                animation: {
+                    animateScale: true,
+                    animateRotate: true,
+                    duration: 1000,
+                    easing: 'easeOutQuart'
                 }
             }
         });
@@ -734,6 +1042,13 @@
                         cornerRadius: 8,
                         boxPadding: 10
                     }
+                },
+                animation: {
+                    delay: function(context) {
+                        return context.dataIndex * 100;
+                    },
+                    duration: 1000,
+                    easing: 'easeOutQuart'
                 }
             }
         });
@@ -887,6 +1202,16 @@
                             }
                         }
                     }
+                },
+                animation: {
+                    delay: function(context) {
+                        // Different delay for line vs bar
+                        return context.datasetIndex === 0 ? 
+                            context.dataIndex * 100 : 
+                            500 + context.dataIndex * 100;
+                    },
+                    duration: 1200,
+                    easing: 'easeOutQuart'
                 }
             }
         });
@@ -991,6 +1316,13 @@
                             }
                         }
                     }
+                },
+                animation: {
+                    delay: function(context) {
+                        return context.datasetIndex * 300 + context.dataIndex * 100;
+                    },
+                    duration: 1000,
+                    easing: 'easeOutQuart'
                 }
             }
         });
@@ -1006,7 +1338,7 @@
             const row = document.createElement('tr');
             
             row.innerHTML = `
-                <td><strong>${propType}</strong></td>
+                <td><strong class="neon-highlight">${propType}</strong></td>
                 <td>${typeStats.count.toLocaleString()}</td>
                 <td>${formatCurrency(typeStats.average_value)}</td>
                 <td>${formatCurrency(typeStats.median_value)}</td>
@@ -1020,6 +1352,10 @@
     
     // Initialize when document is ready
     document.addEventListener('DOMContentLoaded', function() {
+        // Initialize particles background
+        initParticles();
+        
+        // Load statistics data
         loadStatistics();
         
         // Add subtle hover effects to summary boxes
