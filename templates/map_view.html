@@ -5,8 +5,8 @@
 {% block head %}
 <!-- Leaflet.js CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin=""/>
-<style>
-    #map-container {
+<!-- Leaflet Markercluster CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
         position: relative;
         height: calc(100vh - 180px);
         min-height: 500px;
@@ -111,6 +111,14 @@
                 </div>
                 
                 <!-- City Filtering -->
+                <!-- Clustering Option -->
+                <div class="map-control-section">
+                    <label class="form-label">Display Options</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="clustering-toggle" checked>
+                        <label class="form-check-label" for="clustering-toggle">Enable Clustering</label>
+                    </div>
+                </div>
                 <div class="map-control-section">
                     <label for="city-filter" class="form-label">City</label>
                     <select class="form-select" id="city-filter">
@@ -189,6 +197,8 @@
                 </div>
             </div>
         </div>
+<!-- Leaflet Markercluster JS -->
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     </div>
 </div>
 {% endblock %}
@@ -209,6 +219,34 @@
         }).addTo(map);
         
         // Property markers layer group
+        // Initialize property clusters
+        let markerClusterGroup = L.markerClusterGroup({
+            maxClusterRadius: 50,
+            iconCreateFunction: function(cluster) {
+                const childCount = cluster.getChildCount();
+                let clusterClass = 'marker-cluster-';
+                
+                if (childCount < 10) {
+                    clusterClass += 'small';
+                } else if (childCount < 50) {
+                    clusterClass += 'medium';
+                } else {
+                    clusterClass += 'large';
+                }
+                
+                return new L.DivIcon({
+                    html: '<div><span>' + childCount + '</span></div>',
+                    className: 'marker-cluster ' + clusterClass,
+                    iconSize: new L.Point(40, 40)
+                });
+            }
+        });
+        
+        // Toggle clustering
+        const clusteringToggle = document.getElementById('clustering-toggle');
+        clusteringToggle.addEventListener('change', function() {
+            loadMapData();
+        });
         let propertyLayer = L.layerGroup().addTo(map);
         
         // Legend
@@ -322,6 +360,7 @@
             const dataSource = document.getElementById('data-source').value;
             const valueFilter = document.getElementById('value-filter').value;
             const cityFilter = document.getElementById('city-filter').value;
+            const useClustering = document.getElementById('clustering-toggle').checked;
             
             // Get selected property types
             const selectedPropertyTypes = [];
@@ -343,6 +382,7 @@
                 .then(data => {
                     // Clear existing markers
                     propertyLayer.clearLayers();
+                    markerClusterGroup.clearLayers();
                     
                     // Filter properties by selected property types
                     const filteredFeatures = data.geojson.features.filter(feature => 
@@ -354,13 +394,21 @@
                         features: filteredFeatures
                     };
                     
-                    // Add GeoJSON layer with custom marker and popup
-                    L.geoJSON(filteredGeoJSON, {
+                    // Create GeoJSON layer with custom marker and popup
+                    const geoJsonLayer = L.geoJSON(filteredGeoJSON, {
                         pointToLayer: createPropertyMarker,
                         onEachFeature: function(feature, layer) {
                             layer.bindPopup(createPopupContent(feature.properties));
                         }
-                    }).addTo(propertyLayer);
+                    });
+                    
+                    // Add markers based on clustering preference
+                    if (useClustering) {
+                        markerClusterGroup.addLayer(geoJsonLayer);
+                        propertyLayer.addLayer(markerClusterGroup);
+                    } else {
+                        geoJsonLayer.addTo(propertyLayer);
+                    }
                     
                     // Update statistics
                     updateStatistics(data.statistics);

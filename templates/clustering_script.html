@@ -1,0 +1,28 @@
+        // Initialize property clusters
+        let markerClusterGroup = L.markerClusterGroup({
+            maxClusterRadius: 50,
+            iconCreateFunction: function(cluster) {
+                const childCount = cluster.getChildCount();
+                let clusterClass = 'marker-cluster-';
+                
+                if (childCount < 10) {
+                    clusterClass += 'small';
+                } else if (childCount < 50) {
+                    clusterClass += 'medium';
+                } else {
+                    clusterClass += 'large';
+                }
+                
+                return new L.DivIcon({
+                    html: '<div><span>' + childCount + '</span></div>',
+                    className: 'marker-cluster ' + clusterClass,
+                    iconSize: new L.Point(40, 40)
+                });
+            }
+        });
+        
+        // Toggle clustering
+        const clusteringToggle = document.getElementById('clustering-toggle');
+        clusteringToggle.addEventListener('change', function() {
+            loadMapData();
+        });

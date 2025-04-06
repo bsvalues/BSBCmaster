@@ -10,6 +10,7 @@ from flask import render_template, jsonify, request, Blueprint, make_response, s
 from models import Parcel, Property, Sale, Account, PropertyImage
 from sqlalchemy import func
 from app.api.statistics import get_property_statistics
+import map_module
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -919,6 +920,42 @@ def statistics_dashboard():
 def statistics_data():
     """API endpoint to get property statistics data."""
     return get_property_statistics()
+
+# Map visualization routes
+@api_routes.route('/map')
+def map_view():
+    """Render the property map visualization page."""
+    return render_template('map_view.html', title="Property Map Visualization")
+
+@api_routes.route('/api/map/data')
+def api_map_data():
+    """API endpoint to get property map data with filtering and clustering."""
+    return map_module.get_map_data()
+
+@api_routes.route('/api/map/clusters')
+def api_map_clusters():
+    """API endpoint to get property clusters for the map."""
+    return map_module.get_map_clusters()
+
+@api_routes.route('/api/map/property-types')
+def api_property_types():
+    """API endpoint to get available property types."""
+    return map_module.get_property_types()
+
+@api_routes.route('/api/map/cities')
+def api_cities():
+    """API endpoint to get available cities."""
+    return map_module.get_cities()
+
+@api_routes.route('/api/map/property-images/<account_id>')
+def api_property_images(account_id):
+    """API endpoint to get property images for a specific account."""
+    return map_module.get_property_images_for_map(account_id)
+
+@api_routes.route('/api/map/value-ranges')
+def api_value_ranges():
+    """API endpoint to get property value ranges for filtering."""
+    return map_module.get_value_ranges()
 
 @api_routes.route('/api/visualization-data/property-locations')
 def visualization_property_locations():
