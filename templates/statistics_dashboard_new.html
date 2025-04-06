@@ -1,0 +1,408 @@
+{% extends "base_new.html" %}
+
+{% block title %}Statistics Dashboard - Benton County Assessor{% endblock %}
+
+{% block head %}
+<!-- Chart.js for visualizations -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="mb-3">Property Statistics Dashboard</h1>
+            <p class="text-secondary">Comprehensive analytics and insights for Benton County property data.</p>
+        </div>
+    </div>
+    
+    <!-- Key Performance Indicators -->
+    <div class="row mb-4">
+        <div class="col-sm-6 col-lg-3 mb-4">
+            <div class="kpi-card text-center">
+                <div class="kpi-value" id="total-properties">{{ property_count }}</div>
+                <div class="kpi-label">Total Properties</div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3 mb-4">
+            <div class="kpi-card text-center">
+                <div class="kpi-value" id="avg-value">${{ avg_value|default("329,850") }}</div>
+                <div class="kpi-label">Average Property Value</div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3 mb-4">
+            <div class="kpi-card text-center">
+                <div class="kpi-value" id="total-cities">{{ city_count|default("5") }}</div>
+                <div class="kpi-label">Represented Cities</div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3 mb-4">
+            <div class="kpi-card text-center">
+                <div class="kpi-value" id="property-types">{{ property_type_count|default("5") }}</div>
+                <div class="kpi-label">Property Types</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Filters and Controls -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Data Filters</h2>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label for="city-filter" class="form-label">City</label>
+                            <select id="city-filter" class="form-select">
+                                <option value="">All Cities</option>
+                                {% for city in cities %}
+                                <option value="{{ city }}">{{ city }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="property-type-filter" class="form-label">Property Type</label>
+                            <select id="property-type-filter" class="form-select">
+                                <option value="">All Types</option>
+                                {% for type in property_types %}
+                                <option value="{{ type }}">{{ type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Value Range</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="number" id="min-value" class="form-control" placeholder="Min">
+                                </div>
+                                <div class="col-6">
+                                    <input type="number" id="max-value" class="form-control" placeholder="Max">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 d-flex align-items-end">
+                            <button id="apply-filters" class="btn btn-primary w-100">Apply Filters</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts and Visualizations -->
+    <div class="row">
+        <!-- Property Value Distribution -->
+        <div class="col-lg-6 mb-4">
+            <div class="chart-container">
+                <h3 class="chart-title">Property Value Distribution</h3>
+                <canvas id="value-distribution-chart" height="300"></canvas>
+            </div>
+        </div>
+        
+        <!-- Property Types Breakdown -->
+        <div class="col-lg-6 mb-4">
+            <div class="chart-container">
+                <h3 class="chart-title">Property Types Breakdown</h3>
+                <canvas id="property-types-chart" height="300"></canvas>
+            </div>
+        </div>
+        
+        <!-- Average Value by City -->
+        <div class="col-lg-6 mb-4">
+            <div class="chart-container">
+                <h3 class="chart-title">Average Value by City</h3>
+                <canvas id="city-values-chart" height="300"></canvas>
+            </div>
+        </div>
+        
+        <!-- Value Trends Over Time -->
+        <div class="col-lg-6 mb-4">
+            <div class="chart-container">
+                <h3 class="chart-title">Value Trends Over Time</h3>
+                <div class="btn-group mb-3" role="group" aria-label="Timeframe">
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-timeframe="6m">6M</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm active" data-timeframe="1y">1Y</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm" data-timeframe="5y">5Y</button>
+                </div>
+                <canvas id="value-trends-chart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Property Data Table -->
+    <div class="row">
+        <div class="col-12 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="h5 mb-0">Property Data Summary</h3>
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm" id="export-csv">
+                            <i class="fas fa-download me-1"></i> Export CSV
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Parcel ID</th>
+                                    <th>Address</th>
+                                    <th>City</th>
+                                    <th>Type</th>
+                                    <th>Assessed Value</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="property-table-body">
+                                {% for property in properties %}
+                                <tr>
+                                    <td>{{ property.parcel_id }}</td>
+                                    <td>{{ property.address }}</td>
+                                    <td>{{ property.city }}</td>
+                                    <td>{{ property.property_type }}</td>
+                                    <td>${{ property.assessed_value|default(0)|commatize }}</td>
+                                    <td>
+                                        <a href="/property/{{ property.parcel_id }}" class="btn btn-sm btn-outline-primary">
+                                            View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <span class="text-muted">Showing <span id="showing-count">{{ properties|length }}</span> of {{ property_count }} properties</span>
+                        <nav aria-label="Property table navigation">
+                            <ul class="pagination pagination-sm mb-0">
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" aria-label="Previous">
+                                        <span aria-hidden="true">&laquo;</span>
+                                    </a>
+                                </li>
+                                <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                                <li class="page-item"><a class="page-link" href="#">2</a></li>
+                                <li class="page-item"><a class="page-link" href="#">3</a></li>
+                                <li class="page-item">
+                                    <a class="page-link" href="#" aria-label="Next">
+                                        <span aria-hidden="true">&raquo;</span>
+                                    </a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize charts with sample data
+        // (In production, this would use actual data from the backend)
+        
+        // Property Value Distribution Chart
+        const valueDistributionCtx = document.getElementById('value-distribution-chart').getContext('2d');
+        const valueDistributionChart = new Chart(valueDistributionCtx, {
+            type: 'bar',
+            data: {
+                labels: ['<$100K', '$100K-$250K', '$250K-$500K', '$500K-$1M', '>$1M'],
+                datasets: [{
+                    label: 'Number of Properties',
+                    data: [2, 5, 15, 3, 0],
+                    backgroundColor: [
+                        'rgba(66, 153, 225, 0.6)',
+                        'rgba(66, 153, 225, 0.7)',
+                        'rgba(66, 153, 225, 0.8)',
+                        'rgba(66, 153, 225, 0.9)',
+                        'rgba(66, 153, 225, 1.0)'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Properties'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Value Range'
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Property Types Chart
+        const propertyTypesCtx = document.getElementById('property-types-chart').getContext('2d');
+        const propertyTypesChart = new Chart(propertyTypesCtx, {
+            type: 'pie',
+            data: {
+                labels: ['Residential', 'Commercial', 'Agricultural', 'Industrial', 'Mixed Use'],
+                datasets: [{
+                    label: 'Property Types',
+                    data: [12, 5, 3, 1, 4],
+                    backgroundColor: [
+                        'rgba(66, 153, 225, 0.8)',
+                        'rgba(49, 130, 206, 0.8)',
+                        'rgba(44, 82, 130, 0.8)',
+                        'rgba(99, 179, 237, 0.8)',
+                        'rgba(144, 205, 244, 0.8)'
+                    ],
+                    borderColor: '#ffffff',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    }
+                }
+            }
+        });
+        
+        // City Values Chart
+        const cityValuesCtx = document.getElementById('city-values-chart').getContext('2d');
+        const cityValuesChart = new Chart(cityValuesCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Richland', 'Kennewick', 'Pasco', 'West Richland', 'Benton City'],
+                datasets: [{
+                    label: 'Average Property Value',
+                    data: [375000, 325000, 290000, 350000, 275000],
+                    backgroundColor: 'rgba(66, 153, 225, 0.8)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Average Value ($)'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'City'
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Value Trends Chart
+        const valueTrendsCtx = document.getElementById('value-trends-chart').getContext('2d');
+        const valueTrendsChart = new Chart(valueTrendsCtx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                datasets: [{
+                    label: 'Average Property Value',
+                    data: [310000, 315000, 325000, 320000, 330000, 340000, 335000, 345000, 350000, 355000, 360000, 365000],
+                    borderColor: '#3182ce',
+                    backgroundColor: 'rgba(49, 130, 206, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Handle timeframe button clicks for trends chart
+        document.querySelectorAll('[data-timeframe]').forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active class from all buttons
+                document.querySelectorAll('[data-timeframe]').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                // Add active class to clicked button
+                this.classList.add('active');
+                
+                const timeframe = this.getAttribute('data-timeframe');
+                
+                // Update chart data based on timeframe (sample data)
+                if (timeframe === '6m') {
+                    valueTrendsChart.data.labels = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    valueTrendsChart.data.datasets[0].data = [335000, 345000, 350000, 355000, 360000, 365000];
+                } else if (timeframe === '1y') {
+                    valueTrendsChart.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    valueTrendsChart.data.datasets[0].data = [310000, 315000, 325000, 320000, 330000, 340000, 335000, 345000, 350000, 355000, 360000, 365000];
+                } else if (timeframe === '5y') {
+                    valueTrendsChart.data.labels = ['2020', '2021', '2022', '2023', '2024'];
+                    valueTrendsChart.data.datasets[0].data = [280000, 310000, 335000, 350000, 365000];
+                }
+                
+                valueTrendsChart.update();
+            });
+        });
+        
+        // Handle export button click
+        document.getElementById('export-csv').addEventListener('click', function() {
+            window.location.href = '/export-data?format=csv&limit=1000';
+        });
+        
+        // Handle filter application
+        document.getElementById('apply-filters').addEventListener('click', function() {
+            // In a real implementation, this would fetch filtered data from the backend
+            alert('Filter functionality will be implemented in the next phase.');
+        });
+    });
+</script>
+{% endblock %}

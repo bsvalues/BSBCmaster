@@ -34,6 +34,17 @@ from sqlalchemy import create_engine, inspect
 from app.validators import validate_query
 import map_module
 
+# Import minimalist routes
+try:
+    from routes_minimal import register_minimalist_routes
+    # Register minimalist routes
+    register_minimalist_routes(app)
+    logger = logging.getLogger(__name__)
+    logger.info("Minimalist design routes registered successfully")
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.error(f"Failed to import minimalist routes: {e}")
+
 # Register routes
 app.register_blueprint(api_routes)
 

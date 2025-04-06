@@ -1,0 +1,202 @@
+{% extends "base_new.html" %}
+
+{% block title %}Home - Benton County Assessor{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-5">
+        <div class="col-lg-8 mx-auto text-center">
+            <h1 class="mb-4">Benton County Assessor's Office</h1>
+            <p class="lead text-secondary mb-4">Access comprehensive property assessment data and advanced analytics for Benton County properties.</p>
+            <div class="d-flex justify-content-center gap-3">
+                <a href="/map-minimal" class="btn btn-primary">
+                    <i class="fas fa-map-marker-alt me-2"></i>Explore Map
+                </a>
+                <a href="/statistics-minimal" class="btn btn-outline-primary">
+                    <i class="fas fa-chart-bar me-2"></i>View Statistics
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-5">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 hover-lift">
+                <div class="card-body text-center p-4">
+                    <div class="mb-3">
+                        <i class="fas fa-map-marked-alt fa-3x text-primary-color mb-3"></i>
+                        <h3 class="h4 mb-3">Interactive Property Map</h3>
+                        <p class="text-secondary">Visualize property locations and data with our interactive map featuring clustering and detailed property information.</p>
+                    </div>
+                    <a href="/map-minimal" class="btn btn-outline-primary mt-auto">Open Map</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 hover-lift">
+                <div class="card-body text-center p-4">
+                    <div class="mb-3">
+                        <i class="fas fa-chart-line fa-3x text-primary-color mb-3"></i>
+                        <h3 class="h4 mb-3">Statistical Insights</h3>
+                        <p class="text-secondary">Explore comprehensive property statistics, value trends, and advanced data visualizations.</p>
+                    </div>
+                    <a href="/statistics-minimal" class="btn btn-outline-primary mt-auto">View Statistics</a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 hover-lift">
+                <div class="card-body text-center p-4">
+                    <div class="mb-3">
+                        <i class="fas fa-download fa-3x text-primary-color mb-3"></i>
+                        <h3 class="h4 mb-3">Data Export</h3>
+                        <p class="text-secondary">Download property assessment data in various formats for further analysis and reporting.</p>
+                    </div>
+                    <a href="/export-data" class="btn btn-outline-primary mt-auto">Export Data</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-5">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Quick Property Search</h2>
+                </div>
+                <div class="card-body">
+                    <form>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="parcel-id" class="form-label">Parcel ID</label>
+                                <input type="text" class="form-control" id="parcel-id" placeholder="Enter parcel ID">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="address" class="form-label">Address</label>
+                                <input type="text" class="form-control" id="address" placeholder="Enter address">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="owner" class="form-label">Owner Name</label>
+                                <input type="text" class="form-control" id="owner" placeholder="Enter owner name">
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search me-2"></i>Search
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Property Value Trends</h2>
+                </div>
+                <div class="card-body">
+                    <canvas id="value-trends-chart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Recent Updates</h2>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center border-0 px-0">
+                            <div>
+                                <span class="badge bg-primary-color me-2">New</span>
+                                <span>Property values updated for Richland area</span>
+                            </div>
+                            <small class="text-muted">Today</small>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center border-0 px-0">
+                            <div>
+                                <span class="badge bg-secondary-color me-2">Update</span>
+                                <span>New commercial properties added in Kennewick</span>
+                            </div>
+                            <small class="text-muted">Yesterday</small>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center border-0 px-0">
+                            <div>
+                                <span class="badge bg-secondary-color me-2">Update</span>
+                                <span>Property images updated for 15 parcels</span>
+                            </div>
+                            <small class="text-muted">3 days ago</small>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center border-0 px-0">
+                            <div>
+                                <span class="badge bg-primary-color me-2">New</span>
+                                <span>Statistical dashboard enhancements deployed</span>
+                            </div>
+                            <small class="text-muted">1 week ago</small>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Sample chart for home page
+        const trendsChart = new Chart(
+            document.getElementById('value-trends-chart'),
+            {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                    datasets: [{
+                        label: 'Avg. Residential Value',
+                        data: [310000, 315000, 325000, 320000, 330000, 340000, 335000, 345000, 350000, 355000, 360000, 365000],
+                        borderColor: '#3182ce',
+                        backgroundColor: 'rgba(49, 130, 206, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    },
+                    {
+                        label: 'Avg. Commercial Value',
+                        data: [520000, 525000, 530000, 540000, 550000, 545000, 560000, 570000, 580000, 575000, 590000, 595000],
+                        borderColor: '#2c5282',
+                        backgroundColor: 'rgba(44, 82, 130, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        );
+    });
+</script>
+{% endblock %}

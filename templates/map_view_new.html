@@ -1,0 +1,337 @@
+{% extends "base_new.html" %}
+
+{% block title %}Property Map - Benton County Assessor{% endblock %}
+
+{% block head %}
+<!-- Leaflet.js CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin=""/>
+<!-- Leaflet Markercluster CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="mb-3">Property Map</h1>
+            <p class="text-secondary">Explore Benton County properties through an interactive map with detailed data visualization.</p>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Map Filters and Controls -->
+        <div class="col-md-4 col-lg-3 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="h5 mb-0">Map Controls</h2>
+                </div>
+                <div class="card-body">
+                    <!-- Visualization Type Selection -->
+                    <div class="map-control-section">
+                        <label class="form-label">Visualization Type</label>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary" id="toggle-markers">
+                                <i class="fas fa-map-marker-alt me-2"></i>Markers
+                            </button>
+                            <button class="btn btn-outline-primary" id="toggle-clusters">
+                                <i class="fas fa-object-group me-2"></i>Clusters
+                            </button>
+                            <button class="btn btn-outline-primary" id="toggle-heatmap">
+                                <i class="fas fa-fire me-2"></i>Heat Map
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Property Filters -->
+                    <div class="map-control-section">
+                        <label class="form-label">Filter Properties</label>
+                        
+                        <div class="mb-3">
+                            <label for="city-filter" class="form-label">City</label>
+                            <select class="form-select" id="city-filter">
+                                <option value="">All Cities</option>
+                                <option value="Richland">Richland</option>
+                                <option value="Kennewick">Kennewick</option>
+                                <option value="Pasco">Pasco</option>
+                                <option value="West Richland">West Richland</option>
+                                <option value="Benton City">Benton City</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="property-type-filter" class="form-label">Property Type</label>
+                            <select class="form-select" id="property-type-filter">
+                                <option value="">All Types</option>
+                                <option value="Residential">Residential</option>
+                                <option value="Commercial">Commercial</option>
+                                <option value="Industrial">Industrial</option>
+                                <option value="Agricultural">Agricultural</option>
+                                <option value="Mixed Use">Mixed Use</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Value Range</label>
+                            <div class="row g-2">
+                                <div class="col">
+                                    <input type="number" class="form-control" id="min-value" placeholder="Min" min="0">
+                                </div>
+                                <div class="col">
+                                    <input type="number" class="form-control" id="max-value" placeholder="Max" min="0">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-primary w-100" id="apply-filters">
+                            <i class="fas fa-filter me-2"></i>Apply Filters
+                        </button>
+                    </div>
+                    
+                    <!-- Saved Filters -->
+                    <div class="map-control-section">
+                        <label class="form-label">Saved Filters</label>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-secondary btn-sm" id="save-filter">
+                                <i class="fas fa-save me-2"></i>Save Current Filter
+                            </button>
+                        </div>
+                        <div id="saved-filters-list" class="mt-2">
+                            <!-- Saved filters will be listed here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Map Container -->
+        <div class="col-md-8 col-lg-9">
+            <div class="card h-100">
+                <div class="card-body p-0">
+                    <div id="map-container">
+                        <div id="property-map"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Property Value Trends Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h2 class="h5 mb-0">Property Value Trends</h2>
+                    <div class="btn-group" role="group" aria-label="Timeframe">
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-timeframe="6m">6M</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm active" data-timeframe="1y">1Y</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-timeframe="5y">5Y</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="value-trends-chart" style="height: 300px;">
+                        <!-- Chart will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet.js JavaScript -->
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<!-- Leaflet Markercluster JavaScript -->
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+<!-- Chart.js for value trends -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Map Functionality -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize the map
+        const map = L.map('property-map').setView([46.2804, -119.2752], 11);
+        
+        // Add the OpenStreetMap tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Initialize marker clusters
+        const markers = L.markerClusterGroup({
+            showCoverageOnHover: false,
+            maxClusterRadius: 50,
+            iconCreateFunction: function(cluster) {
+                const count = cluster.getChildCount();
+                let size, className;
+                
+                if (count < 10) {
+                    size = 'small';
+                    className = 'cluster-small';
+                } else if (count < 100) {
+                    size = 'medium';
+                    className = 'cluster-medium';
+                } else {
+                    size = 'large';
+                    className = 'cluster-large';
+                }
+                
+                return L.divIcon({
+                    html: `<div class="cluster-icon ${size}"><span>${count}</span></div>`,
+                    className: className,
+                    iconSize: L.point(40, 40)
+                });
+            }
+        });
+        
+        // Fetch property data
+        fetch('/api/map-data')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Fetched map data:', data);
+                
+                if (data.properties && data.properties.length > 0) {
+                    data.properties.forEach(property => {
+                        if (property.latitude && property.longitude) {
+                            // Create marker for each property
+                            const marker = L.marker([property.latitude, property.longitude]);
+                            
+                            // Create popup content
+                            const popupContent = `
+                                <div class="property-popup">
+                                    <h3 class="h6 mb-2">${property.address || 'Property'}</h3>
+                                    <p class="mb-1"><strong>Type:</strong> ${property.property_type || 'N/A'}</p>
+                                    <p class="mb-1"><strong>Value:</strong> $${(property.assessed_value || 0).toLocaleString()}</p>
+                                    <p class="mb-1"><strong>City:</strong> ${property.city || 'N/A'}</p>
+                                    <p class="mb-2"><strong>Parcel ID:</strong> ${property.parcel_id || 'N/A'}</p>
+                                    <a href="/property/${property.parcel_id}" class="btn btn-sm btn-primary">View Details</a>
+                                </div>
+                            `;
+                            
+                            marker.bindPopup(popupContent);
+                            markers.addLayer(marker);
+                        }
+                    });
+                    
+                    map.addLayer(markers);
+                    
+                    // Fit map to markers
+                    if (markers.getBounds().isValid()) {
+                        map.fitBounds(markers.getBounds());
+                    }
+                } else {
+                    console.log('No property data available');
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching map data:', error);
+            });
+        
+        // Handle visualization toggles
+        document.getElementById('toggle-markers').addEventListener('click', function() {
+            // Toggle markers visualization (default)
+            if (!map.hasLayer(markers)) {
+                map.addLayer(markers);
+            }
+            
+            // Update active button states
+            this.classList.add('active');
+            document.getElementById('toggle-clusters').classList.remove('active');
+            document.getElementById('toggle-heatmap').classList.remove('active');
+        });
+        
+        document.getElementById('toggle-clusters').addEventListener('click', function() {
+            // Toggle cluster visualization (should already be active with markerClusterGroup)
+            if (!map.hasLayer(markers)) {
+                map.addLayer(markers);
+            }
+            
+            // Update active button states
+            this.classList.add('active');
+            document.getElementById('toggle-markers').classList.remove('active');
+            document.getElementById('toggle-heatmap').classList.remove('active');
+        });
+        
+        document.getElementById('toggle-heatmap').addEventListener('click', function() {
+            // Placeholder for heat map toggle - will be implemented with actual heat map library
+            alert('Heat map visualization is coming soon!');
+            
+            // Update active button states
+            this.classList.add('active');
+            document.getElementById('toggle-markers').classList.remove('active');
+            document.getElementById('toggle-clusters').classList.remove('active');
+        });
+        
+        // Initialize value trends chart (placeholder)
+        const ctx = document.getElementById('value-trends-chart').getContext('2d');
+        const valueChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                datasets: [{
+                    label: 'Average Property Value',
+                    data: [310000, 315000, 325000, 320000, 330000, 340000, 335000, 345000, 350000, 355000, 360000, 365000],
+                    borderColor: '#3182ce',
+                    backgroundColor: 'rgba(49, 130, 206, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Handle timeframe button clicks
+        document.querySelectorAll('[data-timeframe]').forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active class from all buttons
+                document.querySelectorAll('[data-timeframe]').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                
+                // Add active class to clicked button
+                this.classList.add('active');
+                
+                // Update chart data based on timeframe (placeholder)
+                // In a real implementation, this would fetch and display actual data
+                const timeframe = this.getAttribute('data-timeframe');
+                
+                if (timeframe === '6m') {
+                    valueChart.data.labels = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    valueChart.data.datasets[0].data = [335000, 345000, 350000, 355000, 360000, 365000];
+                } else if (timeframe === '1y') {
+                    valueChart.data.labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    valueChart.data.datasets[0].data = [310000, 315000, 325000, 320000, 330000, 340000, 335000, 345000, 350000, 355000, 360000, 365000];
+                } else if (timeframe === '5y') {
+                    valueChart.data.labels = ['2020', '2021', '2022', '2023', '2024'];
+                    valueChart.data.datasets[0].data = [280000, 310000, 335000, 350000, 365000];
+                }
+                
+                valueChart.update();
+            });
+        });
+    });
+</script>
+{% endblock %}
