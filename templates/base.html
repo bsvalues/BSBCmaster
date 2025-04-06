@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}MCP Assessor Agent API{% endblock %}</title>
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
@@ -13,23 +13,28 @@
     <!-- Custom CSS -->
     <style>
         :root {
-            --main-bg-color: #1a1e2c;
-            --navbar-bg-color: #22273a;
-            --card-bg-color: #22273a;
-            --card-header-color: #2a3048;
-            --accent-color-1: #6366f1;
-            --accent-color-2: #8b5cf6;
-            --accent-color-3: #ec4899;
-            --accent-gradient: linear-gradient(135deg, var(--accent-color-1) 0%, var(--accent-color-2) 50%, var(--accent-color-3) 100%);
-            --text-primary: #e2e8f0;
+            --main-bg-color: #0f172a;
+            --navbar-bg-color: #1e293b;
+            --card-bg-color: #1e293b;
+            --card-header-color: #334155;
+            --accent-color-1: #3b82f6;
+            --accent-color-2: #64748b;
+            --accent-color-3: #475569;
+            --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+            --text-primary: #f1f5f9;
             --text-secondary: #94a3b8;
-            --box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-            --subtle-border: 1px solid rgba(255, 255, 255, 0.08);
+            --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            --subtle-border: 1px solid rgba(148, 163, 184, 0.1);
         }
         
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Poppins', sans-serif;
             background-color: var(--main-bg-color);
+            background-image: 
+                radial-gradient(circle at 25% 25%, rgba(59, 130, 246, 0.03) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(99, 102, 241, 0.03) 0%, transparent 50%);
+            background-size: 100% 100%;
+            background-attachment: fixed;
             color: var(--text-primary);
             min-height: 100vh;
             display: flex;
@@ -37,7 +42,7 @@
         }
         
         h1, h2, h3, h4, h5 {
-            font-family: 'Playfair Display', serif;
+            font-family: 'Lora', serif;
             font-weight: 700;
         }
         
@@ -50,13 +55,17 @@
         }
         
         .navbar-brand {
-            font-family: 'Playfair Display', serif;
+            font-family: 'Lora', serif;
             font-weight: 700;
-            font-size: 1.6rem;
+            font-size: 1.5rem;
+            color: var(--text-primary);
+            padding: 0.5rem 0;
+        }
+        
+        .navbar-brand span {
             background: var(--accent-gradient);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            padding: 0.5rem 0;
         }
         
         .navbar-nav .nav-link {
@@ -64,7 +73,7 @@
             font-weight: 500;
             padding: 0.5rem 1rem;
             margin: 0 0.2rem;
-            border-radius: 8px;
+            border-radius: 4px;
             transition: all 0.3s ease;
         }
         
@@ -97,10 +106,11 @@
         /* Footer */
         .footer {
             background-color: var(--navbar-bg-color);
-            padding: 1.5rem 0;
+            padding: 1.2rem 0;
             color: var(--text-secondary);
             border-top: var(--subtle-border);
             margin-top: auto;
+            font-size: 0.9rem;
         }
         
         /* Utility classes */
@@ -108,6 +118,21 @@
             background: var(--accent-gradient);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+        }
+        
+        .dropdown-menu {
+            background-color: var(--navbar-bg-color);
+            border: var(--subtle-border);
+            box-shadow: var(--box-shadow);
+        }
+        
+        .dropdown-item {
+            color: var(--text-secondary);
+        }
+        
+        .dropdown-item:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
         }
         
         /* Custom scrollbar */
@@ -126,7 +151,7 @@
         }
         
         ::-webkit-scrollbar-thumb:hover {
-            background: var(--accent-color-1);
+            background: var(--accent-color-3);
         }
     </style>
     {% block head %}{% endblock %}
@@ -135,7 +160,7 @@
     <!-- Modern Navbar -->
     <nav class="navbar navbar-expand-lg">
         <div class="container">
-            <a class="navbar-brand" href="/">MCP Assessor Agent</a>
+            <a class="navbar-brand" href="/"><span>MCP</span> Assessor Agent</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <i class="fas fa-bars"></i>
             </button>
@@ -160,7 +185,7 @@
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-database"></i>Data
                         </a>
-                        <ul class="dropdown-menu dropdown-menu-dark">
+                        <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="/api/imported-data/accounts">Account Data</a></li>
                             <li><a class="dropdown-item" href="/export-data">Export Data</a></li>
                         </ul>
@@ -181,7 +206,7 @@
             <div class="row">
                 <div class="col">
                     <div class="text-center">
-                        <span>MCP Assessor Agent API &copy; 2025</span>
+                        <span>MCP Assessor Agent API &copy; 2025 | Benton County Property Assessment Data</span>
                     </div>
                 </div>
             </div>
