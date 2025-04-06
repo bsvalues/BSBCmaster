@@ -7,6 +7,10 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin=""/>
 <!-- Leaflet Markercluster CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+<!-- Custom Marker Cluster Styling -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/custom_marker_cluster.css') }}" />
+<style>
+    #map-container {
         position: relative;
         height: calc(100vh - 180px);
         min-height: 500px;
@@ -110,7 +114,6 @@
                     </select>
                 </div>
                 
-                <!-- City Filtering -->
                 <!-- Clustering Option -->
                 <div class="map-control-section">
                     <label class="form-label">Display Options</label>
@@ -197,8 +200,6 @@
                 </div>
             </div>
         </div>
-<!-- Leaflet Markercluster JS -->
-<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
     </div>
 </div>
 {% endblock %}
@@ -206,6 +207,8 @@
 {% block scripts %}
 <!-- Leaflet.js JavaScript -->
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
+<!-- Leaflet Markercluster JS -->
+<script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -218,26 +221,46 @@
             maxZoom: 19
         }).addTo(map);
         
-        // Property markers layer group
-        // Initialize property clusters
+        // Initialize property clusters with enhanced features
         let markerClusterGroup = L.markerClusterGroup({
             maxClusterRadius: 50,
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: true,
+            zoomToBoundsOnClick: true,
+            animate: true,
+            animateAddingMarkers: true,
+            disableClusteringAtZoom: 18,
             iconCreateFunction: function(cluster) {
                 const childCount = cluster.getChildCount();
-                let clusterClass = 'marker-cluster-';
+                const childMarkers = cluster.getAllChildMarkers();
                 
+                // Calculate average property value for the cluster
+                let totalValue = 0;
+                let valueCount = 0;
+                childMarkers.forEach(marker => {
+                    if (marker.feature && marker.feature.properties && marker.feature.properties.assessed_value) {
+                        totalValue += marker.feature.properties.assessed_value;
+                        valueCount++;
+                    }
+                });
+                const avgValue = valueCount > 0 ? totalValue / valueCount : 0;
+                
+                // Determine class based on count
+                let clusterClass = "marker-cluster-";
                 if (childCount < 10) {
-                    clusterClass += 'small';
+                    clusterClass += "small";
                 } else if (childCount < 50) {
-                    clusterClass += 'medium';
+                    clusterClass += "medium";
                 } else {
-                    clusterClass += 'large';
+                    clusterClass += "large";
                 }
                 
+                // Create the cluster icon with enhanced information
                 return new L.DivIcon({
-                    html: '<div><span>' + childCount + '</span></div>',
-                    className: 'marker-cluster ' + clusterClass,
-                    iconSize: new L.Point(40, 40)
+                    html: "<div><span>" + childCount + "</span></div>",
+                    className: "marker-cluster " + clusterClass,
+                    iconSize: new L.Point(40, 40),
+                    iconAnchor: new L.Point(20, 20)
                 });
             }
         });
@@ -309,19 +332,42 @@
             }
         }
         
-        // Create custom marker
+        // Create custom marker with enhanced hover effects
         function createPropertyMarker(feature, latlng) {
-            const propertyType = feature.properties.property_type || 'Residential';
+            const propertyType = feature.properties.property_type || "Residential";
             const markerColor = getMarkerColor(propertyType);
             
-            return L.circleMarker(latlng, {
+            const marker = L.circleMarker(latlng, {
                 radius: 8,
                 fillColor: markerColor,
-                color: '#fff',
+                color: "#fff",
                 weight: 1,
                 opacity: 1,
-                fillOpacity: 0.8
+                fillOpacity: 0.8,
+                className: "property-marker",
+                interactive: true
             });
+            
+            // Add hover effects
+            marker.on("mouseover", function() {
+                this.setStyle({
+                    radius: 10,
+                    weight: 2,
+                    fillOpacity: 1.0,
+                    color: "#fff"
+                });
+            });
+            
+            marker.on("mouseout", function() {
+                this.setStyle({
+                    radius: 8,
+                    weight: 1,
+                    fillOpacity: 0.8,
+                    color: "#fff"
+                });
+            });
+            
+            return marker;
         }
         
         // Create popup content
@@ -404,6 +450,31 @@
                     
                     // Add markers based on clustering preference
                     if (useClustering) {
+                        // Add cluster tooltip with value information
+                        markerClusterGroup.on("clusterclick", function(cluster) {
+                            const childMarkers = cluster.layer.getAllChildMarkers();
+                            const propertyCount = childMarkers.length;
+                            
+                            // Calculate value statistics for this cluster
+                            let totalValue = 0;
+                            let propertyValues = [];
+                            childMarkers.forEach(marker => {
+                                if (marker.feature && marker.feature.properties && marker.feature.properties.assessed_value) {
+                                    const value = marker.feature.properties.assessed_value;
+                                    totalValue += value;
+                                    propertyValues.push(value);
+                                }
+                            });
+                            
+                            // Add tooltip data
+                            const avgValue = propertyValues.length > 0 ? totalValue / propertyValues.length : 0;
+                            cluster.layer.bindTooltip(
+                                `<strong>${propertyCount} Properties</strong><br>
+                                Average Value: ${formatCurrency(avgValue)}`,
+                                { direction: "top", offset: [0, -10] }
+                            );
+                        });
+                        
                         markerClusterGroup.addLayer(geoJsonLayer);
                         propertyLayer.addLayer(markerClusterGroup);
                     } else {
@@ -437,52 +508,11 @@
         document.addEventListener('click', function(e) {
             if (e.target && e.target.classList.contains('view-images-btn')) {
                 const accountId = e.target.getAttribute('data-account-id');
-                
-                // Fetch property images
-                fetch(`/api/map/property-images/${accountId}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        // Create image gallery HTML
-                        let imagesHtml = '<div class="property-images">';
-                        
-                        if (data.data && data.data.length > 0) {
-                            data.data.forEach(image => {
-                                imagesHtml += `
-                                    <div class="mb-2">
-                                        <img src="${image.image_url || image.image_path}" 
-                                            alt="${image.image_type || 'Property image'}" 
-                                            class="img-fluid img-thumbnail">
-                                        <small class="d-block text-muted">
-                                            ${image.image_type || 'Property'} - 
-                                            ${image.image_date ? new Date(image.image_date).toLocaleDateString() : 'No date'}
-                                            ${image.file_format ? ' (' + image.file_format + ')' : ''}
-                                        </small>
-                                    </div>
-                                `;
-                            });
-                        } else {
-                            imagesHtml += '<p>No images available for this property.</p>';
-                        }
-                        
-                        imagesHtml += '</div>';
-                        
-                        // Create and show a popup with the images
-                        L.popup()
-                            .setLatLng(map.getCenter())
-                            .setContent(imagesHtml)
-                            .openOn(map);
-                    })
-                    .catch(error => {
-                        console.error('Error fetching property images:', error);
-                        L.popup()
-                            .setLatLng(map.getCenter())
-                            .setContent('<p>Error loading property images.</p>')
-                            .openOn(map);
-                    });
+                window.location.href = `/property/${accountId}/images`;
             }
         });
         
-        // Initial data load
+        // Load initial map data
         loadMapData();
     });
 </script>
