@@ -7,17 +7,19 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 <style>
     :root {
-        --main-bg-color: #0f172a;
-        --card-bg-color: #1e293b;
-        --card-header-color: #334155;
+        --main-bg-color: #0a0e17;
+        --card-bg-color: #141a27;
+        --card-header-color: #1c293b;
         --accent-color-1: #3b82f6;
-        --accent-color-2: #64748b;
-        --accent-color-3: #475569;
+        --accent-color-2: #10b981;
+        --accent-color-3: #6366f1;
         --accent-gradient: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
-        --text-primary: #f1f5f9;
+        --secondary-gradient: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+        --glow-color: rgba(59, 130, 246, 0.3);
+        --text-primary: #f8fafc;
         --text-secondary: #94a3b8;
-        --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        --subtle-border: 1px solid rgba(148, 163, 184, 0.1);
+        --box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+        --subtle-border: 1px solid rgba(99, 102, 241, 0.1);
     }
     
     .container-fluid {
@@ -33,71 +35,109 @@
         font-size: 2.2rem;
         margin-bottom: 10px;
         color: var(--text-primary);
+        position: relative;
+        display: inline-block;
+    }
+    
+    .dashboard-header h1::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 0;
+        width: 80px;
+        height: 3px;
+        background: var(--accent-gradient);
+        border-radius: 2px;
     }
     
     .dashboard-header p {
         color: var(--text-secondary);
         font-weight: 300;
         font-size: 1.1rem;
-    }
-    
-    .dashboard-header::after {
-        content: '';
-        position: absolute;
-        width: 60px;
-        height: 3px;
-        background: var(--accent-gradient);
-        bottom: -15px;
-        left: 0;
-        border-radius: 2px;
+        margin-top: 15px;
     }
     
     .stats-card {
-        border-radius: 8px;
+        border-radius: 10px;
         background-color: var(--card-bg-color);
         margin-bottom: 25px;
         box-shadow: var(--box-shadow);
         border: var(--subtle-border);
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         overflow: hidden;
+        position: relative;
+    }
+    
+    .stats-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: -1;
+        border-radius: inherit;
+        box-shadow: 0 0 25px var(--glow-color);
+        opacity: 0;
+        transition: opacity 0.3s ease;
     }
     
     .stats-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        transform: translateY(-5px);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+    }
+    
+    .stats-card:hover::before {
+        opacity: 1;
     }
     
     .stats-card-header {
-        padding: 16px 20px;
+        padding: 18px 20px;
         border-bottom: var(--subtle-border);
         background-color: var(--card-header-color);
         display: flex;
         align-items: center;
         justify-content: space-between;
+        position: relative;
+    }
+    
+    .stats-card-header::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 1px;
+        background: var(--accent-gradient);
+        opacity: 0.3;
     }
     
     .stats-card-header h5 {
         margin: 0;
         font-size: 1.1rem;
         color: var(--text-primary);
+        letter-spacing: 0.5px;
     }
     
     .stats-card-body {
-        padding: 20px;
+        padding: 25px;
     }
     
     .stat-value {
         font-size: 2.2rem;
         font-weight: 700;
         margin-bottom: 5px;
-        color: var(--accent-color-1);
+        background: var(--accent-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: inline-block;
     }
     
     .stat-label {
         color: var(--text-secondary);
         font-size: 0.85rem;
         text-transform: uppercase;
-        letter-spacing: 0.08rem;
+        letter-spacing: 0.1rem;
         font-weight: 500;
     }
     
@@ -123,7 +163,7 @@
     .filter-section {
         background-color: var(--card-header-color);
         padding: 20px;
-        border-radius: 8px;
+        border-radius: 10px;
         margin-bottom: 25px;
         box-shadow: var(--box-shadow);
         border: var(--subtle-border);
@@ -131,18 +171,19 @@
     
     .stats-summary-box {
         background-color: var(--card-bg-color);
-        border-radius: 8px;
-        padding: 20px;
+        border-radius: 10px;
+        padding: 25px;
         margin-bottom: 25px;
         position: relative;
         overflow: hidden;
         box-shadow: var(--box-shadow);
         border: var(--subtle-border);
-        transition: transform 0.3s ease;
+        transition: all 0.3s ease;
     }
     
     .stats-summary-box:hover {
-        transform: translateY(-3px);
+        transform: translateY(-5px);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
     }
     
     .stats-summary-box::before {
@@ -155,10 +196,31 @@
         background: var(--accent-gradient);
     }
     
+    .stats-summary-box::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: -1;
+        border-radius: inherit;
+        box-shadow: 0 0 25px var(--glow-color);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .stats-summary-box:hover::after {
+        opacity: 1;
+    }
+    
     .summary-value {
-        font-size: 1.8rem;
+        font-size: 2rem;
         font-weight: 700;
-        color: var(--accent-color-1);
+        background: var(--accent-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: inline-block;
     }
     
     .table {
@@ -170,12 +232,23 @@
         font-weight: 600;
         border-bottom: var(--subtle-border);
         padding: 15px 10px;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        letter-spacing: 0.05rem;
     }
     
     .table tbody td {
         padding: 15px 10px;
         border-bottom: var(--subtle-border);
         vertical-align: middle;
+    }
+    
+    .table tbody tr {
+        transition: background-color 0.3s ease;
+    }
+    
+    .table tbody tr:hover {
+        background-color: rgba(59, 130, 246, 0.05);
     }
     
     .table tbody tr:last-child td {
@@ -189,7 +262,10 @@
     }
     
     .loading {
-        background: linear-gradient(to right, var(--card-bg-color) 8%, var(--card-header-color) 18%, var(--card-bg-color) 33%);
+        background: linear-gradient(to right, 
+            var(--card-bg-color) 8%, 
+            rgba(59, 130, 246, 0.1) 18%, 
+            var(--card-bg-color) 33%);
         background-size: 1000px 100%;
         animation: shimmer 2s infinite linear;
     }
@@ -206,6 +282,38 @@
         width: 150px;
         border-radius: 6px;
     }
+    
+    /* Advanced data value indicators */
+    .value-indicator {
+        display: inline-flex;
+        align-items: center;
+        margin-left: 10px;
+        font-size: 0.9rem;
+    }
+    
+    .value-indicator.positive {
+        color: #10b981;
+    }
+    
+    .value-indicator.negative {
+        color: #ef4444;
+    }
+    
+    /* Cyberpunk-like grid overlay for cards */
+    .cyber-grid {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-image: 
+            linear-gradient(to right, var(--card-bg-color) 9px, transparent 1px),
+            linear-gradient(to bottom, var(--card-bg-color) 9px, transparent 1px);
+        background-size: 10px 10px;
+        background-position: 0 0;
+        opacity: 0.015;
+        pointer-events: none;
+    }
 </style>
 {% endblock %}
 
@@ -213,31 +321,35 @@
 <div class="container-fluid">
     <div class="dashboard-header">
         <h1>Property Statistics Dashboard</h1>
-        <p>Explore comprehensive analytics of the property assessment data</p>
+        <p>Advanced analytics and real-time data insights for property assessment</p>
     </div>
     
     <!-- Summary Statistics Row -->
     <div class="row mb-4">
         <div class="col-md-3">
             <div class="stats-summary-box">
+                <div class="cyber-grid"></div>
                 <div class="stat-label">Total Properties</div>
                 <div class="summary-value" id="total-properties">0</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="stats-summary-box">
+                <div class="cyber-grid"></div>
                 <div class="stat-label">Average Value</div>
                 <div class="summary-value" id="average-value">$0</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="stats-summary-box">
+                <div class="cyber-grid"></div>
                 <div class="stat-label">Total Cities</div>
                 <div class="summary-value" id="total-cities">0</div>
             </div>
         </div>
         <div class="col-md-3">
             <div class="stats-summary-box">
+                <div class="cyber-grid"></div>
                 <div class="stat-label">Image Coverage</div>
                 <div class="summary-value" id="image-coverage">0%</div>
             </div>
@@ -249,6 +361,7 @@
         <!-- Property Type Distribution -->
         <div class="col-md-6">
             <div class="stats-card">
+                <div class="cyber-grid"></div>
                 <div class="stats-card-header">
                     <h5>Property Type Distribution</h5>
                 </div>
@@ -263,6 +376,7 @@
         <!-- Value Distribution -->
         <div class="col-md-6">
             <div class="stats-card">
+                <div class="cyber-grid"></div>
                 <div class="stats-card-header">
                     <h5>Value Distribution</h5>
                 </div>
@@ -279,6 +393,7 @@
         <!-- City Statistics -->
         <div class="col-md-6">
             <div class="stats-card">
+                <div class="cyber-grid"></div>
                 <div class="stats-card-header">
                     <h5>City Statistics</h5>
                 </div>
@@ -293,6 +408,7 @@
         <!-- Property Value by Type -->
         <div class="col-md-6">
             <div class="stats-card">
+                <div class="cyber-grid"></div>
                 <div class="stats-card-header">
                     <h5>Average Property Value by Type</h5>
                 </div>
@@ -309,6 +425,7 @@
     <div class="row mt-4">
         <div class="col-12">
             <div class="stats-card">
+                <div class="cyber-grid"></div>
                 <div class="stats-card-header">
                     <h5>Detailed Statistics</h5>
                 </div>
@@ -360,31 +477,31 @@
     // Chart colors and gradients
     const chartColors = {
         residential: {
-            start: 'rgba(59, 130, 246, 0.8)',
-            end: 'rgba(59, 130, 246, 0.4)'
+            start: 'rgba(59, 130, 246, 0.9)',
+            end: 'rgba(59, 130, 246, 0.5)'
         },
         commercial: {
-            start: 'rgba(14, 165, 233, 0.8)',
-            end: 'rgba(14, 165, 233, 0.4)'
+            start: 'rgba(16, 185, 129, 0.9)',
+            end: 'rgba(16, 185, 129, 0.5)'
         },
         agricultural: {
-            start: 'rgba(34, 197, 94, 0.8)',
-            end: 'rgba(34, 197, 94, 0.4)'
+            start: 'rgba(99, 102, 241, 0.9)',
+            end: 'rgba(99, 102, 241, 0.5)'
         },
         industrial: {
-            start: 'rgba(245, 158, 11, 0.8)',
-            end: 'rgba(245, 158, 11, 0.4)'
+            start: 'rgba(245, 158, 11, 0.9)',
+            end: 'rgba(245, 158, 11, 0.5)'
         },
         vacant: {
-            start: 'rgba(71, 85, 105, 0.8)',
-            end: 'rgba(71, 85, 105, 0.4)'
+            start: 'rgba(100, 116, 139, 0.9)',
+            end: 'rgba(100, 116, 139, 0.5)'
         },
         valueRanges: [
-            'rgba(59, 130, 246, 0.8)',
-            'rgba(59, 130, 246, 0.65)',
-            'rgba(59, 130, 246, 0.5)',
-            'rgba(59, 130, 246, 0.35)',
-            'rgba(59, 130, 246, 0.2)'
+            'rgba(59, 130, 246, 0.9)',
+            'rgba(59, 130, 246, 0.75)',
+            'rgba(59, 130, 246, 0.6)',
+            'rgba(59, 130, 246, 0.45)',
+            'rgba(59, 130, 246, 0.3)'
         ]
     };
     
@@ -419,6 +536,13 @@
                     createCityComparisonChart(data.statistics);
                     createValueByTypeChart(data.statistics);
                     populateStatisticsTable(data.statistics);
+                    
+                    // Add animation classes after data is loaded
+                    setTimeout(() => {
+                        document.querySelectorAll('.stats-card, .stats-summary-box').forEach(el => {
+                            el.classList.add('loaded');
+                        });
+                    }, 100);
                 } else {
                     console.error('Error loading statistics data:', data.message);
                 }
@@ -484,7 +608,8 @@
                 datasets: [{
                     data: propertyCounts,
                     backgroundColor: backgroundColors,
-                    borderWidth: 0,
+                    borderWidth: 1,
+                    borderColor: '#0a0e17',
                     borderRadius: 4,
                     hoverOffset: 15
                 }]
@@ -497,10 +622,10 @@
                     legend: {
                         position: 'right',
                         labels: {
-                            color: '#f1f5f9',
+                            color: '#f8fafc',
                             padding: 20,
                             font: {
-                                family: 'Poppins',
+                                family: 'Montserrat',
                                 size: 12
                             },
                             usePointStyle: true,
@@ -508,14 +633,14 @@
                         }
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        backgroundColor: 'rgba(10, 14, 23, 0.9)',
                         titleFont: {
-                            family: 'Poppins',
+                            family: 'Montserrat',
                             size: 14,
                             weight: 'bold'
                         },
                         bodyFont: {
-                            family: 'Poppins',
+                            family: 'Montserrat',
                             size: 13
                         },
                         padding: 15,
@@ -543,6 +668,12 @@
         
         const ctx = document.getElementById('value-distribution-chart').getContext('2d');
         
+        // Create gradient for bars
+        const backgroundColors = valueRanges.map((_, index) => {
+            const alpha = 0.9 - (index * 0.15);
+            return `rgba(59, 130, 246, ${alpha})`;
+        });
+        
         new Chart(ctx, {
             type: 'bar',
             data: {
@@ -550,9 +681,9 @@
                 datasets: [{
                     label: 'Property Count',
                     data: valueCounts,
-                    backgroundColor: chartColors.valueRanges,
+                    backgroundColor: backgroundColors,
                     borderWidth: 0,
-                    borderRadius: 4,
+                    borderRadius: 6,
                     borderSkipped: false
                 }]
             },
@@ -568,7 +699,7 @@
                         ticks: {
                             color: '#94a3b8',
                             font: {
-                                family: 'Poppins'
+                                family: 'Montserrat'
                             }
                         }
                     },
@@ -579,7 +710,7 @@
                         ticks: {
                             color: '#94a3b8',
                             font: {
-                                family: 'Poppins'
+                                family: 'Montserrat'
                             }
                         }
                     }
@@ -589,14 +720,14 @@
                         display: false
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        backgroundColor: 'rgba(10, 14, 23, 0.9)',
                         titleFont: {
-                            family: 'Poppins',
+                            family: 'Montserrat',
                             size: 14,
                             weight: 'bold'
                         },
                         bodyFont: {
-                            family: 'Poppins',
+                            family: 'Montserrat',
                             size: 13
                         },
                         padding: 15,
@@ -616,9 +747,9 @@
         
         const ctx = document.getElementById('city-comparison-chart').getContext('2d');
         
-        // Create colors for bars and line
-        const barGradient = createGradient(ctx, 'rgba(59, 130, 246, 0.8)', 'rgba(59, 130, 246, 0.4)');
-        const lineColor = 'rgba(34, 197, 94, 0.8)';
+        // Create gradient for bars
+        const barGradient = createGradient(ctx, 'rgba(59, 130, 246, 0.9)', 'rgba(59, 130, 246, 0.5)');
+        const lineColor = 'rgba(16, 185, 129, 0.9)';
         
         new Chart(ctx, {
             type: 'bar',
@@ -629,7 +760,7 @@
                     data: averageValues,
                     backgroundColor: barGradient,
                     borderWidth: 0,
-                    borderRadius: 4,
+                    borderRadius: 6,
                     borderSkipped: false,
                     yAxisID: 'y',
                     order: 2
@@ -639,10 +770,10 @@
                     data: propertyCounts,
                     type: 'line',
                     borderColor: lineColor,
-                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
                     borderWidth: 2,
-                    pointBackgroundColor: 'rgba(34, 197, 94, 0.8)',
-                    pointBorderColor: '#fff',
+                    pointBackgroundColor: 'rgba(16, 185, 129, 0.9)',
+                    pointBorderColor: '#0a0e17',
                     pointBorderWidth: 1,
                     pointRadius: 4,
                     pointHoverRadius: 6,
@@ -665,7 +796,7 @@
                             text: 'Average Value ($)',
                             color: '#94a3b8',
                             font: {
-                                family: 'Poppins',
+                                family: 'Montserrat',
                                 size: 12
                             }
                         },
@@ -675,7 +806,7 @@
                             },
                             color: '#94a3b8',
                             font: {
-                                family: 'Poppins'
+                                family: 'Montserrat'
                             }
                         },
                         grid: {
@@ -691,14 +822,14 @@
                             text: 'Property Count',
                             color: '#94a3b8',
                             font: {
-                                family: 'Poppins',
+                                family: 'Montserrat',
                                 size: 12
                             }
                         },
                         ticks: {
                             color: '#94a3b8',
                             font: {
-                                family: 'Poppins'
+                                family: 'Montserrat'
                             }
                         },
                         grid: {
@@ -712,7 +843,7 @@
                         ticks: {
                             color: '#94a3b8',
                             font: {
-                                family: 'Poppins'
+                                family: 'Montserrat'
                             }
                         }
                     }
@@ -720,10 +851,10 @@
                 plugins: {
                     legend: {
                         labels: {
-                            color: '#f1f5f9',
+                            color: '#f8fafc',
                             padding: 20,
                             font: {
-                                family: 'Poppins',
+                                family: 'Montserrat',
                                 size: 12
                             },
                             usePointStyle: true,
@@ -731,14 +862,14 @@
                         }
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        backgroundColor: 'rgba(10, 14, 23, 0.9)',
                         titleFont: {
-                            family: 'Poppins',
+                            family: 'Montserrat',
                             size: 14,
                             weight: 'bold'
                         },
                         bodyFont: {
-                            family: 'Poppins',
+                            family: 'Montserrat',
                             size: 13
                         },
                         padding: 15,
@@ -770,8 +901,8 @@
         const ctx = document.getElementById('value-by-type-chart').getContext('2d');
         
         // Create colors for chart
-        const avgColor = 'rgba(59, 130, 246, 0.7)';
-        const medianColor = 'rgba(34, 197, 94, 0.7)';
+        const avgGradient = createGradient(ctx, 'rgba(59, 130, 246, 0.9)', 'rgba(59, 130, 246, 0.5)');
+        const medianGradient = createGradient(ctx, 'rgba(16, 185, 129, 0.9)', 'rgba(16, 185, 129, 0.5)');
         
         new Chart(ctx, {
             type: 'bar',
@@ -780,17 +911,17 @@
                 datasets: [{
                     label: 'Average Value',
                     data: averageValues,
-                    backgroundColor: avgColor,
+                    backgroundColor: avgGradient,
                     borderWidth: 0,
-                    borderRadius: 4,
+                    borderRadius: 6,
                     borderSkipped: false
                 },
                 {
                     label: 'Median Value',
                     data: medianValues,
-                    backgroundColor: medianColor,
+                    backgroundColor: medianGradient,
                     borderWidth: 0,
-                    borderRadius: 4,
+                    borderRadius: 6,
                     borderSkipped: false
                 }]
             },
@@ -809,7 +940,7 @@
                             },
                             color: '#94a3b8',
                             font: {
-                                family: 'Poppins'
+                                family: 'Montserrat'
                             }
                         }
                     },
@@ -820,7 +951,7 @@
                         ticks: {
                             color: '#94a3b8',
                             font: {
-                                family: 'Poppins'
+                                family: 'Montserrat'
                             }
                         }
                     }
@@ -828,10 +959,10 @@
                 plugins: {
                     legend: {
                         labels: {
-                            color: '#f1f5f9',
+                            color: '#f8fafc',
                             padding: 20,
                             font: {
-                                family: 'Poppins',
+                                family: 'Montserrat',
                                 size: 12
                             },
                             usePointStyle: true,
@@ -839,14 +970,14 @@
                         }
                     },
                     tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                        backgroundColor: 'rgba(10, 14, 23, 0.9)',
                         titleFont: {
-                            family: 'Poppins',
+                            family: 'Montserrat',
                             size: 14,
                             weight: 'bold'
                         },
                         bodyFont: {
-                            family: 'Poppins',
+                            family: 'Montserrat',
                             size: 13
                         },
                         padding: 15,
@@ -890,6 +1021,17 @@
     // Initialize when document is ready
     document.addEventListener('DOMContentLoaded', function() {
         loadStatistics();
+        
+        // Add subtle hover effects to summary boxes
+        document.querySelectorAll('.stats-summary-box, .stats-card').forEach(el => {
+            el.addEventListener('mouseenter', function() {
+                this.querySelector('.cyber-grid').style.opacity = '0.03';
+            });
+            
+            el.addEventListener('mouseleave', function() {
+                this.querySelector('.cyber-grid').style.opacity = '0.015';
+            });
+        });
     });
 </script>
 {% endblock %}
