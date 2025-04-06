@@ -1,0 +1,101 @@
+/* Enhanced marker cluster styling */
+.marker-cluster-small {
+    background-color: rgba(181, 226, 140, 0.6);
+}
+.marker-cluster-small div {
+    background-color: rgba(110, 204, 57, 0.7);
+    box-shadow: 0 0 10px rgba(110, 204, 57, 0.5);
+    transition: all 0.3s ease;
+}
+
+.marker-cluster-medium {
+    background-color: rgba(241, 211, 87, 0.6);
+}
+.marker-cluster-medium div {
+    background-color: rgba(240, 194, 12, 0.7);
+    box-shadow: 0 0 10px rgba(240, 194, 12, 0.5);
+    transition: all 0.3s ease;
+}
+
+.marker-cluster-large {
+    background-color: rgba(253, 156, 115, 0.6);
+}
+.marker-cluster-large div {
+    background-color: rgba(241, 128, 23, 0.7);
+    box-shadow: 0 0 10px rgba(241, 128, 23, 0.5);
+    transition: all 0.3s ease;
+}
+
+/* Value-based styling */
+.marker-cluster.high-value {
+    background-color: rgba(253, 156, 115, 0.6);
+}
+.marker-cluster.high-value div {
+    background-color: rgba(241, 128, 23, 0.7);
+    box-shadow: 0 0 15px rgba(241, 128, 23, 0.6);
+}
+
+.marker-cluster.medium-value {
+    background-color: rgba(241, 211, 87, 0.6);
+}
+.marker-cluster.medium-value div {
+    background-color: rgba(240, 194, 12, 0.7);
+    box-shadow: 0 0 12px rgba(240, 194, 12, 0.5);
+}
+
+.marker-cluster.standard-value {
+    background-color: rgba(181, 226, 140, 0.6);
+}
+.marker-cluster.standard-value div {
+    background-color: rgba(110, 204, 57, 0.7);
+    box-shadow: 0 0 10px rgba(110, 204, 57, 0.5);
+}
+
+/* Enhanced hover effects */
+.marker-cluster:hover {
+    transform: scale(1.1);
+}
+
+.marker-cluster div {
+    width: 30px;
+    height: 30px;
+    margin-left: 5px;
+    margin-top: 5px;
+    text-align: center;
+    border-radius: 15px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.marker-cluster span {
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* Animation effects */
+.marker-cluster {
+    transition: transform 0.3s ease;
+    backface-visibility: hidden;
+}
+
+/* Property value legend */
+.property-value-legend {
+    padding: 8px 10px;
+    background: white;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.property-value-legend h6 {
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+.time-indicator {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}

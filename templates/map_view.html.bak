@@ -77,29 +77,6 @@
         justify-content: space-between;
         margin-bottom: 5px;
     }
-    .visualization-selector {
-        margin-bottom: 15px;
-        padding: 10px;
-        background-color: rgba(0, 0, 0, 0.05);
-        border-radius: 4px;
-    }
-    .visualization-btn {
-        margin-right: 5px;
-        margin-bottom: 5px;
-        padding: 5px 12px;
-        border-radius: 4px;
-        font-size: 0.9rem;
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        transition: all 0.2s ease;
-    }
-    .visualization-btn.active {
-        background-color: var(--bs-primary);
-        color: white;
-        border-color: var(--bs-primary);
-    }
-    .visualization-btn:hover:not(.active) {
-        background-color: rgba(0, 0, 0, 0.1);
-    }
 </style>
 {% endblock %}
 
@@ -117,17 +94,6 @@
         <div class="col-md-3">
             <div class="map-sidebar">
                 <h4>Map Controls</h4>
-                
-                <!-- Visualization Type Selector -->
-                <div class="visualization-selector">
-                    <label class="form-label">Visualization Mode</label>
-                    <div class="d-flex flex-wrap">
-                        <button class="visualization-btn active" data-mode="markers">Markers</button>
-                        <button class="visualization-btn" data-mode="clusters">Clusters</button>
-                        <button class="visualization-btn" data-mode="heatmap">Heat Map</button>
-                        <button class="visualization-btn" data-mode="value">Value Map</button>
-                    </div>
-                </div>
                 
                 <!-- Data Source Selection -->
                 <div class="map-control-section">
@@ -156,10 +122,6 @@
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" id="clustering-toggle" checked>
                         <label class="form-check-label" for="clustering-toggle">Enable Clustering</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="animation-toggle" checked>
-                        <label class="form-check-label" for="animation-toggle">Enable Animations</label>
                     </div>
                 </div>
                 <div class="map-control-section">
@@ -249,10 +211,6 @@
 <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin=""></script>
 <!-- Leaflet Markercluster JS -->
 <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
-<!-- Leaflet Heat plugin -->
-<script src="{{ url_for('static', filename='js/leaflet-heat.js') }}"></script>
-<!-- Map Visualizations -->
-<script src="{{ url_for('static', filename='js/map_visualizations.js') }}"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -264,14 +222,6 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             maxZoom: 19
         }).addTo(map);
-        
-        // Initialize visualizations manager
-        const visualizationsManager = new PropertyMapVisualizations(map, {
-            heatmapRadius: 25,
-            heatmapBlur: 15,
-            clusterAnimationEnabled: true,
-            timeSeriesEnabled: false
-        });
         
         // Initialize property clusters with enhanced features
         let markerClusterGroup = L.markerClusterGroup({
@@ -443,28 +393,11 @@
         // Update property statistics display
         function updateStatistics(stats) {
             document.getElementById('stat-count').textContent = stats.count.toLocaleString();
-            document.getElementById('stat-avg').textContent = formatCurrency(stats.average);
-            document.getElementById('stat-median').textContent = formatCurrency(stats.median);
-            document.getElementById('stat-range').textContent = `${formatCurrency(stats.min)} - ${formatCurrency(stats.max)}`;
+            document.getElementById('stat-avg').textContent = formatCurrency(stats.average_value);
+            document.getElementById('stat-median').textContent = formatCurrency(stats.median_value);
+            document.getElementById('stat-range').textContent = 
+                `${formatCurrency(stats.min_value)} - ${formatCurrency(stats.max_value)}`;
         }
-        
-        // Handle visualization mode switching
-        const vizButtons = document.querySelectorAll('.visualization-btn');
-        let currentMode = 'markers';
-        
-        vizButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                // Update active button
-                vizButtons.forEach(btn => btn.classList.remove('active'));
-                this.classList.add('active');
-                
-                // Get selected mode
-                currentMode = this.getAttribute('data-mode');
-                
-                // Reload data with new visualization mode
-                loadMapData();
-            });
-        });
         
         // Load map data with filters
         function loadMapData() {
@@ -476,7 +409,6 @@
             const valueFilter = document.getElementById('value-filter').value;
             const cityFilter = document.getElementById('city-filter').value;
             const useClustering = document.getElementById('clustering-toggle').checked;
-            const useAnimation = document.getElementById('animation-toggle').checked;
             
             // Get selected property types
             const selectedPropertyTypes = [];
@@ -510,123 +442,45 @@
                         features: filteredFeatures
                     };
                     
-                    // Extract property data for visualizations
-                    const propertyData = filteredFeatures.map(feature => {
-                        return {
-                            latitude: feature.geometry.coordinates[1],
-                            longitude: feature.geometry.coordinates[0],
-                            assessed_value: feature.properties.assessed_value,
-                            property_type: feature.properties.property_type,
-                            property_address: feature.properties.property_address,
-                            account_id: feature.properties.account_id,
-                            owner_name: feature.properties.owner_name,
-                            property_city: feature.properties.property_city
-                        };
+                    // Create GeoJSON layer with custom marker and popup
+                    const geoJsonLayer = L.geoJSON(filteredGeoJSON, {
+                        pointToLayer: createPropertyMarker,
+                        onEachFeature: function(feature, layer) {
+                            layer.bindPopup(createPopupContent(feature.properties));
+                        }
                     });
                     
-                    // Set data for visualization manager
-                    visualizationsManager.setPropertyData(propertyData);
-                    
-                    // Apply selected visualization mode
-                    switch (currentMode) {
-                        case 'heatmap':
-                            // Heat map mode
-                            visualizationsManager.showHeatmap('assessed_value');
-                            visualizationsManager.addValueLegend();
-                            break;
+                    // Add markers based on clustering preference
+                    if (useClustering) {
+                        // Add cluster tooltip with value information
+                        markerClusterGroup.on("clusterclick", function(cluster) {
+                            const childMarkers = cluster.layer.getAllChildMarkers();
+                            const propertyCount = childMarkers.length;
                             
-                        case 'value':
-                            // Value-based visualization
-                            visualizationsManager.showClusters(
-                                // Marker factory function with value-based sizing
-                                function(prop) {
-                                    const value = prop.assessed_value || 0;
-                                    const radius = Math.max(5, Math.min(15, Math.sqrt(value) / 1000 * 5));
-                                    
-                                    return L.circleMarker([prop.latitude, prop.longitude], {
-                                        radius: radius,
-                                        fillColor: visualizationsManager._getValueColor(value),
-                                        color: '#fff',
-                                        weight: 1,
-                                        opacity: 1,
-                                        fillOpacity: 0.8
-                                    });
-                                },
-                                // Popup factory function
-                                function(prop) {
-                                    return `
-                                        <div class="property-popup">
-                                            <h6>${prop.property_address || 'Property'}</h6>
-                                            <p><strong>Value:</strong> ${formatCurrency(prop.assessed_value || 0)}</p>
-                                            <p><strong>Type:</strong> ${prop.property_type || 'Residential'}</p>
-                                            <p><strong>City:</strong> ${prop.property_city || 'N/A'}</p>
-                                            <button class="btn btn-sm btn-outline-primary view-images-btn" 
-                                                data-account-id="${prop.account_id}">
-                                                View Images
-                                            </button>
-                                        </div>
-                                    `;
+                            // Calculate value statistics for this cluster
+                            let totalValue = 0;
+                            let propertyValues = [];
+                            childMarkers.forEach(marker => {
+                                if (marker.feature && marker.feature.properties && marker.feature.properties.assessed_value) {
+                                    const value = marker.feature.properties.assessed_value;
+                                    totalValue += value;
+                                    propertyValues.push(value);
                                 }
+                            });
+                            
+                            // Add tooltip data
+                            const avgValue = propertyValues.length > 0 ? totalValue / propertyValues.length : 0;
+                            cluster.layer.bindTooltip(
+                                `<strong>${propertyCount} Properties</strong><br>
+                                Average Value: ${formatCurrency(avgValue)}`,
+                                { direction: "top", offset: [0, -10] }
                             );
-                            visualizationsManager.addValueLegend();
-                            break;
-                            
-                        case 'clusters':
-                            // Create GeoJSON layer with custom marker and popup
-                            const geoJsonLayer = L.geoJSON(filteredGeoJSON, {
-                                pointToLayer: createPropertyMarker,
-                                onEachFeature: function(feature, layer) {
-                                    layer.bindPopup(createPopupContent(feature.properties));
-                                }
-                            });
-                            
-                            // Add to cluster layer with enhanced options
-                            markerClusterGroup.addLayer(geoJsonLayer);
-                            propertyLayer.addLayer(markerClusterGroup);
-                            break;
-                            
-                        default:
-                            // Default marker mode
-                            // Create GeoJSON layer with custom marker and popup
-                            const regularLayer = L.geoJSON(filteredGeoJSON, {
-                                pointToLayer: createPropertyMarker,
-                                onEachFeature: function(feature, layer) {
-                                    layer.bindPopup(createPopupContent(feature.properties));
-                                }
-                            });
-                            
-                            // Add markers based on clustering preference
-                            if (useClustering) {
-                                // Add cluster tooltip with value information
-                                markerClusterGroup.on("clusterclick", function(cluster) {
-                                    const childMarkers = cluster.layer.getAllChildMarkers();
-                                    const propertyCount = childMarkers.length;
-                                    
-                                    // Calculate value statistics for this cluster
-                                    let totalValue = 0;
-                                    let propertyValues = [];
-                                    childMarkers.forEach(marker => {
-                                        if (marker.feature && marker.feature.properties && marker.feature.properties.assessed_value) {
-                                            const value = marker.feature.properties.assessed_value;
-                                            totalValue += value;
-                                            propertyValues.push(value);
-                                        }
-                                    });
-                                    
-                                    // Add tooltip data
-                                    const avgValue = propertyValues.length > 0 ? totalValue / propertyValues.length : 0;
-                                    cluster.layer.bindTooltip(
-                                        `<strong>${propertyCount} Properties</strong><br>
-                                        Average Value: ${formatCurrency(avgValue)}`,
-                                        { direction: "top", offset: [0, -10] }
-                                    );
-                                });
-                                
-                                markerClusterGroup.addLayer(regularLayer);
-                                propertyLayer.addLayer(markerClusterGroup);
-                            } else {
-                                regularLayer.addTo(propertyLayer);
-                            }
+                        });
+                        
+                        markerClusterGroup.addLayer(geoJsonLayer);
+                        propertyLayer.addLayer(markerClusterGroup);
+                    } else {
+                        geoJsonLayer.addTo(propertyLayer);
                     }
                     
                     // Update statistics
