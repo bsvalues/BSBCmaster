@@ -308,7 +308,9 @@ def import_accounts(batch_size=20, commit_every=10):
             with app.app_context():
                 # Process each record
                 for _, row in df.iterrows():
-                    account_id = str(row.get('account_id', ''))
+                    # Map CSV columns to database fields
+                    # The account.csv file has 'acct_id' and 'file_as_name'
+                    account_id = str(row.get('acct_id', ''))
                     if not account_id or account_id == 'nan':
                         continue
                     
@@ -316,18 +318,15 @@ def import_accounts(batch_size=20, commit_every=10):
                     existing_account = db.session.query(Account).filter_by(account_id=account_id).first()
                     
                     if not existing_account:
-                        # Get parcel ID if available
-                        parcel_id = str(row.get('parcel_id', '')) if pd.notna(row.get('parcel_id')) else None
-                        
                         # Create a new account
                         account = Account(
                             account_id=account_id,
-                            parcel_id=parcel_id,
-                            owner_name=str(row.get('owner_name', '')) if pd.notna(row.get('owner_name')) else "Unknown",
-                            mailing_address=str(row.get('mailing_address', '')) if pd.notna(row.get('mailing_address')) else None,
-                            mailing_city=str(row.get('mailing_city', '')) if pd.notna(row.get('mailing_city')) else None,
-                            mailing_state=str(row.get('mailing_state', '')) if pd.notna(row.get('mailing_state')) else None,
-                            mailing_zip=str(row.get('mailing_zip', '')) if pd.notna(row.get('mailing_zip')) else None
+                            owner_name=str(row.get('file_as_name', '')) if pd.notna(row.get('file_as_name')) else "Unknown",
+                            # Set other fields to defaults since they're not in the CSV
+                            mailing_address=None,
+                            mailing_city=None,
+                            mailing_state=None,
+                            mailing_zip=None
                         )
                         db.session.add(account)
                         accounts_created += 1
@@ -356,6 +355,7 @@ def import_accounts(batch_size=20, commit_every=10):
                 
         except Exception as e:
             logger.error(f"Error processing batch: {str(e)}")
+            logger.error(traceback.format_exc())
             try:
                 db.session.rollback()
             except:
@@ -434,24 +434,36 @@ def import_images(batch_size=20, commit_every=10):
             with app.app_context():
                 # Process each record
                 for _, row in df.iterrows():
-                    image_id = str(row.get('image_id', ''))
-                    property_id = str(row.get('property_id', '')) if pd.notna(row.get('property_id')) else None
+                    # The CSV has 'id', 'prop_id', 'year', 'image_path', 'image_nm', 'image_type'
+                    image_id = str(row.get('id', ''))
+                    property_id = str(row.get('prop_id', '')) if pd.notna(row.get('prop_id')) else None
                     
                     if not image_id or image_id == 'nan' or not property_id:
                         continue
                     
-                    # Check if image already exists
-                    existing_image = db.session.query(PropertyImage).filter_by(image_id=image_id).first()
+                    # Check if image already exists for this property and image type
+                    existing_image = db.session.query(PropertyImage).filter(
+                        PropertyImage.property_id == property_id,
+                        PropertyImage.image_path.contains(str(row.get('image_nm', '')))
+                    ).first()
                     
                     if not existing_image:
+                        # Get image year and format as date if available
+                        image_year = row.get('year') if pd.notna(row.get('year')) else None
+                        image_date = None
+                        if image_year:
+                            try:
+                                image_date = datetime.strptime(f"{int(image_year)}-01-01", "%Y-%m-%d").date()
+                            except (ValueError, TypeError):
+                                pass
+                                
                         # Create a new property image
                         image = PropertyImage(
-                            image_id=image_id,
                             property_id=property_id,
-                            image_url=str(row.get('image_url', '')) if pd.notna(row.get('image_url')) else None,
+                            image_path=str(row.get('image_path', '')) if pd.notna(row.get('image_path')) else None,
                             image_type=str(row.get('image_type', '')) if pd.notna(row.get('image_type')) else "Unknown",
-                            capture_date=row.get('capture_date') if pd.notna(row.get('capture_date')) else None,
-                            description=str(row.get('description', '')) if pd.notna(row.get('description')) else None
+                            image_date=image_date,
+                            file_format=str(row.get('image_nm', '')).split('.')[-1] if pd.notna(row.get('image_nm')) else None
                         )
                         db.session.add(image)
                         images_created += 1
@@ -480,6 +492,7 @@ def import_images(batch_size=20, commit_every=10):
                 
         except Exception as e:
             logger.error(f"Error processing batch: {str(e)}")
+            logger.error(traceback.format_exc())
             try:
                 db.session.rollback()
             except:
