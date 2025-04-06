@@ -114,6 +114,7 @@ class Account(db.Model):
     # Property details
     property_address = db.Column(db.String(255), nullable=True)
     property_city = db.Column(db.String(100), nullable=True)
+    property_type = db.Column(db.String(50), nullable=True)
     legal_description = db.Column(db.Text, nullable=True)
     
     # Geographic coordinates

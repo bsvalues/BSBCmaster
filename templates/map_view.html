@@ -401,12 +401,13 @@
                             data.data.forEach(image => {
                                 imagesHtml += `
                                     <div class="mb-2">
-                                        <img src="${image.image_url}" 
-                                            alt="${image.image_description || 'Property image'}" 
+                                        <img src="${image.image_url || image.image_path}" 
+                                            alt="${image.image_type || 'Property image'}" 
                                             class="img-fluid img-thumbnail">
                                         <small class="d-block text-muted">
                                             ${image.image_type || 'Property'} - 
                                             ${image.image_date ? new Date(image.image_date).toLocaleDateString() : 'No date'}
+                                            ${image.file_format ? ' (' + image.file_format + ')' : ''}
                                         </small>
                                     </div>
                                 `;
