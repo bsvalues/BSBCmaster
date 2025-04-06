@@ -5,46 +5,135 @@
 {% block head %}
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 <style>
+    :root {
+        --main-bg-color: #1a1e2c;
+        --card-bg-color: #22273a;
+        --card-header-color: #2a3048;
+        --accent-color-1: #6366f1;
+        --accent-color-2: #8b5cf6;
+        --accent-color-3: #ec4899;
+        --accent-gradient: linear-gradient(135deg, var(--accent-color-1) 0%, var(--accent-color-2) 50%, var(--accent-color-3) 100%);
+        --text-primary: #e2e8f0;
+        --text-secondary: #94a3b8;
+        --box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        --subtle-border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    body {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--main-bg-color);
+        color: var(--text-primary);
+    }
+    
+    h1, h2, h3, h4, h5 {
+        font-family: 'Playfair Display', serif;
+        font-weight: 700;
+    }
+    
+    .container-fluid {
+        padding: 30px;
+    }
+    
+    .dashboard-header {
+        margin-bottom: 40px;
+        position: relative;
+    }
+    
+    .dashboard-header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 5px;
+        background: var(--accent-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: inline-block;
+    }
+    
+    .dashboard-header p {
+        color: var(--text-secondary);
+        font-weight: 300;
+        font-size: 1.1rem;
+    }
+    
+    .dashboard-header::after {
+        content: '';
+        position: absolute;
+        width: 80px;
+        height: 4px;
+        background: var(--accent-gradient);
+        bottom: -15px;
+        left: 0;
+        border-radius: 2px;
+    }
+    
     .stats-card {
-        border-radius: 8px;
-        background-color: rgba(255, 255, 255, 0.05);
-        margin-bottom: 20px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-radius: 16px;
+        background-color: var(--card-bg-color);
+        margin-bottom: 30px;
+        box-shadow: var(--box-shadow);
+        border: var(--subtle-border);
+        backdrop-filter: blur(10px);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        overflow: hidden;
+    }
+    
+    .stats-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
     }
     
     .stats-card-header {
-        padding: 15px 20px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 20px 25px;
+        border-bottom: var(--subtle-border);
+        background-color: var(--card-header-color);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .stats-card-header h5 {
+        margin: 0;
+        font-size: 1.1rem;
+        color: var(--text-primary);
     }
     
     .stats-card-body {
-        padding: 20px;
+        padding: 25px;
     }
     
     .stat-value {
-        font-size: 2.2rem;
-        font-weight: 600;
+        font-size: 2.4rem;
+        font-weight: 700;
+        margin-bottom: 5px;
+        background: var(--accent-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: inline-block;
     }
     
     .stat-label {
-        color: #adb5bd;
-        font-size: 0.9rem;
+        color: var(--text-secondary);
+        font-size: 0.85rem;
         text-transform: uppercase;
-        letter-spacing: 0.05rem;
+        letter-spacing: 0.08rem;
+        font-weight: 600;
     }
     
     .chart-container {
         position: relative;
-        height: 250px;
+        height: 280px;
         width: 100%;
+        margin-top: 10px;
     }
     
     .city-stat-item {
         display: flex;
         justify-content: space-between;
-        padding: 8px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        align-items: center;
+        padding: 12px 0;
+        border-bottom: var(--subtle-border);
     }
     
     .city-stat-item:last-child {
@@ -52,34 +141,122 @@
     }
     
     .filter-section {
-        background-color: rgba(255, 255, 255, 0.05);
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 20px;
+        background-color: var(--card-header-color);
+        padding: 20px;
+        border-radius: 16px;
+        margin-bottom: 30px;
+        box-shadow: var(--box-shadow);
+        border: var(--subtle-border);
     }
     
     .stats-summary-box {
-        background-color: var(--bs-dark);
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 20px;
+        background-color: var(--card-bg-color);
+        border-radius: 16px;
+        padding: 25px;
+        margin-bottom: 30px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: var(--box-shadow);
+        border: var(--subtle-border);
+        backdrop-filter: blur(10px);
+        transition: transform 0.3s ease;
+    }
+    
+    .stats-summary-box:hover {
+        transform: translateY(-5px);
+    }
+    
+    .stats-summary-box::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: var(--accent-gradient);
     }
     
     .summary-value {
-        font-size: 1.5rem;
+        font-size: 2rem;
+        font-weight: 700;
+        background: var(--accent-gradient);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        display: inline-block;
+    }
+    
+    .table {
+        color: var(--text-primary);
+    }
+    
+    .table thead th {
+        color: var(--text-secondary);
         font-weight: 600;
-        color: var(--bs-primary);
+        border-bottom: var(--subtle-border);
+        padding: 15px 10px;
+    }
+    
+    .table tbody td {
+        padding: 15px 10px;
+        border-bottom: var(--subtle-border);
+        vertical-align: middle;
+    }
+    
+    .table tbody tr:last-child td {
+        border-bottom: none;
+    }
+    
+    /* Animated shimmer effect for loading state */
+    @keyframes shimmer {
+        0% { background-position: -1000px 0; }
+        100% { background-position: 1000px 0; }
+    }
+    
+    .loading {
+        background: linear-gradient(to right, var(--card-bg-color) 8%, var(--card-header-color) 18%, var(--card-bg-color) 33%);
+        background-size: 1000px 100%;
+        animation: shimmer 2s infinite linear;
+    }
+    
+    .loading-text {
+        height: 20px;
+        width: 100px;
+        border-radius: 4px;
+        margin-bottom: 8px;
+    }
+    
+    .loading-value {
+        height: 40px;
+        width: 150px;
+        border-radius: 6px;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: var(--main-bg-color);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: var(--card-header-color);
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: var(--accent-color-1);
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row mb-4">
-        <div class="col">
-            <h1>Property Statistics Dashboard</h1>
-            <p class="lead">Comprehensive analytics and visualizations of property assessment data.</p>
-        </div>
+    <div class="dashboard-header">
+        <h1>Property Statistics Dashboard</h1>
+        <p>Explore comprehensive analytics of the property assessment data</p>
     </div>
     
     <!-- Summary Statistics Row -->
@@ -116,7 +293,7 @@
         <div class="col-md-6">
             <div class="stats-card">
                 <div class="stats-card-header">
-                    <h5 class="mb-0">Property Type Distribution</h5>
+                    <h5>Property Type Distribution</h5>
                 </div>
                 <div class="stats-card-body">
                     <div class="chart-container">
@@ -130,7 +307,7 @@
         <div class="col-md-6">
             <div class="stats-card">
                 <div class="stats-card-header">
-                    <h5 class="mb-0">Value Distribution</h5>
+                    <h5>Value Distribution</h5>
                 </div>
                 <div class="stats-card-body">
                     <div class="chart-container">
@@ -146,7 +323,7 @@
         <div class="col-md-6">
             <div class="stats-card">
                 <div class="stats-card-header">
-                    <h5 class="mb-0">City Statistics</h5>
+                    <h5>City Statistics</h5>
                 </div>
                 <div class="stats-card-body">
                     <div class="chart-container">
@@ -160,7 +337,7 @@
         <div class="col-md-6">
             <div class="stats-card">
                 <div class="stats-card-header">
-                    <h5 class="mb-0">Average Property Value by Type</h5>
+                    <h5>Average Property Value by Type</h5>
                 </div>
                 <div class="stats-card-body">
                     <div class="chart-container">
@@ -176,11 +353,11 @@
         <div class="col-12">
             <div class="stats-card">
                 <div class="stats-card-header">
-                    <h5 class="mb-0">Detailed Statistics</h5>
+                    <h5>Detailed Statistics</h5>
                 </div>
                 <div class="stats-card-body">
                     <div class="table-responsive">
-                        <table class="table table-striped">
+                        <table class="table">
                             <thead>
                                 <tr>
                                     <th>Property Type</th>
@@ -223,22 +400,62 @@
         }).format(value / 100);
     }
     
-    // Chart colors
+    // Chart colors and gradients
     const chartColors = {
-        residential: '#4CAF50',
-        commercial: '#2196F3',
-        agricultural: '#FFC107',
-        industrial: '#F44336',
-        other: '#9E9E9E',
-        valueRanges: ['#E3F2FD', '#90CAF9', '#42A5F5', '#1E88E5', '#0D47A1']
+        residential: {
+            start: '#4f46e5',
+            end: '#818cf8'
+        },
+        commercial: {
+            start: '#0ea5e9',
+            end: '#38bdf8'
+        },
+        agricultural: {
+            start: '#16a34a',
+            end: '#4ade80'
+        },
+        industrial: {
+            start: '#f59e0b',
+            end: '#fbbf24'
+        },
+        vacant: {
+            start: '#94a3b8',
+            end: '#cbd5e1'
+        },
+        valueRanges: [
+            'rgba(99, 102, 241, 0.9)',
+            'rgba(99, 102, 241, 0.7)',
+            'rgba(99, 102, 241, 0.5)',
+            'rgba(99, 102, 241, 0.3)',
+            'rgba(99, 102, 241, 0.2)'
+        ]
     };
+    
+    // Create gradient
+    function createGradient(ctx, startColor, endColor) {
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, startColor);
+        gradient.addColorStop(1, endColor);
+        return gradient;
+    }
     
     // Load statistics data
     function loadStatistics() {
+        // Show loading state
+        document.querySelectorAll('.summary-value').forEach(el => {
+            el.classList.add('loading');
+            el.textContent = '';
+        });
+        
         fetch('/api/statistics')
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
+                    // Remove loading state
+                    document.querySelectorAll('.summary-value').forEach(el => {
+                        el.classList.remove('loading');
+                    });
+                    
                     updateSummaryStatistics(data.statistics);
                     createPropertyTypeChart(data.statistics);
                     createValueDistributionChart(data.statistics);
@@ -284,38 +501,69 @@
     function createPropertyTypeChart(stats) {
         const propertyTypes = Object.keys(stats.property_type_statistics);
         const propertyCounts = propertyTypes.map(type => stats.property_type_statistics[type].count);
+        
+        const ctx = document.getElementById('property-type-chart').getContext('2d');
+        
+        // Create gradients for each property type
         const backgroundColors = propertyTypes.map(type => {
             switch(type.toLowerCase()) {
-                case 'residential': return chartColors.residential;
-                case 'commercial': return chartColors.commercial;
-                case 'agricultural': return chartColors.agricultural;
-                case 'industrial': return chartColors.industrial;
-                default: return chartColors.other;
+                case 'residential': 
+                    return createGradient(ctx, chartColors.residential.start, chartColors.residential.end);
+                case 'commercial': 
+                    return createGradient(ctx, chartColors.commercial.start, chartColors.commercial.end);
+                case 'agricultural': 
+                    return createGradient(ctx, chartColors.agricultural.start, chartColors.agricultural.end);
+                case 'industrial': 
+                    return createGradient(ctx, chartColors.industrial.start, chartColors.industrial.end);
+                default: 
+                    return createGradient(ctx, chartColors.vacant.start, chartColors.vacant.end);
             }
         });
         
-        const ctx = document.getElementById('property-type-chart').getContext('2d');
         new Chart(ctx, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
                 labels: propertyTypes,
                 datasets: [{
                     data: propertyCounts,
                     backgroundColor: backgroundColors,
-                    borderWidth: 1
+                    borderWidth: 0,
+                    borderRadius: 4,
+                    hoverOffset: 15
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                cutout: '65%',
                 plugins: {
                     legend: {
                         position: 'right',
                         labels: {
-                            color: '#adb5bd'
+                            color: '#e2e8f0',
+                            padding: 20,
+                            font: {
+                                family: 'Inter',
+                                size: 12
+                            },
+                            usePointStyle: true,
+                            pointStyle: 'circle'
                         }
                     },
                     tooltip: {
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        titleFont: {
+                            family: 'Inter',
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            family: 'Inter',
+                            size: 13
+                        },
+                        padding: 15,
+                        cornerRadius: 8,
+                        boxPadding: 10,
                         callbacks: {
                             label: function(context) {
                                 const label = context.label || '';
@@ -337,6 +585,7 @@
         const valueCounts = valueRanges.map(range => stats.value_distribution[range]);
         
         const ctx = document.getElementById('value-distribution-chart').getContext('2d');
+        
         new Chart(ctx, {
             type: 'bar',
             data: {
@@ -345,7 +594,9 @@
                     label: 'Property Count',
                     data: valueCounts,
                     backgroundColor: chartColors.valueRanges,
-                    borderWidth: 1
+                    borderWidth: 0,
+                    borderRadius: 6,
+                    borderSkipped: false
                 }]
             },
             options: {
@@ -354,25 +605,46 @@
                 scales: {
                     y: {
                         beginAtZero: true,
-                        ticks: {
-                            color: '#adb5bd'
-                        },
                         grid: {
                             color: 'rgba(255, 255, 255, 0.05)'
+                        },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: {
+                                family: 'Inter'
+                            }
                         }
                     },
                     x: {
-                        ticks: {
-                            color: '#adb5bd'
-                        },
                         grid: {
-                            color: 'rgba(255, 255, 255, 0.05)'
+                            color: 'rgba(255, 255, 255, 0)'
+                        },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: {
+                                family: 'Inter'
+                            }
                         }
                     }
                 },
                 plugins: {
                     legend: {
                         display: false
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        titleFont: {
+                            family: 'Inter',
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            family: 'Inter',
+                            size: 13
+                        },
+                        padding: 15,
+                        cornerRadius: 8,
+                        boxPadding: 10
                     }
                 }
             }
@@ -386,6 +658,11 @@
         const propertyCounts = cities.map(city => stats.city_statistics[city].count);
         
         const ctx = document.getElementById('city-comparison-chart').getContext('2d');
+        
+        // Create gradient for bars
+        const barGradient = createGradient(ctx, '#6366f1', '#a855f7');
+        const lineGradient = createGradient(ctx, '#f43f5e', '#ec4899');
+        
         new Chart(ctx, {
             type: 'bar',
             data: {
@@ -393,8 +670,10 @@
                 datasets: [{
                     label: 'Average Property Value',
                     data: averageValues,
-                    backgroundColor: '#3498db',
-                    borderWidth: 1,
+                    backgroundColor: barGradient,
+                    borderWidth: 0,
+                    borderRadius: 6,
+                    borderSkipped: false,
                     yAxisID: 'y',
                     order: 2
                 },
@@ -402,9 +681,14 @@
                     label: 'Property Count',
                     data: propertyCounts,
                     type: 'line',
-                    borderColor: '#e74c3c',
-                    backgroundColor: 'rgba(231, 76, 60, 0.2)',
-                    borderWidth: 2,
+                    borderColor: lineGradient,
+                    backgroundColor: 'rgba(236, 72, 153, 0.2)',
+                    borderWidth: 3,
+                    pointBackgroundColor: '#ec4899',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
                     fill: true,
                     tension: 0.4,
                     yAxisID: 'y1',
@@ -422,13 +706,20 @@
                         title: {
                             display: true,
                             text: 'Average Value ($)',
-                            color: '#adb5bd'
+                            color: '#94a3b8',
+                            font: {
+                                family: 'Inter',
+                                size: 12
+                            }
                         },
                         ticks: {
                             callback: function(value) {
                                 return '$' + value.toLocaleString();
                             },
-                            color: '#adb5bd'
+                            color: '#94a3b8',
+                            font: {
+                                family: 'Inter'
+                            }
                         },
                         grid: {
                             color: 'rgba(255, 255, 255, 0.05)'
@@ -441,31 +732,61 @@
                         title: {
                             display: true,
                             text: 'Property Count',
-                            color: '#adb5bd'
+                            color: '#94a3b8',
+                            font: {
+                                family: 'Inter',
+                                size: 12
+                            }
                         },
                         ticks: {
-                            color: '#adb5bd'
+                            color: '#94a3b8',
+                            font: {
+                                family: 'Inter'
+                            }
                         },
                         grid: {
                             drawOnChartArea: false
                         }
                     },
                     x: {
-                        ticks: {
-                            color: '#adb5bd'
-                        },
                         grid: {
-                            color: 'rgba(255, 255, 255, 0.05)'
+                            color: 'rgba(255, 255, 255, 0)'
+                        },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: {
+                                family: 'Inter'
+                            }
                         }
                     }
                 },
                 plugins: {
                     legend: {
                         labels: {
-                            color: '#adb5bd'
+                            color: '#e2e8f0',
+                            padding: 20,
+                            font: {
+                                family: 'Inter',
+                                size: 12
+                            },
+                            usePointStyle: true,
+                            pointStyle: 'circle'
                         }
                     },
                     tooltip: {
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        titleFont: {
+                            family: 'Inter',
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            family: 'Inter',
+                            size: 13
+                        },
+                        padding: 15,
+                        cornerRadius: 8,
+                        boxPadding: 10,
                         callbacks: {
                             label: function(context) {
                                 const label = context.dataset.label || '';
@@ -490,6 +811,11 @@
         const medianValues = propertyTypes.map(type => stats.property_type_statistics[type].median_value);
         
         const ctx = document.getElementById('value-by-type-chart').getContext('2d');
+        
+        // Create gradients for chart
+        const avgGradient = createGradient(ctx, '#6366f1', '#818cf8');
+        const medianGradient = createGradient(ctx, '#16a34a', '#4ade80');
+        
         new Chart(ctx, {
             type: 'bar',
             data: {
@@ -497,14 +823,18 @@
                 datasets: [{
                     label: 'Average Value',
                     data: averageValues,
-                    backgroundColor: '#3498db',
-                    borderWidth: 1
+                    backgroundColor: avgGradient,
+                    borderWidth: 0,
+                    borderRadius: 6,
+                    borderSkipped: false
                 },
                 {
                     label: 'Median Value',
                     data: medianValues,
-                    backgroundColor: '#2ecc71',
-                    borderWidth: 1
+                    backgroundColor: medianGradient,
+                    borderWidth: 0,
+                    borderRadius: 6,
+                    borderSkipped: false
                 }]
             },
             options: {
@@ -513,32 +843,58 @@
                 scales: {
                     y: {
                         beginAtZero: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.05)'
+                        },
                         ticks: {
                             callback: function(value) {
                                 return '$' + value.toLocaleString();
                             },
-                            color: '#adb5bd'
-                        },
-                        grid: {
-                            color: 'rgba(255, 255, 255, 0.05)'
+                            color: '#94a3b8',
+                            font: {
+                                family: 'Inter'
+                            }
                         }
                     },
                     x: {
-                        ticks: {
-                            color: '#adb5bd'
-                        },
                         grid: {
-                            color: 'rgba(255, 255, 255, 0.05)'
+                            color: 'rgba(255, 255, 255, 0)'
+                        },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: {
+                                family: 'Inter'
+                            }
                         }
                     }
                 },
                 plugins: {
                     legend: {
                         labels: {
-                            color: '#adb5bd'
+                            color: '#e2e8f0',
+                            padding: 20,
+                            font: {
+                                family: 'Inter',
+                                size: 12
+                            },
+                            usePointStyle: true,
+                            pointStyle: 'circle'
                         }
                     },
                     tooltip: {
+                        backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                        titleFont: {
+                            family: 'Inter',
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            family: 'Inter',
+                            size: 13
+                        },
+                        padding: 15,
+                        cornerRadius: 8,
+                        boxPadding: 10,
                         callbacks: {
                             label: function(context) {
                                 const label = context.dataset.label || '';
@@ -562,7 +918,7 @@
             const row = document.createElement('tr');
             
             row.innerHTML = `
-                <td>${propType}</td>
+                <td><strong>${propType}</strong></td>
                 <td>${typeStats.count.toLocaleString()}</td>
                 <td>${formatCurrency(typeStats.average_value)}</td>
                 <td>${formatCurrency(typeStats.median_value)}</td>
