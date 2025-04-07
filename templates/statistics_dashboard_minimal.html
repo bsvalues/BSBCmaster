@@ -1036,13 +1036,9 @@ function updateCityStatsTable(cityStatsData) {
                     // Hide loading state
                     hideLoading();
                     
-                    // Check if response has correct structure
-                    if (data.status !== 'success' || !data.statistics) {
-                        throw new Error('Invalid data format from statistics API');
-                    }
                     
                     // Get the statistics data
-                    const stats = data.statistics;
+                    // stats already declared = data.statistics;
                     
                     // Update summary statistics with animation
                     updateStatWithAnimation('total-properties', stats.data_summary.total_properties || '0');
