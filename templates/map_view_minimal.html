@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet-heat@0.2.0/dist/leaflet-heat.min.css" />
 <!-- Range Slider CSS -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css" />
+    <link rel="stylesheet" href="/static/css/timeline-controls.css">
 
 <style>
     #map-container {
@@ -251,15 +252,25 @@
         <div class="col-12 mb-4">
             <h1 class="mb-3">Property Map</h1>
             <p class="lead">Explore property locations, values, and details with our interactive map.</p>
+    </div>
         </div>
+    </div>
     </div>
     
     <div class="row">
         <div class="col-12">
             <div id="map-container">
+    </div>
                 <div id="property-map"></div>
                 
                 <!-- Map Controls -->
+                    <div class="timeline-toggle-button" id="toggle-timeline" title="Show Timeline View">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20">
+                            <path fill="none" d="M0 0h24v24H0z"/>
+                            <path d="M12 2c5.52 0 10 4.48 10 10s-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2zm0 18c4.42 0 8-3.58 8-8s-3.58-8-8-8-8 3.58-8 8 3.58 8 8 8zm1-8h4v2h-6V7h2v5z" fill="currentColor"/>
+                        </svg>
+    </div>
+                    </div>
                 <div class="controls-container">
                     <h5 class="mb-3">Map Controls</h5>
                     
@@ -269,6 +280,7 @@
                             <option value="all">All Property Types</option>
                             <!-- Populated by JavaScript -->
                         </select>
+    </div>
                     </div>
                     
                     <div class="filter-section">
@@ -277,15 +289,19 @@
                             <option value="all">All Cities</option>
                             <!-- Populated by JavaScript -->
                         </select>
+    </div>
                     </div>
                     
                     <div class="filter-section">
                         <h5>Property Value Range</h5>
+    </div>
                         <div id="value-range-slider"></div>
                         <div class="slider-values">
                             <span id="min-value">$0</span>
                             <span id="max-value">$1M</span>
+    </div>
                         </div>
+    </div>
                     </div>
                     
                     <div class="toggle-control">
@@ -294,6 +310,7 @@
                             <input type="checkbox" id="clustering-toggle" checked>
                             <span class="slider"></span>
                         </label>
+    </div>
                     </div>
                     
                     <div class="toggle-control">
@@ -302,15 +319,17 @@
                             <input type="checkbox" id="heatmap-toggle">
                             <span class="slider"></span>
                         </label>
+    </div>
                     </div>
                     
                     <button id="reset-filters" class="btn btn-sm btn-outline-secondary w-100 mt-2 ripple">
                         <i class="fas fa-undo me-1"></i> Reset Filters
                     </button>
+    </div>
                 </div>
                 
                 <!-- Legend -->
-                <div class="map-legend">
+                <div class="map-legend card shadow-sm p-3">
                     <h6 class="mb-2">Property Value</h6>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #2c5282;"></div>
@@ -328,9 +347,36 @@
                         <div class="legend-color" style="background-color: #63b3ed;"></div>
                         <span>$750K+</span>
                     </div>
+                    
+                    <hr class="my-2">
+                    
+                    <h6 class="mb-2">Map Controls</h6>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="cluster-toggle" checked>
+                        <label class="form-check-label" for="cluster-toggle">Cluster Markers</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="heatmap-toggle">
+                        <label class="form-check-label" for="heatmap-toggle">Heat Map</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="enhanced-markers-toggle" checked>
+                        <label class="form-check-label" for="enhanced-markers-toggle">Enhanced Markers</label>
+                    </div>
                 </div>
+                
+                </div>
+        </svg>
+    </div>
+                    </div>
+    </div>
+                </div>
+    </div>
             </div>
+    </div>
         </div>
+    </div>
+    </div>
     </div>
 </div>
 {% endblock %}
@@ -344,6 +390,11 @@
 <script src="https://unpkg.com/leaflet-heat@0.2.0/dist/leaflet-heat.js"></script>
 <!-- Range Slider JS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
+<!-- Custom Map Enhancement Components -->
+<script src="/static/js/enhanced_property_markers.js"></script>
+<script src="/static/js/property_comparison.js"></script>
+<script src="/static/js/time_based_visualization.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -354,7 +405,6 @@
         loadingOverlay.style.zIndex = "2000";
         loadingOverlay.style.top = "0";
         loadingOverlay.style.left = "0";
-        loadingOverlay.innerHTML = `
             <div class="text-center">
                 <div class="loading-spinner mb-3"></div>
                 <h5>Loading Map Data</h5>
@@ -364,11 +414,26 @@
                     <span class="dot-pulse"></span>
                 </div>
             </div>
+            </div>
         `;
         mapContainer.appendChild(loadingOverlay);
         
         // Map initialization
         const map = L.map('property-map').setView([47.7511, -120.7401], 7);
+        
+        // Enhanced marker initialization
+        let enhancedMarkers = null;
+        if (document.getElementById("enhanced-markers-toggle") && document.getElementById("enhanced-markers-toggle").checked && typeof EnhancedPropertyMarkers !== "undefined") {
+            enhancedMarkers = new EnhancedPropertyMarkers(map);
+        }
+        let enhancedMarkers = null;
+        
+        // Enhanced marker initialization
+        let enhancedMarkers = null;
+        if (document.getElementById("enhanced-markers-toggle") && document.getElementById("enhanced-markers-toggle").checked && typeof EnhancedPropertyMarkers !== "undefined") {
+            enhancedMarkers = new EnhancedPropertyMarkers(map);
+        }
+        let enhancedMarkers = null;
         
         // Add tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -443,9 +508,12 @@
                     <div class="d-flex">
                         <div class="toast-body">
                             ${message}
+    </div>
                         </div>
                         <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
                     </div>
+    </div>
                 </div>
             `;
             
@@ -598,11 +666,31 @@
         
         // Create a custom marker icon based on property value
         function createMarkerIcon(propertyValue) {
+            // Use enhanced property markers if available
+            if (typeof EnhancedPropertyMarkers !== "undefined" && enhancedMarkers) {
+                return enhancedMarkers.createMarkerIcon(propertyValue);
+            }
+            
+            // Fallback to original implementation
             let markerColor;
             
             if (propertyValue < 250000) {
                 markerColor = "#2c5282"; // Dark blue
             } else if (propertyValue < 500000) {
+                markerColor = "#3182ce"; // Medium blue
+            } else if (propertyValue < 750000) {
+                markerColor = "#4299e1"; // Light blue
+            } else {
+                markerColor = "#63b3ed"; // Very light blue
+            }
+            
+            return L.divIcon({
+                className: "custom-marker animated-marker",
+                html: `<div style="background-color: ${markerColor}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3);"></div>`,
+                iconSize: [12, 12],
+                iconAnchor: [6, 6]
+            });
+        }
                 markerColor = "#3182ce"; // Medium blue
             } else if (propertyValue < 750000) {
                 markerColor = "#4299e1"; // Light blue
@@ -639,30 +727,46 @@
                 <div class="property-popup">
                     <div class="property-popup-header">
                         <h6 class="mb-0">${property.address || 'Property #' + property.id}</h6>
+    </div>
                     </div>
                     <div class="property-popup-body">
                         <div class="property-detail">
+    </div>
                             <div class="property-detail-label">Parcel ID:</div>
+    </div>
                             <div class="property-detail-value">${property.parcel_id || 'N/A'}</div>
+    </div>
                         </div>
                         <div class="property-detail">
+    </div>
                             <div class="property-detail-label">Property Type:</div>
+    </div>
                             <div class="property-detail-value">${property.property_type || 'N/A'}</div>
+    </div>
                         </div>
                         <div class="property-detail">
+    </div>
                             <div class="property-detail-label">Location:</div>
+    </div>
                             <div class="property-detail-value">${property.city || 'N/A'}, ${property.state || 'N/A'}</div>
+    </div>
                         </div>
                         <div class="property-detail">
+    </div>
                             <div class="property-detail-label">Assessed Value:</div>
+    </div>
                             <div class="property-detail-value ${valueClass}">${formattedValue || 'N/A'}</div>
+    </div>
                         </div>
+    </div>
                     </div>
                     <div class="property-popup-footer">
                         <a href="#" class="btn btn-sm btn-outline-primary ripple" onclick="viewPropertyDetails(${property.id})">
                             <i class="fas fa-info-circle me-1"></i> View Details
                         </a>
+    </div>
                     </div>
+    </div>
                 </div>
             `;
         }
@@ -674,7 +778,7 @@
         };
         
         // Function to load and filter map data
-        function loadMapData() {
+        function loadMapData(isTimeUpdate = false) {
             // Show loading indicator
             const refreshBtn = document.getElementById('reset-filters');
             if (refreshBtn) {
@@ -743,8 +847,18 @@
                         // Skip if no location data
                         if (!property.latitude || !property.longitude) return;
                         
-                        // Create marker
-                        const marker = L.marker([property.latitude, property.longitude], {
+                        // Initialize enhanced marker if available
+                        // Add to heat map data array
+                        heatData.push([
+                            property.latitude,
+                            property.longitude,
+                            property.total_value / 1000000  // Scale for heat intensity
+                        ]);
+
+                        // If enhanced markers are enabled, let the enhancedMarkers handle it
+                        if (enhancedMarkers && document.getElementById("enhanced-markers-toggle").checked) {
+                            return; // Skip regular marker creation, handled in bulk later
+                        }
                             icon: createMarkerIcon(property.total_value)
                         });
                         
@@ -756,6 +870,10 @@
                         // Store property value for cluster calculations
                         marker.propertyValue = property.total_value;
                         
+                        // Apply enhanced marker animation if available
+                        if (typeof EnhancedPropertyMarkers !== "undefined" && enhancedMarkers) {
+                            enhancedMarkers.applyMarkerEffects(marker, property);
+                        
                         // Add popup
                         marker.bindPopup(createPopupContent(property));
                         
@@ -763,13 +881,6 @@
                         marker.on('mouseover', function(e) {
                             this.openPopup();
                             
-                            // Scale up the marker for emphasis
-                            if (this._icon) {
-                                this._icon.classList.add('hover-lift');
-                            }
-                        });
-                        
-                        marker.on('mouseout', function(e) {
                             if (this._icon) {
                                 this._icon.classList.remove('hover-lift');
                             }
@@ -787,6 +898,14 @@
                     });
                     
                     // Create heat map with the filtered data
+                    // Process enhanced markers if enabled
+                    if (enhancedMarkers && document.getElementById("enhanced-markers-toggle").checked) {
+                        // Store all properties for reference
+                        window.allProperties = filteredProperties;
+                        
+                        // Use enhanced markers
+                        enhancedMarkers.addMarkers(filteredProperties);
+                    }
                     heatLayer = L.heatLayer(heatData, {
                         radius: 25,
                         blur: 15,
@@ -881,6 +1000,22 @@
             if (e.target.checked) {
                 // Re-enable clustering by reloading data
                 loadMapData();
+
+        // Initialize enhanced map components
+        let enhancedMarkers = new EnhancedPropertyMarkers(map);
+        let propertyComparison = new PropertyComparison();
+        let timeVisualization = new TimeBasedVisualization(map);
+        
+        // Add event listeners for visualization controls
+        document.getElementById("toggle-comparison").addEventListener("click", function() {
+            this.classList.toggle("active");
+            propertyComparison.toggle();
+        });
+        
+        document.getElementById("toggle-timeline").addEventListener("click", function() {
+            this.classList.toggle("active");
+            timeVisualization.toggle();
+        });
             } else {
                 // Disable clustering by adding markers directly to map
                 const allMarkers = [];
@@ -902,6 +1037,25 @@
         
         // Toggle heat map
         document.getElementById('heatmap-toggle').addEventListener('change', function(e) {
+        // Listen for enhanced markers toggle
+        document.getElementById("enhanced-markers-toggle").addEventListener("change", function(e) {
+            const useEnhancedMarkers = e.target.checked;
+            
+            // Update for existing markers
+            if (typeof EnhancedPropertyMarkers !== "undefined") {
+                // If toggling on and enhancedMarkers not initialized
+                if (useEnhancedMarkers && !enhancedMarkers) {
+                    enhancedMarkers = new EnhancedPropertyMarkers(map);
+                    // Reload data to apply enhanced markers
+                    loadMapData();
+                } else if (!useEnhancedMarkers && enhancedMarkers) {
+                    // Disable enhanced markers
+                    enhancedMarkers = null;
+                    // Reload data to use standard markers
+                    loadMapData();
+                }
+            }
+        });
             if (e.target.checked && heatLayer) {
                 map.addLayer(heatLayer);
                 
@@ -948,6 +1102,22 @@
                 
                 // Reload map data
                 loadMapData();
+
+        // Initialize enhanced map components
+        let enhancedMarkers = new EnhancedPropertyMarkers(map);
+        let propertyComparison = new PropertyComparison();
+        let timeVisualization = new TimeBasedVisualization(map);
+        
+        // Add event listeners for visualization controls
+        document.getElementById("toggle-comparison").addEventListener("click", function() {
+            this.classList.toggle("active");
+            propertyComparison.toggle();
+        });
+        
+        document.getElementById("toggle-timeline").addEventListener("click", function() {
+            this.classList.toggle("active");
+            timeVisualization.toggle();
+        });
                 
                 // Show toast
                 showToast('Map filters have been reset', 'success');
@@ -959,6 +1129,61 @@
         
         // Initial load
         loadMapData();
+
+        // Initialize enhanced map components
+        let enhancedMarkers = new EnhancedPropertyMarkers(map);
+        let propertyComparison = new PropertyComparison();
+        let timeVisualization = new TimeBasedVisualization(map);
+        
+        // Add event listeners for visualization controls
+        document.getElementById("toggle-comparison").addEventListener("click", function() {
+            this.classList.toggle("active");
+            propertyComparison.toggle();
+        });
+        
+        document.getElementById("toggle-timeline").addEventListener("click", function() {
+            this.classList.toggle("active");
+            timeVisualization.toggle();
+        });
     });
 </script>
 {% endblock %}
+
+<style>
+/* Comparison toggle button */
+.comparison-toggle-button {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: #3182ce;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s, background-color 0.2s;
+    z-index: 999;
+}
+
+.comparison-toggle-button:hover {
+    transform: scale(1.1);
+    background-color: #4299e1;
+}
+
+.comparison-toggle-button.active {
+    background-color: #2c5282;
+}
+
+@media (max-width: 768px) {
+    .comparison-toggle-button {
+        bottom: 15px;
+        right: 15px;
+        width: 40px;
+        height: 40px;
+    }
+}
+</style>
