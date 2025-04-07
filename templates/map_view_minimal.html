@@ -265,7 +265,7 @@
                     
                     <div class="filter-section">
                         <h5>Property Type</h5>
-                        <select id="property-type-filter" class="form-select form-select-sm filter-select">
+                        <select id="property-type-filter" class="form-select form-select-sm filter-select focus-interaction">
                             <option value="all">All Property Types</option>
                             <!-- Populated by JavaScript -->
                         </select>
@@ -273,7 +273,7 @@
                     
                     <div class="filter-section">
                         <h5>City</h5>
-                        <select id="city-filter" class="form-select form-select-sm filter-select">
+                        <select id="city-filter" class="form-select form-select-sm filter-select focus-interaction">
                             <option value="all">All Cities</option>
                             <!-- Populated by JavaScript -->
                         </select>
@@ -304,7 +304,7 @@
                         </label>
                     </div>
                     
-                    <button id="reset-filters" class="btn btn-sm btn-outline-secondary w-100 mt-2">
+                    <button id="reset-filters" class="btn btn-sm btn-outline-secondary w-100 mt-2 ripple">
                         <i class="fas fa-undo me-1"></i> Reset Filters
                     </button>
                 </div>
@@ -347,6 +347,26 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Add loading overlay
+        const mapContainer = document.getElementById('map-container');
+        const loadingOverlay = document.createElement('div');
+        loadingOverlay.className = 'position-absolute w-100 h-100 d-flex align-items-center justify-content-center bg-white bg-opacity-75';
+        loadingOverlay.style.zIndex = "2000";
+        loadingOverlay.style.top = "0";
+        loadingOverlay.style.left = "0";
+        loadingOverlay.innerHTML = `
+            <div class="text-center">
+                <div class="loading-spinner mb-3"></div>
+                <h5>Loading Map Data</h5>
+                <div>
+                    <span class="dot-pulse"></span>
+                    <span class="dot-pulse"></span>
+                    <span class="dot-pulse"></span>
+                </div>
+            </div>
+        `;
+        mapContainer.appendChild(loadingOverlay);
+        
         // Map initialization
         const map = L.map('property-map').setView([47.7511, -120.7401], 7);
         
@@ -401,35 +421,104 @@
         // Initialize heat map layer (hidden by default)
         let heatLayer;
         
-        // Fetch data for property types filter
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            // Create toast container if doesn't exist
+            let toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                document.body.appendChild(toastContainer);
+            }
+            
+            // Determine color class based on type
+            const colorClass = type === 'success' ? 'bg-success' : 
+                              type === 'error' ? 'bg-danger' :
+                              type === 'warning' ? 'bg-warning' : 'bg-info';
+            
+            // Create toast
+            const toastId = 'toast-' + Date.now();
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-white ${colorClass} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            
+            toastContainer.innerHTML += toastHtml;
+            
+            // Initialize and show the toast
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+            toast.show();
+            
+            // Remove toast after it's hidden
+            toastElement.addEventListener('hidden.bs.toast', function() {
+                toastElement.remove();
+            });
+        }
+        
+        // Fetch data for property types filter with animation
         fetch('/api/map/property-types')
             .then(response => response.json())
             .then(data => {
                 const propertyTypeSelect = document.getElementById('property-type-filter');
-                data.property_types.forEach(type => {
-                    const option = document.createElement('option');
-                    option.value = type;
-                    option.textContent = type;
-                    propertyTypeSelect.appendChild(option);
+                
+                // Clear loading option
+                propertyTypeSelect.innerHTML = '<option value="all">All Property Types</option>';
+                
+                // Add options with staggered animation
+                data.property_types.forEach((type, index) => {
+                    setTimeout(() => {
+                        const option = document.createElement('option');
+                        option.value = type;
+                        option.textContent = type;
+                        propertyTypeSelect.appendChild(option);
+                        
+                        // Add highlight effect for new option
+                        option.classList.add('highlight-update');
+                        setTimeout(() => option.classList.remove('highlight-update'), 1000);
+                    }, index * 100);
                 });
             })
-            .catch(error => console.error('Error fetching property types:', error));
+            .catch(error => {
+                console.error('Error fetching property types:', error);
+                showToast('Error loading property types. Please try again.', 'error');
+            });
         
-        // Fetch data for cities filter
+        // Fetch data for cities filter with animation
         fetch('/api/map/cities')
             .then(response => response.json())
             .then(data => {
                 const citySelect = document.getElementById('city-filter');
-                data.cities.forEach(city => {
-                    const option = document.createElement('option');
-                    option.value = city;
-                    option.textContent = city;
-                    citySelect.appendChild(option);
+                
+                // Clear loading option
+                citySelect.innerHTML = '<option value="all">All Cities</option>';
+                
+                // Add options with staggered animation
+                data.cities.forEach((city, index) => {
+                    setTimeout(() => {
+                        const option = document.createElement('option');
+                        option.value = city;
+                        option.textContent = city;
+                        citySelect.appendChild(option);
+                        
+                        // Add highlight effect for new option
+                        option.classList.add('highlight-update');
+                        setTimeout(() => option.classList.remove('highlight-update'), 1000);
+                    }, index * 100);
                 });
             })
-            .catch(error => console.error('Error fetching cities:', error));
+            .catch(error => {
+                console.error('Error fetching cities:', error);
+                showToast('Error loading cities. Please try again.', 'error');
+            });
         
-        // Initialize the value range slider
+        // Initialize the value range slider with animation
         fetch('/api/map/value-ranges')
             .then(response => response.json())
             .then(data => {
@@ -457,22 +546,43 @@
                 
                 noUiSlider.create(valueSlider, sliderOptions);
                 
+                // Add animation to slider
+                valueSlider.classList.add('highlight-update');
+                setTimeout(() => valueSlider.classList.remove('highlight-update'), 1500);
+                
                 // Update value display and filter map
                 valueSlider.noUiSlider.on('update', function(values, handle) {
                     const minValueDisplay = document.getElementById('min-value');
                     const maxValueDisplay = document.getElementById('max-value');
                     
-                    minValueDisplay.textContent = formatCurrency(values[0]);
-                    maxValueDisplay.textContent = formatCurrency(values[1]);
+                    // Animate value changes
+                    if (handle === 0) {
+                        minValueDisplay.textContent = formatCurrency(values[0]);
+                        minValueDisplay.classList.add('pulse-attention');
+                        setTimeout(() => minValueDisplay.classList.remove('pulse-attention'), 500);
+                    } else {
+                        maxValueDisplay.textContent = formatCurrency(values[1]);
+                        maxValueDisplay.classList.add('pulse-attention');
+                        setTimeout(() => maxValueDisplay.classList.remove('pulse-attention'), 500);
+                    }
                     
-                    loadMapData();
+                    // Debounce the loadMapData call to avoid too many refreshes while sliding
+                    clearTimeout(window.sliderTimeout);
+                    window.sliderTimeout = setTimeout(loadMapData, 300);
                 });
                 
-                // Display initial values
+                // Display initial values with animation
                 document.getElementById('min-value').textContent = formatCurrency(minValue);
                 document.getElementById('max-value').textContent = formatCurrency(maxValue);
+                
+                // Pulse min/max values on load
+                document.getElementById('min-value').classList.add('pulse-on-load');
+                document.getElementById('max-value').classList.add('pulse-on-load');
             })
-            .catch(error => console.error('Error fetching value ranges:', error));
+            .catch(error => {
+                console.error('Error fetching value ranges:', error);
+                showToast('Error loading value ranges. Please try again.', 'error');
+            });
         
         // Function to format currency values
         function formatCurrency(value) {
@@ -510,6 +620,21 @@
         
         // Create property popup content
         function createPopupContent(property) {
+            // Format value for display
+            const formattedValue = formatCurrency(property.total_value);
+            
+            // Determine value class for color coding
+            let valueClass = '';
+            if (property.total_value < 250000) {
+                valueClass = 'text-primary-color';
+            } else if (property.total_value < 500000) {
+                valueClass = 'text-secondary-color';
+            } else if (property.total_value < 750000) {
+                valueClass = 'text-accent-color';
+            } else {
+                valueClass = 'text-highlight-color';
+            }
+            
             return `
                 <div class="property-popup">
                     <div class="property-popup-header">
@@ -530,11 +655,11 @@
                         </div>
                         <div class="property-detail">
                             <div class="property-detail-label">Assessed Value:</div>
-                            <div class="property-detail-value">${formatCurrency(property.total_value) || 'N/A'}</div>
+                            <div class="property-detail-value ${valueClass}">${formattedValue || 'N/A'}</div>
                         </div>
                     </div>
                     <div class="property-popup-footer">
-                        <a href="#" class="btn btn-sm btn-outline-primary" onclick="viewPropertyDetails(${property.id})">
+                        <a href="#" class="btn btn-sm btn-outline-primary ripple" onclick="viewPropertyDetails(${property.id})">
                             <i class="fas fa-info-circle me-1"></i> View Details
                         </a>
                     </div>
@@ -544,12 +669,19 @@
         
         // Function to view property details (placeholder)
         window.viewPropertyDetails = function(propertyId) {
-            alert('Property details viewer would open for property #' + propertyId);
+            showToast(`Viewing details for property #${propertyId}`, 'info');
             // In a real implementation, this could open a modal or navigate to a details page
         };
         
         // Function to load and filter map data
         function loadMapData() {
+            // Show loading indicator
+            const refreshBtn = document.getElementById('reset-filters');
+            if (refreshBtn) {
+                refreshBtn.disabled = true;
+                refreshBtn.innerHTML = '<span class="loading-spinner me-2" style="width: 14px; height: 14px;"></span> Loading...';
+            }
+            
             // Get filter values
             const propertyType = document.getElementById('property-type-filter').value;
             const city = document.getElementById('city-filter').value;
@@ -569,12 +701,27 @@
                 map.removeLayer(heatLayer);
             }
             
+            // Add subtle loading animation to map
+            mapContainer.classList.add('pulse-on-load');
+            
             // Fetch and filter properties
             fetch('/api/map/data')
                 .then(response => response.json())
                 .then(data => {
+                    // Hide loading overlay
+                    if (loadingOverlay.parentNode === mapContainer) {
+                        mapContainer.removeChild(loadingOverlay);
+                    }
+                    
+                    // Reset button
+                    if (refreshBtn) {
+                        refreshBtn.disabled = false;
+                        refreshBtn.innerHTML = '<i class="fas fa-undo me-1"></i> Reset Filters';
+                    }
+                    
                     if (!data.properties || data.properties.length === 0) {
                         console.log('No property data available');
+                        showToast('No property data available', 'warning');
                         return;
                     }
                     
@@ -591,8 +738,8 @@
                     // Heat map data preparation
                     const heatData = [];
                     
-                    // Add markers for filtered properties
-                    filteredProperties.forEach(property => {
+                    // Add markers for filtered properties with staggered animation
+                    filteredProperties.forEach((property, index) => {
                         // Skip if no location data
                         if (!property.latitude || !property.longitude) return;
                         
@@ -601,11 +748,32 @@
                             icon: createMarkerIcon(property.total_value)
                         });
                         
+                        // Add animation delay based on index
+                        marker._icon = marker._icon || {};
+                        marker._icon.style = marker._icon.style || {};
+                        marker._icon.style.animationDelay = (index * 0.02) + 's';
+                        
                         // Store property value for cluster calculations
                         marker.propertyValue = property.total_value;
                         
                         // Add popup
                         marker.bindPopup(createPopupContent(property));
+                        
+                        // Add hover listener for highlight effect
+                        marker.on('mouseover', function(e) {
+                            this.openPopup();
+                            
+                            // Scale up the marker for emphasis
+                            if (this._icon) {
+                                this._icon.classList.add('hover-lift');
+                            }
+                        });
+                        
+                        marker.on('mouseout', function(e) {
+                            if (this._icon) {
+                                this._icon.classList.remove('hover-lift');
+                            }
+                        });
                         
                         // Add to cluster layer
                         markers.addLayer(marker);
@@ -637,7 +805,10 @@
                     
                     // If we have properties but none match the filter
                     if (data.properties.length > 0 && filteredProperties.length === 0) {
-                        alert('No properties match the current filters. Try adjusting your criteria.');
+                        showToast('No properties match the current filters. Try adjusting your criteria.', 'warning');
+                    } else {
+                        // Show count in a toast
+                        showToast(`Showing ${filteredProperties.length} properties on the map`, 'success');
                     }
                     
                     // Fit bounds if we have filtered properties
@@ -646,7 +817,59 @@
                         map.fitBounds(bounds, { padding: [50, 50] });
                     }
                 })
-                .catch(error => console.error('Error loading map data:', error));
+                .catch(error => {
+                    console.error('Error loading map data:', error);
+                    showToast('Error loading map data. Please try again.', 'error');
+                    
+                    // Hide loading overlay
+                    if (loadingOverlay.parentNode === mapContainer) {
+                        mapContainer.removeChild(loadingOverlay);
+                    }
+                    
+                    // Reset button
+                    if (refreshBtn) {
+                        refreshBtn.disabled = false;
+                        refreshBtn.innerHTML = '<i class="fas fa-undo me-1"></i> Reset Filters';
+                    }
+                })
+                .finally(() => {
+                    // Remove animation class
+                    setTimeout(() => {
+                        mapContainer.classList.remove('pulse-on-load');
+                    }, 1000);
+                });
+        }
+        
+        // Setup filter animations
+        function setupFilterAnimations() {
+            // Add animation to filter selections
+            const filters = document.querySelectorAll('.filter-select');
+            filters.forEach(filter => {
+                filter.addEventListener('change', function() {
+                    // Pulse animation on change
+                    this.classList.add('pulse-on-load');
+                    setTimeout(() => this.classList.remove('pulse-on-load'), 1000);
+                    
+                    // Show loading toast
+                    showToast('Updating map with new filters...', 'info');
+                });
+            });
+            
+            // Add animation to toggle switches
+            const toggles = document.querySelectorAll('.switch input');
+            toggles.forEach(toggle => {
+                toggle.addEventListener('change', function() {
+                    const switchEl = this.closest('.switch');
+                    if (switchEl) {
+                        switchEl.classList.add('pulse-on-load');
+                        setTimeout(() => switchEl.classList.remove('pulse-on-load'), 1000);
+                    }
+                    
+                    // Show info toast
+                    const toggleName = this.id === 'clustering-toggle' ? 'clustering' : 'heat map';
+                    showToast(`${this.checked ? 'Enabled' : 'Disabled'} ${toggleName} visualization`, 'info');
+                });
+            });
         }
         
         // Event listeners for filters
@@ -668,8 +891,11 @@
                 markers.clearLayers();
                 map.removeLayer(markers);
                 
-                allMarkers.forEach(function(marker) {
-                    map.addLayer(marker);
+                // Add markers with staggered animation
+                allMarkers.forEach(function(marker, index) {
+                    setTimeout(() => {
+                        map.addLayer(marker);
+                    }, index * 10);
                 });
             }
         });
@@ -678,6 +904,15 @@
         document.getElementById('heatmap-toggle').addEventListener('change', function(e) {
             if (e.target.checked && heatLayer) {
                 map.addLayer(heatLayer);
+                
+                // Add pulse animation to heat layer
+                const heatCanvas = document.querySelector('.leaflet-heatmap-layer');
+                if (heatCanvas) {
+                    heatCanvas.style.animation = 'pulse 1s ease-in-out';
+                    setTimeout(() => {
+                        if (heatCanvas) heatCanvas.style.animation = '';
+                    }, 1000);
+                }
             } else if (heatLayer) {
                 map.removeLayer(heatLayer);
             }
@@ -685,22 +920,44 @@
         
         // Reset filters
         document.getElementById('reset-filters').addEventListener('click', function() {
+            // Add shake animation to button
+            this.classList.add('shake-attention');
+            
+            // Reset filters with animation
             document.getElementById('property-type-filter').value = 'all';
+            document.getElementById('property-type-filter').classList.add('highlight-update');
+            
             document.getElementById('city-filter').value = 'all';
+            document.getElementById('city-filter').classList.add('highlight-update');
             
             const valueSlider = document.getElementById('value-range-slider').noUiSlider;
             if (valueSlider) {
                 valueSlider.reset();
+                document.getElementById('value-range-slider').classList.add('highlight-update');
             }
             
             document.getElementById('clustering-toggle').checked = true;
             document.getElementById('heatmap-toggle').checked = false;
             
-            loadMapData();
+            // Remove animations after a delay
+            setTimeout(() => {
+                this.classList.remove('shake-attention');
+                document.getElementById('property-type-filter').classList.remove('highlight-update');
+                document.getElementById('city-filter').classList.remove('highlight-update');
+                document.getElementById('value-range-slider').classList.remove('highlight-update');
+                
+                // Reload map data
+                loadMapData();
+                
+                // Show toast
+                showToast('Map filters have been reset', 'success');
+            }, 500);
         });
+        
+        // Setup map control interactions
+        setupFilterAnimations();
         
         // Initial load
         loadMapData();
     });
 </script>
-{% endblock %}

@@ -170,7 +170,7 @@
                     <div class="col-md-3">
                         <div class="filter-group">
                             <div class="filter-label">Property Type</div>
-                            <select id="property-type-filter" class="form-select">
+                            <select id="property-type-filter" class="form-select focus-interaction">
                                 <option value="all">All Types</option>
                                 <!-- Populated by JavaScript -->
                             </select>
@@ -179,7 +179,7 @@
                     <div class="col-md-3">
                         <div class="filter-group">
                             <div class="filter-label">City</div>
-                            <select id="city-filter" class="form-select">
+                            <select id="city-filter" class="form-select focus-interaction">
                                 <option value="all">All Cities</option>
                                 <!-- Populated by JavaScript -->
                             </select>
@@ -188,7 +188,7 @@
                     <div class="col-md-3">
                         <div class="filter-group">
                             <div class="filter-label">Year</div>
-                            <select id="year-filter" class="form-select">
+                            <select id="year-filter" class="form-select focus-interaction">
                                 <option value="all">All Years</option>
                                 <option value="2025">2025</option>
                                 <option value="2024">2024</option>
@@ -199,7 +199,7 @@
                     <div class="col-md-3">
                         <div class="filter-group">
                             <div class="filter-label">Action</div>
-                            <button id="refresh-stats" class="btn btn-primary w-100">
+                            <button id="refresh-stats" class="btn btn-primary w-100 ripple">
                                 <i class="fas fa-sync-alt me-2"></i>Update Statistics
                             </button>
                         </div>
@@ -213,7 +213,7 @@
     <div class="stats-container">
         <div class="row">
             <div class="col-md-3 mb-4 animate-fade-in animate-delay-1">
-                <div class="card stat-card">
+                <div class="card stat-card stat-card-interactive">
                     <div class="card-body">
                         <div class="stat-label">Total Properties</div>
                         <div class="d-flex align-items-baseline">
@@ -227,7 +227,7 @@
                 </div>
             </div>
             <div class="col-md-3 mb-4 animate-fade-in animate-delay-1">
-                <div class="card stat-card">
+                <div class="card stat-card stat-card-interactive">
                     <div class="card-body">
                         <div class="stat-label">Average Value</div>
                         <div class="d-flex align-items-baseline">
@@ -241,7 +241,7 @@
                 </div>
             </div>
             <div class="col-md-3 mb-4 animate-fade-in animate-delay-2">
-                <div class="card stat-card">
+                <div class="card stat-card stat-card-interactive">
                     <div class="card-body">
                         <div class="stat-label">Highest Value</div>
                         <div class="d-flex align-items-baseline">
@@ -252,7 +252,7 @@
                 </div>
             </div>
             <div class="col-md-3 mb-4 animate-fade-in animate-delay-2">
-                <div class="card stat-card">
+                <div class="card stat-card stat-card-interactive">
                     <div class="card-body">
                         <div class="stat-label">Most Common Type</div>
                         <div class="d-flex align-items-baseline">
@@ -268,7 +268,7 @@
     <!-- Charts Row -->
     <div class="row mb-4">
         <div class="col-md-6 mb-4 animate-fade-in animate-delay-3">
-            <div class="card chart-card">
+            <div class="card chart-card hover-lift">
                 <div class="card-body">
                     <h5 class="chart-title">Property Value by Type</h5>
                     <div class="chart-container">
@@ -278,7 +278,7 @@
             </div>
         </div>
         <div class="col-md-6 mb-4 animate-fade-in animate-delay-3">
-            <div class="card chart-card">
+            <div class="card chart-card hover-lift">
                 <div class="card-body">
                     <h5 class="chart-title">Value Distribution</h5>
                     <div class="chart-container">
@@ -291,7 +291,7 @@
     
     <div class="row mb-4">
         <div class="col-md-12 animate-fade-in animate-delay-4">
-            <div class="card chart-card">
+            <div class="card chart-card hover-lift">
                 <div class="card-body">
                     <h5 class="chart-title">Property Value Trends by Year</h5>
                     <div class="chart-container">
@@ -309,7 +309,7 @@
                 <div class="card-body">
                     <h5 class="chart-title">Property Types Summary</h5>
                     <div class="table-responsive">
-                        <table class="table stats-table">
+                        <table class="table stats-table table-hover-row">
                             <thead>
                                 <tr>
                                     <th>Property Type</th>
@@ -337,7 +337,7 @@
                 <div class="card-body">
                     <h5 class="chart-title">City Statistics</h5>
                     <div class="table-responsive">
-                        <table class="table stats-table">
+                        <table class="table stats-table table-hover-row">
                             <thead>
                                 <tr>
                                     <th>City</th>
@@ -392,6 +392,52 @@
                 `<span class="trend-change trend-neutral">0%</span>`;
         }
         
+        // Add loading indicator
+        function showLoading() {
+            const statValues = document.querySelectorAll('.stat-value');
+            statValues.forEach(el => {
+                const originalValue = el.textContent;
+                el.setAttribute('data-original-value', originalValue);
+                
+                // Create loading dots
+                el.innerHTML = `
+                    <span class="dot-pulse"></span>
+                    <span class="dot-pulse"></span>
+                    <span class="dot-pulse"></span>
+                `;
+            });
+            
+            // Add loading spinner to button
+            const refreshBtn = document.getElementById('refresh-stats');
+            if (refreshBtn) {
+                refreshBtn.disabled = true;
+                refreshBtn.innerHTML = `
+                    <span class="loading-spinner me-2"></span>
+                    Loading...
+                `;
+            }
+        }
+        
+        // Remove loading indicator
+        function hideLoading() {
+            const statValues = document.querySelectorAll('.stat-value');
+            statValues.forEach(el => {
+                const originalValue = el.getAttribute('data-original-value');
+                if (originalValue) {
+                    el.textContent = originalValue;
+                }
+            });
+            
+            // Restore button
+            const refreshBtn = document.getElementById('refresh-stats');
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = `
+                    <i class="fas fa-sync-alt me-2"></i>Update Statistics
+                `;
+            }
+        }
+        
         // Charts
         let propertyTypeChart;
         let valueDistributionChart;
@@ -400,10 +446,7 @@
         // Fetch and initialize data
         function loadStatisticsData() {
             // Show loading state
-            document.getElementById('total-properties').textContent = 'Loading...';
-            document.getElementById('avg-value').textContent = 'Loading...';
-            document.getElementById('highest-value').textContent = 'Loading...';
-            document.getElementById('common-type').textContent = 'Loading...';
+            showLoading();
             
             // Get filter values
             const propertyType = document.getElementById('property-type-filter').value;
@@ -414,11 +457,14 @@
             fetch('/api/statistics?property_type=' + propertyType + '&city=' + city + '&year=' + year)
                 .then(response => response.json())
                 .then(data => {
-                    // Update summary statistics
-                    document.getElementById('total-properties').textContent = data.summary.total_properties || '0';
-                    document.getElementById('avg-value').textContent = formatCurrency(data.summary.average_value) || '$0';
-                    document.getElementById('highest-value').textContent = formatCurrency(data.summary.highest_value) || '$0';
-                    document.getElementById('common-type').textContent = data.summary.most_common_type || 'N/A';
+                    // Hide loading state
+                    hideLoading();
+                    
+                    // Update summary statistics with animation
+                    updateStatWithAnimation('total-properties', data.summary.total_properties || '0');
+                    updateStatWithAnimation('avg-value', formatCurrency(data.summary.average_value) || '$0');
+                    updateStatWithAnimation('highest-value', formatCurrency(data.summary.highest_value) || '$0');
+                    updateStatWithAnimation('common-type', data.summary.most_common_type || 'N/A');
                     
                     // Update additional info
                     document.getElementById('highest-property-type').textContent = data.summary.highest_value_type || 'Property';
@@ -460,14 +506,117 @@
                             cityFilter.appendChild(option);
                         });
                     }
+                    
+                    // Show success message
+                    showSuccessToast("Statistics updated successfully!");
                 })
                 .catch(error => {
                     console.error('Error loading statistics data:', error);
+                    hideLoading();
+                    
                     document.getElementById('total-properties').textContent = 'Error';
                     document.getElementById('avg-value').textContent = 'Error';
                     document.getElementById('highest-value').textContent = 'Error';
                     document.getElementById('common-type').textContent = 'Error';
+                    
+                    // Show error message
+                    showErrorToast("Failed to load statistics data. Please try again.");
                 });
+        }
+        
+        // Update stat with animation
+        function updateStatWithAnimation(elementId, newValue) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            
+            // Store the old value
+            const oldValue = element.textContent;
+            
+            // Set the new value
+            element.textContent = newValue;
+            
+            // Add highlight effect
+            element.classList.add('highlight-update');
+            
+            // Remove the class after animation completes
+            setTimeout(() => {
+                element.classList.remove('highlight-update');
+            }, 1500);
+        }
+        
+        // Show success toast
+        function showSuccessToast(message) {
+            // Create toast container if doesn't exist
+            let toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                document.body.appendChild(toastContainer);
+            }
+            
+            // Create toast
+            const toastId = 'toast-' + Date.now();
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <i class="fas fa-check-circle me-2"></i>${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            
+            toastContainer.innerHTML += toastHtml;
+            
+            // Initialize and show the toast
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { delay: 3000 });
+            toast.show();
+            
+            // Remove toast after it's hidden
+            toastElement.addEventListener('hidden.bs.toast', function() {
+                toastElement.remove();
+            });
+        }
+        
+        // Show error toast
+        function showErrorToast(message) {
+            // Create toast container if doesn't exist
+            let toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                document.body.appendChild(toastContainer);
+            }
+            
+            // Create toast
+            const toastId = 'toast-' + Date.now();
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-white bg-danger border-0" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            <i class="fas fa-exclamation-circle me-2"></i>${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            
+            toastContainer.innerHTML += toastHtml;
+            
+            // Initialize and show the toast
+            const toastElement = document.getElementById(toastId);
+            const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+            toast.show();
+            
+            // Shake element to grab attention
+            toastElement.classList.add('shake-attention');
+            
+            // Remove toast after it's hidden
+            toastElement.addEventListener('hidden.bs.toast', function() {
+                toastElement.remove();
+            });
         }
         
         // Update property type chart
@@ -559,6 +708,24 @@
                                 weight: 'bold'
                             }
                         }
+                    },
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeOutQuart'
+                    },
+                    onHover: (event, chartElements) => {
+                        const chartCanvas = event.chart.canvas;
+                        chartCanvas.style.cursor = chartElements.length ? 'pointer' : 'default';
+                        
+                        // Highlight hovered element
+                        if (chartElements.length) {
+                            const index = chartElements[0].index;
+                            const datasetIndex = chartElements[0].datasetIndex;
+                            
+                            // Scale up the bar
+                            event.chart.data.datasets[datasetIndex]._meta = 
+                                event.chart.data.datasets[datasetIndex]._meta || {};
+                        }
                     }
                 }
             };
@@ -571,6 +738,9 @@
                 propertyTypeChart.update();
             } else {
                 propertyTypeChart = new Chart(ctx, chartConfig);
+                
+                // Add chart element class for hover effects
+                ctx.canvas.classList.add('chart-element');
             }
         }
         
@@ -623,6 +793,24 @@
                                 weight: 'bold'
                             }
                         }
+                    },
+                    animation: {
+                        animateRotate: true,
+                        animateScale: true,
+                        duration: 1000,
+                        easing: 'easeOutQuart'
+                    },
+                    hover: {
+                        mode: 'nearest',
+                        intersect: true,
+                        onHover: function(event, elements) {
+                            const chart = event.chart;
+                            if (elements.length) {
+                                chart.canvas.style.cursor = 'pointer';
+                            } else {
+                                chart.canvas.style.cursor = 'default';
+                            }
+                        }
                     }
                 }
             };
@@ -635,6 +823,9 @@
                 valueDistributionChart.update();
             } else {
                 valueDistributionChart = new Chart(ctx, chartConfig);
+                
+                // Add chart element class for hover effects
+                ctx.canvas.classList.add('chart-element');
             }
         }
         
@@ -673,7 +864,10 @@
                     backgroundColor: colors[index % colors.length].bg,
                     borderColor: colors[index % colors.length].border,
                     borderWidth: 2,
-                    tension: 0.1
+                    tension: 0.1,
+                    pointBackgroundColor: colors[index % colors.length].border,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
                 });
             });
             
@@ -718,6 +912,20 @@
                                 }
                             }
                         }
+                    },
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeOutQuart'
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'nearest',
+                        axis: 'x'
+                    },
+                    hover: {
+                        mode: 'nearest',
+                        intersect: true,
+                        animationDuration: 400
                     }
                 }
             };
@@ -730,10 +938,13 @@
                 valueTrendsChart.update();
             } else {
                 valueTrendsChart = new Chart(ctx, chartConfig);
+                
+                // Add chart element class for hover effects
+                ctx.canvas.classList.add('chart-element');
             }
         }
         
-        // Update property type table
+        // Update property type table with animations
         function updatePropertyTypeTable(data) {
             const tableBody = document.getElementById('property-type-table');
             tableBody.innerHTML = '';
@@ -745,23 +956,28 @@
                 return;
             }
             
-            data.forEach(item => {
+            data.forEach((item, index) => {
                 const row = document.createElement('tr');
                 
+                // Add data-tooltip attributes for interactive tooltips
                 row.innerHTML = `
-                    <td>${item.property_type}</td>
-                    <td>${item.count}</td>
-                    <td>${formatCurrency(item.average_value)}</td>
-                    <td>${formatCurrency(item.min_value)}</td>
-                    <td>${formatCurrency(item.max_value)}</td>
-                    <td>${formatChange(item.annual_change)}</td>
+                    <td class="data-tooltip" data-tooltip="Property Type: ${item.property_type}">${item.property_type}</td>
+                    <td class="data-tooltip" data-tooltip="${item.count} properties of this type">${item.count}</td>
+                    <td class="data-tooltip" data-tooltip="Average Value: ${formatCurrency(item.average_value)}">${formatCurrency(item.average_value)}</td>
+                    <td class="data-tooltip" data-tooltip="Minimum Value: ${formatCurrency(item.min_value)}">${formatCurrency(item.min_value)}</td>
+                    <td class="data-tooltip" data-tooltip="Maximum Value: ${formatCurrency(item.max_value)}">${formatCurrency(item.max_value)}</td>
+                    <td class="data-tooltip" data-tooltip="Annual Change: ${item.annual_change}%">${formatChange(item.annual_change)}</td>
                 `;
+                
+                // Add row with staggered animation
+                row.style.opacity = '0';
+                row.style.animation = `fadeInUp 0.5s ease-out ${0.05 * index}s forwards`;
                 
                 tableBody.appendChild(row);
             });
         }
         
-        // Update city statistics table
+        // Update city statistics table with animations
         function updateCityStatsTable(data) {
             const tableBody = document.getElementById('city-stats-table');
             tableBody.innerHTML = '';
@@ -773,26 +989,106 @@
                 return;
             }
             
-            data.forEach(item => {
+            data.forEach((item, index) => {
                 const row = document.createElement('tr');
                 
+                // Add data-tooltip attributes for interactive tooltips
                 row.innerHTML = `
-                    <td>${item.city}</td>
-                    <td>${item.property_count}</td>
-                    <td>${formatCurrency(item.average_value)}</td>
-                    <td>${item.most_common_type}</td>
-                    <td>${formatChange(item.yoy_change)}</td>
+                    <td class="data-tooltip" data-tooltip="City: ${item.city}">${item.city}</td>
+                    <td class="data-tooltip" data-tooltip="${item.property_count} properties in this city">${item.property_count}</td>
+                    <td class="data-tooltip" data-tooltip="Average Value: ${formatCurrency(item.average_value)}">${formatCurrency(item.average_value)}</td>
+                    <td class="data-tooltip" data-tooltip="Most Common: ${item.most_common_type}">${item.most_common_type}</td>
+                    <td class="data-tooltip" data-tooltip="Year-over-Year Change: ${item.yoy_change}%">${formatChange(item.yoy_change)}</td>
                 `;
+                
+                // Add row with staggered animation
+                row.style.opacity = '0';
+                row.style.animation = `fadeInUp 0.5s ease-out ${0.05 * index}s forwards`;
                 
                 tableBody.appendChild(row);
             });
         }
         
+        // Add hover interactions for tables
+        function setupTableInteractions() {
+            // Make cells interactive
+            document.addEventListener('mouseover', function(e) {
+                if (e.target.tagName === 'TD') {
+                    const row = e.target.parentNode;
+                    if (row.tagName === 'TR') {
+                        const cells = row.querySelectorAll('td');
+                        cells.forEach(cell => {
+                            cell.classList.add('data-highlight');
+                        });
+                    }
+                }
+            });
+            
+            document.addEventListener('mouseout', function(e) {
+                if (e.target.tagName === 'TD') {
+                    const row = e.target.parentNode;
+                    if (row.tagName === 'TR') {
+                        const cells = row.querySelectorAll('td');
+                        cells.forEach(cell => {
+                            cell.classList.remove('data-highlight');
+                        });
+                    }
+                }
+            });
+        }
+        
+        // Add ripple effect to buttons
+        function setupButtonAnimations() {
+            document.getElementById('refresh-stats').classList.add('ripple');
+        }
+        
+        // Add pulse animations to stat cards
+        function setupStatCardAnimations() {
+            const statCards = document.querySelectorAll('.stat-card');
+            statCards.forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    const valueEl = this.querySelector('.stat-value');
+                    if (valueEl) {
+                        valueEl.classList.add('pulse-attention');
+                        
+                        // Remove class after animation completes
+                        setTimeout(() => {
+                            valueEl.classList.remove('pulse-attention');
+                        }, 1500);
+                    }
+                });
+            });
+        }
+        
+        // Setup interactive filter controls
+        function setupFilterInteractions() {
+            const filters = document.querySelectorAll('.form-select');
+            filters.forEach(filter => {
+                filter.addEventListener('change', function() {
+                    this.classList.add('highlight-update');
+                    setTimeout(() => {
+                        this.classList.remove('highlight-update');
+                    }, 1000);
+                });
+            });
+        }
+        
         // Event handlers
-        document.getElementById('refresh-stats').addEventListener('click', loadStatisticsData);
+        document.getElementById('refresh-stats').addEventListener('click', function() {
+            this.classList.add('shake-attention');
+            setTimeout(() => {
+                this.classList.remove('shake-attention');
+                loadStatisticsData();
+            }, 500);
+        });
+        
+        // Setup interactions
+        setupTableInteractions();
+        setupButtonAnimations();
+        setupStatCardAnimations();
+        setupFilterInteractions();
         
         // Load initial data
         loadStatisticsData();
     });
 </script>
-{% endblock %}

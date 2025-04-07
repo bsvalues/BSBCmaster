@@ -1,0 +1,300 @@
+/* 
+ * Micro-interactions and hover animations for the Benton County Assessor application
+ * This file contains animations and interactive effects for data elements and UI components
+ */
+
+/* Smooth transitions for all elements */
+* {
+    transition-duration: 0.25s;
+    transition-timing-function: ease-out;
+}
+
+/* ==================
+   HOVER ANIMATIONS
+   ================== */
+
+/* Card hover effects */
+.hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Button hover animations */
+.btn-hover-expand {
+    transition: transform 0.2s ease, padding 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-hover-expand:hover {
+    transform: scale(1.05);
+    padding-right: 1.5rem;
+}
+
+.btn-hover-expand:after {
+    content: "→";
+    position: absolute;
+    right: -20px;
+    opacity: 0;
+    transition: right 0.2s ease, opacity 0.2s ease;
+}
+
+.btn-hover-expand:hover:after {
+    right: 10px;
+    opacity: 1;
+}
+
+/* Data element highlight animation */
+.data-highlight {
+    transition: background-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
+}
+
+.data-highlight:hover {
+    background-color: rgba(66, 153, 225, 0.1);
+    transform: scale(1.02);
+}
+
+/* Table row hover effects */
+.table-hover-row tr {
+    transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.table-hover-row tbody tr:hover {
+    background-color: rgba(66, 153, 225, 0.05);
+    transform: translateX(5px);
+}
+
+/* Chart element interactions */
+.chart-element {
+    transition: filter 0.3s ease, transform 0.3s ease;
+}
+
+.chart-element:hover {
+    filter: brightness(1.1);
+    transform: scale(1.05);
+}
+
+/* Stat card interactions */
+.stat-card-interactive {
+    transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+    border-left: 4px solid var(--primary-color);
+}
+
+.stat-card-interactive:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    border-left-width: 8px;
+}
+
+.stat-card-interactive .stat-value {
+    transition: font-size 0.3s ease, color 0.3s ease;
+}
+
+.stat-card-interactive:hover .stat-value {
+    font-size: 2.2rem;
+    color: var(--secondary-color);
+}
+
+/* ==================
+   MICRO-INTERACTIONS
+   ================== */
+
+/* Click ripple effect */
+.ripple {
+    position: relative;
+    overflow: hidden;
+}
+
+.ripple:after {
+    content: "";
+    display: block;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.3) 10%, transparent 10.01%);
+    background-repeat: no-repeat;
+    background-position: 50%;
+    transform: scale(10, 10);
+    opacity: 0;
+    transition: transform 0.5s, opacity 0.5s;
+}
+
+.ripple:active:after {
+    transform: scale(0, 0);
+    opacity: 0.3;
+    transition: 0s;
+}
+
+/* Subtle pulse animations for important values */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.pulse-on-load {
+    animation: pulse 2s ease-in-out;
+}
+
+.pulse-attention {
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+/* Data update highlighting */
+@keyframes highlightUpdate {
+    0% { background-color: rgba(66, 153, 225, 0.2); }
+    100% { background-color: transparent; }
+}
+
+.highlight-update {
+    animation: highlightUpdate 1.5s ease-out;
+}
+
+/* Scroll indicator animation */
+.scroll-indicator {
+    width: 30px;
+    height: 50px;
+    border: 2px solid var(--text-secondary);
+    border-radius: 15px;
+    position: relative;
+    margin: 0 auto;
+}
+
+.scroll-indicator:after {
+    content: "";
+    width: 8px;
+    height: 8px;
+    background-color: var(--text-secondary);
+    border-radius: 50%;
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    animation: scrollAnim 1.5s infinite;
+}
+
+@keyframes scrollAnim {
+    0% { top: 10px; opacity: 1; }
+    100% { top: 30px; opacity: 0; }
+}
+
+/* Focus interactions for form controls */
+.focus-interaction {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.focus-interaction:focus {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.25);
+}
+
+/* Progress bar animation */
+.progress-bar {
+    transition: width 1s ease, background-color 1s ease;
+}
+
+/* Loading indicator */
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid rgba(66, 153, 225, 0.2);
+    border-top-color: var(--primary-color);
+    border-radius: 50%;
+    animation: rotate 1s linear infinite;
+    display: inline-block;
+}
+
+/* Data point hover tooltip */
+.data-tooltip {
+    position: relative;
+}
+
+.data-tooltip:before {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--border-radius);
+    background-color: var(--card-bg-color);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    white-space: nowrap;
+    box-shadow: var(--box-shadow);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s ease;
+    z-index: 100;
+}
+
+.data-tooltip:hover:before {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* Success checkmark animation */
+@keyframes checkmark {
+    0% { stroke-dashoffset: 100; }
+    100% { stroke-dashoffset: 0; }
+}
+
+.checkmark-animation {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    animation: checkmark 1s ease-in-out forwards;
+}
+
+/* Attention shake animation */
+@keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    50% { transform: translateX(5px); }
+    75% { transform: translateX(-5px); }
+    100% { transform: translateX(0); }
+}
+
+.shake-attention {
+    animation: shake 0.5s ease-in-out;
+}
+
+/* Dot pulse for loading states */
+@keyframes dotPulse {
+    0% { opacity: 0.4; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.2); }
+    100% { opacity: 0.4; transform: scale(1); }
+}
+
+.dot-pulse {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: currentColor;
+    margin: 0 3px;
+}
+
+.dot-pulse:nth-child(1) {
+    animation: dotPulse 1.5s infinite ease-in-out;
+}
+
+.dot-pulse:nth-child(2) {
+    animation: dotPulse 1.5s infinite ease-in-out 0.2s;
+}
+
+.dot-pulse:nth-child(3) {
+    animation: dotPulse 1.5s infinite ease-in-out 0.4s;
+}

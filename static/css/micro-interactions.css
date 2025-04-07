@@ -1,0 +1,412 @@
+/* Micro-interactions CSS */
+
+/* Ripple effect for buttons */
+.ripple {
+    position: relative;
+    overflow: hidden;
+    transform: translate3d(0, 0, 0);
+}
+
+.ripple:after {
+    content: "";
+    display: block;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
+    background-repeat: no-repeat;
+    background-position: 50%;
+    transform: scale(10, 10);
+    opacity: 0;
+    transition: transform .5s, opacity 1s;
+}
+
+.ripple:active:after {
+    transform: scale(0, 0);
+    opacity: .3;
+    transition: 0s;
+}
+
+/* Hover lift effect */
+.hover-lift {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Pulse attention animation */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+.pulse-attention {
+    animation: pulse 0.6s ease-in-out;
+}
+
+.pulse-on-load {
+    animation: pulse 1s ease-in-out;
+}
+
+/* Shake animation for buttons */
+@keyframes shake {
+    0% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    50% { transform: translateX(5px); }
+    75% { transform: translateX(-5px); }
+    100% { transform: translateX(0); }
+}
+
+.shake-attention {
+    animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+/* Focus interaction for form elements */
+.focus-interaction:focus {
+    box-shadow: 0 0 0 0.25rem rgba(66, 153, 225, 0.25);
+    border-color: #4299e1;
+    animation: pulse 0.5s ease-in-out;
+}
+
+/* Highlight update animation */
+@keyframes highlight {
+    0% { background-color: transparent; }
+    50% { background-color: rgba(66, 153, 225, 0.2); }
+    100% { background-color: transparent; }
+}
+
+.highlight-update {
+    animation: highlight 1.5s ease-in-out;
+}
+
+/* Fade in animation for elements */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.fade-in {
+    animation: fadeIn 1s ease-in-out forwards;
+}
+
+/* Staggered fade in for rows */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Animated markers */
+@keyframes fadeInMarker {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+.animated-marker {
+    animation: fadeInMarker 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Loading spinner */
+.loading-spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Dot pulse loading animation */
+.dot-pulse {
+    position: relative;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: currentColor;
+    margin: 0 2px;
+    opacity: 0.6;
+    animation: dotPulse 1.4s infinite ease-in-out;
+}
+
+.dot-pulse:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.dot-pulse:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes dotPulse {
+    0%, 100% {
+        opacity: 0.6;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+}
+
+/* Table hover rows */
+.table-hover-row tbody tr {
+    transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.table-hover-row tbody tr:hover {
+    background-color: rgba(66, 153, 225, 0.1);
+    transform: translateX(5px);
+}
+
+/* Data highlight effect */
+.data-highlight {
+    background-color: rgba(66, 153, 225, 0.1);
+    transition: background-color 0.3s ease;
+}
+
+/* Interactive tooltips */
+.data-tooltip {
+    position: relative;
+}
+
+.data-tooltip:hover:after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    z-index: 10;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+.data-tooltip:hover:before {
+    content: '';
+    position: absolute;
+    bottom: 110%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: rgba(0, 0, 0, 0.8);
+    z-index: 10;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+/* Trend change styling */
+.trend-change {
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.trend-up {
+    color: #38a169;
+}
+
+.trend-down {
+    color: #e53e3e;
+}
+
+.trend-neutral {
+    color: #718096;
+}
+
+/* Stat card interactive */
+.stat-card-interactive {
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.stat-card-interactive:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card-interactive:hover .stat-value {
+    color: #3182ce;
+}
+
+/* Interactive chart elements */
+.chart-element {
+    transition: filter 0.3s ease;
+}
+
+.chart-element:hover {
+    filter: brightness(1.05);
+}
+
+/* Property popup styling */
+.property-popup {
+    min-width: 200px;
+}
+
+.property-popup-header {
+    padding: 8px;
+    background-color: #4299e1;
+    color: white;
+    border-radius: 4px 4px 0 0;
+}
+
+.property-popup-body {
+    padding: 8px;
+}
+
+.property-detail {
+    display: flex;
+    margin-bottom: 4px;
+}
+
+.property-detail-label {
+    font-weight: 500;
+    margin-right: 5px;
+    color: #4a5568;
+}
+
+.property-popup-footer {
+    padding: 8px;
+    border-top: 1px solid #e2e8f0;
+    text-align: center;
+}
+
+/* Toast animations */
+@keyframes toastIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.toast {
+    animation: toastIn 0.3s ease-out forwards;
+}
+
+/* Animations for Map */
+.map-container {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.custom-marker {
+    transition: all 0.3s ease;
+}
+
+.custom-marker:hover {
+    transform: scale(1.5);
+    z-index: 1000;
+}
+
+/* Custom marker cluster animations */
+.marker-cluster {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.marker-cluster:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(66, 153, 225, 0.5);
+    z-index: 1000;
+}
+
+.marker-cluster div {
+    transition: background-color 0.3s ease;
+}
+
+.marker-cluster:hover div {
+    background-color: rgba(66, 153, 225, 0.9);
+}
+
+/* Slider interaction */
+.noUi-handle {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.noUi-handle:hover {
+    transform: scale(1.2);
+    box-shadow: 0 0 10px rgba(66, 153, 225, 0.5);
+}
+
+.noUi-connect {
+    transition: background-color 0.3s ease;
+}
+
+.noUi-target:hover .noUi-connect {
+    background-color: #3182ce;
+}
+
+/* Filter control animations */
+.filter-control {
+    transition: all 0.3s ease;
+}
+
+.filter-control:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Interactive nav links */
+.nav-link {
+    position: relative;
+    transition: color 0.3s ease;
+}
+
+.nav-link:after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background-color: #4299e1;
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+}
+
+.nav-link:hover:after,
+.nav-link.active:after {
+    width: 100%;
+}
+
+/* Navbar brand animation */
+.navbar-brand {
+    transition: all 0.3s ease;
+}
+
+.navbar-brand:hover {
+    transform: scale(1.05);
+}
