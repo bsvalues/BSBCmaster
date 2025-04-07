@@ -1012,3 +1012,202 @@ def visualization_property_locations():
                 "status": "error",
                 "message": f"Failed to generate property location data: {str(e)}"
             }), 500
+# Property Detail Routes
+@api_routes.route('/property/<account_id>')
+def property_detail(account_id):
+    """Render the property detail page for a specific account."""
+    try:
+        from app_setup import db
+        
+        # Get the property data
+        property_data = db.session.query(Account).filter(Account.account_id == account_id).first()
+        
+        if not property_data:
+            return render_template('error.html', title="Property Not Found", 
+                                   message=f"Property with Account ID {account_id} not found")
+        
+        # Get property images
+        images = db.session.query(PropertyImage).filter(PropertyImage.account_id == account_id).all()
+        
+        # Get similar properties (same property type and city, if available)
+        similar_properties = []
+        if property_data.property_type and property_data.property_city:
+            similar_query = db.session.query(Account).filter(
+                Account.property_type == property_data.property_type,
+                Account.property_city == property_data.property_city,
+                Account.account_id != account_id
+            ).order_by(func.random()).limit(3)
+            
+            similar_properties = similar_query.all()
+        
+        # Get neighborhood statistics
+        neighborhood_stats = None
+        if property_data.property_city:
+            from sqlalchemy import func, cast, Numeric
+            
+            # Calculate statistics for properties in the same city
+            stats_query = db.session.query(
+                func.count().label('property_count'),
+                func.avg(cast(Account.assessed_value, Numeric)).label('avg_value'),
+                func.min(cast(Account.assessed_value, Numeric)).label('min_value'),
+                func.max(cast(Account.assessed_value, Numeric)).label('max_value')
+            ).filter(
+                Account.property_city == property_data.property_city,
+                Account.assessed_value.isnot(None)
+            )
+            
+            stats = stats_query.first()
+            
+            # Calculate median value (simplistic approach)
+            all_values = db.session.query(Account.assessed_value).filter(
+                Account.property_city == property_data.property_city,
+                Account.assessed_value.isnot(None)
+            ).order_by(Account.assessed_value).all()
+            
+            median_value = 0
+            if all_values:
+                values = [float(val[0]) for val in all_values]
+                mid = len(values) // 2
+                median_value = values[mid] if len(values) % 2 != 0 else (values[mid-1] + values[mid]) / 2
+            
+            if stats:
+                neighborhood_stats = {
+                    'property_count': stats.property_count,
+                    'avg_value': float(stats.avg_value) if stats.avg_value else 0,
+                    'min_value': float(stats.min_value) if stats.min_value else 0,
+                    'max_value': float(stats.max_value) if stats.max_value else 0,
+                    'median_value': median_value
+                }
+        
+        # Get assessment history (simulated for now since we don't have historical data)
+        # In a real application, this would come from a dedicated table with assessment history
+        assessment_history = []
+        current_year = 2025  # Current assessment year
+        
+        if property_data.assessed_value and property_data.tax_amount:
+            # Create simulated assessment history for the last 3 years
+            current_value = float(property_data.assessed_value)
+            current_tax = float(property_data.tax_amount)
+            
+            assessment_history.append({
+                'year': current_year,
+                'assessed_value': current_value,
+                'tax_amount': current_tax,
+                'value_change_percent': 0.0  # No change for current year
+            })
+            
+            # Previous years with slight decreases (simulating historical data)
+            for i in range(1, 4):
+                # Calculate previous year's value with a random decrease between 2-6%
+                decrease_factor = 0.98 - (i * 0.01)  # 2%, 3%, 4% decrease by year
+                prev_value = current_value * decrease_factor
+                prev_tax = current_tax * decrease_factor
+                
+                assessment_history.append({
+                    'year': current_year - i,
+                    'assessed_value': prev_value,
+                    'tax_amount': prev_tax,
+                    'value_change_percent': (decrease_factor - 1) * 100  # Convert to percentage
+                })
+            
+            # Sort by year (newest first)
+            assessment_history.sort(key=lambda x: x['year'], reverse=True)
+        
+        return render_template('property_detail.html', 
+                             title=f"Property Details - {property_data.property_address}",
+                             property=property_data,
+                             images=images,
+                             similar_properties=similar_properties,
+                             neighborhood_stats=neighborhood_stats,
+                             assessment_history=assessment_history)
+                             
+    except Exception as e:
+        logger.error(f"Error loading property details: {str(e)}")
+        return render_template('error.html', title="Error", 
+                             message=f"Failed to load property details: {str(e)}")
+
+# Advanced Property Search Route
+@api_routes.route('/property-search')
+def property_search():
+    """Render the advanced property search page."""
+    from app_setup import db
+    
+    # Get property types for dropdown
+    property_types = db.session.query(Account.property_type).filter(
+        Account.property_type.isnot(None)
+    ).distinct().order_by(Account.property_type).all()
+    
+    # Get cities for dropdown
+    cities = db.session.query(Account.property_city).filter(
+        Account.property_city.isnot(None)
+    ).distinct().order_by(Account.property_city).all()
+    
+    # Get value ranges for filtering
+    from sqlalchemy import func
+    min_value = db.session.query(func.min(Account.assessed_value)).filter(
+        Account.assessed_value.isnot(None)
+    ).scalar()
+    
+    max_value = db.session.query(func.max(Account.assessed_value)).filter(
+        Account.assessed_value.isnot(None)
+    ).scalar()
+    
+    min_value = float(min_value) if min_value else 0
+    max_value = float(max_value) if max_value else 0
+    
+    # Initialize search results as empty
+    search_results = []
+    
+    # Check if search parameters are provided
+    property_type = request.args.get('property_type')
+    city = request.args.get('city')
+    min_price = request.args.get('min_price', type=float)
+    max_price = request.args.get('max_price', type=float)
+    owner_name = request.args.get('owner_name')
+    property_address = request.args.get('property_address')
+    
+    # Perform search if any parameter is provided
+    is_search = any([property_type, city, min_price, max_price, owner_name, property_address])
+    
+    if is_search:
+        # Build query
+        query = db.session.query(Account)
+        
+        # Apply filters
+        if property_type:
+            query = query.filter(Account.property_type == property_type)
+            
+        if city:
+            query = query.filter(Account.property_city == city)
+            
+        if min_price is not None:
+            query = query.filter(Account.assessed_value >= min_price)
+            
+        if max_price is not None:
+            query = query.filter(Account.assessed_value <= max_price)
+            
+        if owner_name:
+            query = query.filter(Account.owner_name.ilike(f'%{owner_name}%'))
+            
+        if property_address:
+            query = query.filter(Account.property_address.ilike(f'%{property_address}%'))
+            
+        # Execute query with limit
+        search_results = query.order_by(Account.property_address).limit(100).all()
+    
+    return render_template('property_search.html', 
+                         title="Property Search",
+                         property_types=[pt[0] for pt in property_types if pt[0]],
+                         cities=[c[0] for c in cities if c[0]],
+                         min_value=min_value,
+                         max_value=max_value,
+                         search_results=search_results,
+                         is_search=is_search,
+                         search_params={
+                             'property_type': property_type,
+                             'city': city,
+                             'min_price': min_price,
+                             'max_price': max_price,
+                             'owner_name': owner_name,
+                             'property_address': property_address
+                         })

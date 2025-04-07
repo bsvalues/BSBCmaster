@@ -1,0 +1,551 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block head %}
+<style>
+    .search-header {
+        background: linear-gradient(135deg, rgba(44, 82, 130, 0.05) 0%, rgba(44, 82, 130, 0.1) 100%);
+        border-radius: var(--border-radius-lg);
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+    
+    .search-form {
+        position: relative;
+    }
+    
+    .search-form .btn-search {
+        height: calc(3rem + 2px);
+    }
+    
+    .range-container {
+        padding: 0 10px;
+    }
+    
+    .property-card {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        height: 100%;
+    }
+    
+    .property-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--box-shadow-lg);
+    }
+    
+    .property-image {
+        height: 180px;
+        background-color: #f8f9fa;
+        background-size: cover;
+        background-position: center;
+        border-top-left-radius: calc(var(--border-radius) - 1px);
+        border-top-right-radius: calc(var(--border-radius) - 1px);
+    }
+    
+    .property-type-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: rgba(255, 255, 255, 0.9);
+        border-radius: 30px;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--primary-color);
+    }
+    
+    .property-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary-color);
+        margin-bottom: 0.5rem;
+    }
+    
+    .property-address {
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+    }
+    
+    .property-location {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        margin-bottom: 1rem;
+    }
+    
+    .filters-section {
+        background-color: var(--card-bg);
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .filter-title {
+        color: var(--text-primary);
+        font-weight: 600;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--card-border-color);
+    }
+    
+    /* Animation for search results */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .animate-fade-in {
+        animation: fadeInUp 0.5s ease forwards;
+    }
+    
+    /* Stagger animation delay for search results */
+    .search-results-list .col-lg-4:nth-child(1) { animation-delay: 0.1s; }
+    .search-results-list .col-lg-4:nth-child(2) { animation-delay: 0.2s; }
+    .search-results-list .col-lg-4:nth-child(3) { animation-delay: 0.3s; }
+    .search-results-list .col-lg-4:nth-child(4) { animation-delay: 0.4s; }
+    .search-results-list .col-lg-4:nth-child(5) { animation-delay: 0.5s; }
+    .search-results-list .col-lg-4:nth-child(6) { animation-delay: 0.6s; }
+    
+    /* Pagination styles */
+    .pagination-container {
+        margin-top: 2rem;
+    }
+    
+    .pagination .page-link {
+        color: var(--primary-color);
+        border-color: var(--card-border-color);
+    }
+    
+    .pagination .page-item.active .page-link {
+        background-color: var(--primary-color);
+        border-color: var(--primary-color);
+    }
+    
+    /* Range slider styling */
+    .noUi-connect {
+        background: var(--primary-color);
+    }
+    
+    .noUi-horizontal {
+        height: 8px;
+    }
+    
+    .noUi-horizontal .noUi-handle {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: var(--primary-color);
+        box-shadow: none;
+        cursor: pointer;
+        border: 2px solid #fff;
+        right: -10px;
+    }
+    
+    .noUi-handle:before,
+    .noUi-handle:after {
+        display: none;
+    }
+    
+    /* Filter accordion */
+    #filterAccordion .accordion-button {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+    
+    #filterAccordion .accordion-button:not(.collapsed) {
+        background-color: rgba(44, 82, 130, 0.05);
+        color: var(--primary-color);
+    }
+    
+    .filter-item {
+        margin-bottom: 1.5rem;
+    }
+    
+    .filter-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: var(--text-secondary);
+    }
+    
+    /* No results message */
+    .no-results {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-secondary);
+    }
+    
+    .no-results-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        color: var(--card-border-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Page Header -->
+    <div class="search-header mb-4">
+        <h1 class="mb-4">Property Search</h1>
+        <p class="lead mb-0">Search for Benton County properties by address, owner, property type, and value.</p>
+    </div>
+    
+    <!-- Main Content Area -->
+    <div class="row">
+        <!-- Filters Sidebar -->
+        <div class="col-lg-3 mb-4">
+            <div class="filters-section">
+                <h5 class="filter-title">Search Filters</h5>
+                
+                <form action="/property-search" method="get">
+                    <!-- Property Address -->
+                    <div class="filter-item">
+                        <div class="filter-label">Property Address</div>
+                        <input type="text" class="form-control" name="property_address" 
+                               placeholder="Enter street address"
+                               value="{{ search_params.property_address or '' }}">
+                    </div>
+                    
+                    <!-- Owner Name -->
+                    <div class="filter-item">
+                        <div class="filter-label">Owner Name</div>
+                        <input type="text" class="form-control" name="owner_name" 
+                               placeholder="Enter owner name"
+                               value="{{ search_params.owner_name or '' }}">
+                    </div>
+                    
+                    <!-- Property Type -->
+                    <div class="filter-item">
+                        <div class="filter-label">Property Type</div>
+                        <select class="form-select" name="property_type">
+                            <option value="">All Property Types</option>
+                            {% for type in property_types %}
+                            <option value="{{ type }}" {% if search_params.property_type == type %}selected{% endif %}>{{ type }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- City -->
+                    <div class="filter-item">
+                        <div class="filter-label">City</div>
+                        <select class="form-select" name="city">
+                            <option value="">All Cities</option>
+                            {% for city in cities %}
+                            <option value="{{ city }}" {% if search_params.city == city %}selected{% endif %}>{{ city }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Value Range -->
+                    <div class="filter-item">
+                        <div class="filter-label">Value Range</div>
+                        <div class="range-container mb-3">
+                            <div id="valueRange" class="mt-3 mb-3"></div>
+                            <div class="d-flex justify-content-between">
+                                <span id="valueMin" class="small text-muted">${{ '{:,.0f}'.format(min_value) }}</span>
+                                <span id="valueMax" class="small text-muted">${{ '{:,.0f}'.format(max_value) }}</span>
+                            </div>
+                        </div>
+                        <input type="hidden" id="minPriceInput" name="min_price" value="{{ search_params.min_price or min_value }}">
+                        <input type="hidden" id="maxPriceInput" name="max_price" value="{{ search_params.max_price or max_value }}">
+                    </div>
+                    
+                    <!-- Search Button -->
+                    <button type="submit" class="btn btn-primary w-100 ripple">
+                        <i class="fas fa-search me-2"></i> Search Properties
+                    </button>
+                </form>
+                
+                {% if is_search %}
+                <div class="mt-3">
+                    <a href="/property-search" class="btn btn-outline-secondary w-100 ripple">
+                        <i class="fas fa-times me-2"></i> Clear Filters
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Search Tips -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h6 class="card-title">Search Tips</h6>
+                    <ul class="small mb-0 ps-3">
+                        <li class="mb-2">Use partial addresses to find matching properties</li>
+                        <li class="mb-2">Narrow results by selecting property type and city</li>
+                        <li class="mb-2">Adjust the value slider to find properties in your budget</li>
+                        <li>Use owner name search to find all properties belonging to the same owner</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Search Results -->
+        <div class="col-lg-9">
+            {% if is_search %}
+                <!-- Search Results Count -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h5 class="mb-0">
+                        {% if search_results|length > 0 %}
+                            {{ search_results|length }} Properties Found
+                        {% else %}
+                            No Properties Found
+                        {% endif %}
+                    </h5>
+                    
+                    {% if search_results|length > 0 %}
+                    <div class="d-flex gap-2">
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="gridViewBtn" title="Grid View">
+                                <i class="fas fa-th-large"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="listViewBtn" title="List View">
+                                <i class="fas fa-list"></i>
+                            </button>
+                        </div>
+                        <select class="form-select form-select-sm" style="width: auto;">
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="price_high">Price: High to Low</option>
+                            <option value="price_low">Price: Low to High</option>
+                        </select>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                {% if search_results|length > 0 %}
+                <!-- Grid View of Properties -->
+                <div class="row search-results-list" id="gridView">
+                    {% for property in search_results %}
+                    <div class="col-lg-4 col-md-6 mb-4 animate-fade-in" style="opacity: 0;">
+                        <div class="card property-card h-100">
+                            <div class="property-image" style="background-image: url({{ url_for('static', filename='img/property-placeholder.jpg') }});">
+                                <div class="property-type-badge">{{ property.property_type or "Property" }}</div>
+                            </div>
+                            <div class="card-body">
+                                <div class="property-value">${{ '{:,.0f}'.format(property.assessed_value|float) if property.assessed_value else '0' }}</div>
+                                <div class="property-address">{{ property.property_address or "No Address" }}</div>
+                                <div class="property-location">
+                                    <i class="fas fa-map-marker-alt me-1"></i> {{ property.property_city or "Unknown Location" }}
+                                </div>
+                                <a href="/property/{{ property.account_id }}" class="btn btn-outline-primary w-100 ripple">View Property</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- List View of Properties (hidden by default) -->
+                <div class="card mb-4" id="listView" style="display: none;">
+                    <div class="list-group list-group-flush">
+                        {% for property in search_results %}
+                        <div class="list-group-item p-3 animate-fade-in" style="opacity: 0;">
+                            <div class="row align-items-center">
+                                <div class="col-lg-7">
+                                    <h5 class="mb-1">{{ property.property_address or "No Address" }}</h5>
+                                    <p class="text-muted mb-0">
+                                        <span class="badge bg-light text-primary me-2">{{ property.property_type or "Property" }}</span>
+                                        <i class="fas fa-map-marker-alt me-1"></i> {{ property.property_city or "Unknown Location" }}
+                                    </p>
+                                </div>
+                                <div class="col-lg-3">
+                                    <div class="fs-5 fw-bold text-primary">${{ '{:,.0f}'.format(property.assessed_value|float) if property.assessed_value else '0' }}</div>
+                                </div>
+                                <div class="col-lg-2 text-end">
+                                    <a href="/property/{{ property.account_id }}" class="btn btn-sm btn-outline-primary ripple">View Details</a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <!-- Pagination -->
+                <nav aria-label="Search results pages" class="pagination-container">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item disabled">
+                            <a class="page-link" href="#" tabindex="-1" aria-disabled="true">Previous</a>
+                        </li>
+                        <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                        <li class="page-item"><a class="page-link" href="#">2</a></li>
+                        <li class="page-item"><a class="page-link" href="#">3</a></li>
+                        <li class="page-item">
+                            <a class="page-link" href="#">Next</a>
+                        </li>
+                    </ul>
+                </nav>
+                {% else %}
+                <!-- No Results -->
+                <div class="card no-results">
+                    <div class="no-results-icon">
+                        <i class="fas fa-search"></i>
+                    </div>
+                    <h4>No Properties Found</h4>
+                    <p class="text-muted mb-4">Try adjusting your search criteria to find more properties.</p>
+                    <a href="/property-search" class="btn btn-outline-primary ripple">
+                        <i class="fas fa-redo me-2"></i> Reset Search
+                    </a>
+                </div>
+                {% endif %}
+            {% else %}
+                <!-- Initial State - No Search Performed -->
+                <div class="card mb-4">
+                    <div class="card-body text-center py-5">
+                        <div class="display-1 text-muted mb-4">
+                            <i class="fas fa-home"></i>
+                        </div>
+                        <h3 class="mb-3">Find Your Perfect Property</h3>
+                        <p class="lead text-muted mb-4">Use the search filters to the left to find properties in Benton County.</p>
+                        <div class="row justify-content-center">
+                            <div class="col-md-8">
+                                <div class="card mb-3">
+                                    <div class="card-body bg-light">
+                                        <h6 class="mb-2"><i class="fas fa-info-circle me-2"></i>Quick Search Examples</h6>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <a href="/property-search?property_type=Residential" class="d-block py-2">
+                                                    <i class="fas fa-home me-2 text-primary"></i>All Residential Properties
+                                                </a>
+                                                <a href="/property-search?city=Bentonville" class="d-block py-2">
+                                                    <i class="fas fa-city me-2 text-primary"></i>Properties in Bentonville
+                                                </a>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <a href="/property-search?property_type=Commercial" class="d-block py-2">
+                                                    <i class="fas fa-building me-2 text-primary"></i>Commercial Properties
+                                                </a>
+                                                <a href="/property-search?min_price=500000" class="d-block py-2">
+                                                    <i class="fas fa-dollar-sign me-2 text-primary"></i>Premium Properties ($500k+)
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Include noUiSlider for range slider -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@14.6.3/distribute/nouislider.min.css">
+<script src="https://cdn.jsdelivr.net/npm/nouislider@14.6.3/distribute/nouislider.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize range slider
+        const valueSlider = document.getElementById('valueRange');
+        
+        if (valueSlider) {
+            const minPrice = {{ min_value }};
+            const maxPrice = {{ max_value }};
+            const initialMinPrice = {{ search_params.min_price or min_value }};
+            const initialMaxPrice = {{ search_params.max_price or max_value }};
+            
+            noUiSlider.create(valueSlider, {
+                start: [initialMinPrice, initialMaxPrice],
+                connect: true,
+                step: 1000,
+                range: {
+                    'min': minPrice,
+                    'max': maxPrice
+                },
+                format: {
+                    to: function (value) {
+                        return Math.round(value);
+                    },
+                    from: function (value) {
+                        return Number(value);
+                    }
+                }
+            });
+            
+            const minPriceInput = document.getElementById('minPriceInput');
+            const maxPriceInput = document.getElementById('maxPriceInput');
+            const valueMinDisplay = document.getElementById('valueMin');
+            const valueMaxDisplay = document.getElementById('valueMax');
+            
+            valueSlider.noUiSlider.on('update', function (values, handle) {
+                const value = values[handle];
+                
+                if (handle === 0) {
+                    minPriceInput.value = value;
+                    valueMinDisplay.innerHTML = '$' + parseInt(value).toLocaleString();
+                } else {
+                    maxPriceInput.value = value;
+                    valueMaxDisplay.innerHTML = '$' + parseInt(value).toLocaleString();
+                }
+            });
+        }
+        
+        // Toggle between grid and list view
+        const gridViewBtn = document.getElementById('gridViewBtn');
+        const listViewBtn = document.getElementById('listViewBtn');
+        const gridView = document.getElementById('gridView');
+        const listView = document.getElementById('listView');
+        
+        if (gridViewBtn && listViewBtn) {
+            gridViewBtn.addEventListener('click', function() {
+                gridView.style.display = 'flex';
+                listView.style.display = 'none';
+                
+                gridViewBtn.classList.add('active');
+                listViewBtn.classList.remove('active');
+                
+                // Re-trigger animations
+                document.querySelectorAll('#gridView .animate-fade-in').forEach(el => {
+                    el.style.opacity = '0';
+                    setTimeout(() => {
+                        el.style.opacity = '1';
+                    }, 10);
+                });
+            });
+            
+            listViewBtn.addEventListener('click', function() {
+                gridView.style.display = 'none';
+                listView.style.display = 'block';
+                
+                gridViewBtn.classList.remove('active');
+                listViewBtn.classList.add('active');
+                
+                // Re-trigger animations
+                document.querySelectorAll('#listView .animate-fade-in').forEach(el => {
+                    el.style.opacity = '0';
+                    setTimeout(() => {
+                        el.style.opacity = '1';
+                    }, 10);
+                });
+            });
+        }
+        
+        // Initialize animation observer for search results
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, {
+            threshold: 0.1
+        });
+        
+        // Observe all animated elements
+        document.querySelectorAll('.animate-fade-in').forEach(el => {
+            observer.observe(el);
+        });
+    });
+</script>
+{% endblock %}
