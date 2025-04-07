@@ -1,0 +1,706 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block head %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- MarkerCluster CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<!-- Custom MarkerCluster CSS -->
+<link rel="stylesheet" href="/static/css/custom_marker_cluster.css" />
+<!-- Leaflet Heat CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet-heat@0.2.0/dist/leaflet-heat.min.css" />
+<!-- Range Slider CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css" />
+
+<style>
+    #map-container {
+        position: relative;
+        height: calc(100vh - 200px);
+        min-height: 500px;
+        border-radius: var(--border-radius-lg);
+        overflow: hidden;
+        box-shadow: var(--box-shadow);
+    }
+    
+    #property-map {
+        height: 100%;
+        width: 100%;
+        z-index: 1;
+    }
+    
+    .controls-container {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        background-color: var(--card-bg-color);
+        padding: 15px;
+        border-radius: var(--border-radius);
+        max-width: 300px;
+        box-shadow: var(--box-shadow);
+        opacity: 0.9;
+        transition: opacity 0.2s;
+    }
+    
+    .controls-container:hover {
+        opacity: 1;
+    }
+    
+    .filter-section {
+        margin-bottom: 15px;
+    }
+    
+    .filter-section h5 {
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+        color: var(--text-secondary);
+    }
+    
+    .filter-select {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    .toggle-control {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+    
+    /* Custom toggle switch */
+    .switch {
+        position: relative;
+        display: inline-block;
+        width: 46px;
+        height: 24px;
+    }
+    
+    .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    
+    .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #ccc;
+        transition: .4s;
+        border-radius: 34px;
+    }
+    
+    .slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+        background-color: var(--primary-color);
+    }
+    
+    input:focus + .slider {
+        box-shadow: 0 0 1px var(--primary-color);
+    }
+    
+    input:checked + .slider:before {
+        transform: translateX(22px);
+    }
+    
+    /* Legend */
+    .map-legend {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+        background-color: var(--card-bg-color);
+        padding: 12px;
+        border-radius: var(--border-radius);
+        max-width: 200px;
+        box-shadow: var(--box-shadow);
+        font-size: 0.85rem;
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    
+    .legend-color {
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        margin-right: 8px;
+    }
+    
+    /* Custom popup */
+    .leaflet-popup-content-wrapper {
+        background-color: var(--card-bg-color);
+        color: var(--text-primary);
+        border-radius: var(--border-radius);
+        padding: 0;
+        box-shadow: var(--box-shadow-lg);
+    }
+    
+    .leaflet-popup-content {
+        margin: 0;
+        width: 300px !important;
+    }
+    
+    .property-popup {
+        padding: 0;
+    }
+    
+    .property-popup-header {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 10px 15px;
+        border-top-left-radius: var(--border-radius);
+        border-top-right-radius: var(--border-radius);
+    }
+    
+    .property-popup-body {
+        padding: 15px;
+    }
+    
+    .property-popup-footer {
+        background-color: rgba(0,0,0,0.03);
+        padding: 10px 15px;
+        border-bottom-left-radius: var(--border-radius);
+        border-bottom-right-radius: var(--border-radius);
+    }
+    
+    .property-detail {
+        display: flex;
+        margin-bottom: 8px;
+    }
+    
+    .property-detail-label {
+        font-weight: 500;
+        width: 110px;
+        color: var(--text-secondary);
+    }
+    
+    .property-detail-value {
+        flex: 1;
+    }
+    
+    /* Animation for marker appearance */
+    @keyframes markerFadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animated-marker {
+        animation: markerFadeIn 0.4s ease-out forwards;
+    }
+    
+    /* Slider styling */
+    .noUi-connect {
+        background: var(--primary-color);
+    }
+    
+    .noUi-horizontal {
+        height: 8px;
+    }
+    
+    .noUi-handle {
+        border-radius: 50%;
+        background: var(--primary-color);
+        box-shadow: none;
+        border: 2px solid white;
+        width: 18px !important;
+        height: 18px !important;
+        top: -6px !important;
+        right: -9px !important;
+    }
+    
+    .noUi-handle:after, 
+    .noUi-handle:before {
+        display: none;
+    }
+    
+    .slider-values {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 8px;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12 mb-4">
+            <h1 class="mb-3">Property Map</h1>
+            <p class="lead">Explore property locations, values, and details with our interactive map.</p>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <div id="map-container">
+                <div id="property-map"></div>
+                
+                <!-- Map Controls -->
+                <div class="controls-container">
+                    <h5 class="mb-3">Map Controls</h5>
+                    
+                    <div class="filter-section">
+                        <h5>Property Type</h5>
+                        <select id="property-type-filter" class="form-select form-select-sm filter-select">
+                            <option value="all">All Property Types</option>
+                            <!-- Populated by JavaScript -->
+                        </select>
+                    </div>
+                    
+                    <div class="filter-section">
+                        <h5>City</h5>
+                        <select id="city-filter" class="form-select form-select-sm filter-select">
+                            <option value="all">All Cities</option>
+                            <!-- Populated by JavaScript -->
+                        </select>
+                    </div>
+                    
+                    <div class="filter-section">
+                        <h5>Property Value Range</h5>
+                        <div id="value-range-slider"></div>
+                        <div class="slider-values">
+                            <span id="min-value">$0</span>
+                            <span id="max-value">$1M</span>
+                        </div>
+                    </div>
+                    
+                    <div class="toggle-control">
+                        <span>Enable Clustering</span>
+                        <label class="switch">
+                            <input type="checkbox" id="clustering-toggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    
+                    <div class="toggle-control">
+                        <span>Show Heat Map</span>
+                        <label class="switch">
+                            <input type="checkbox" id="heatmap-toggle">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    
+                    <button id="reset-filters" class="btn btn-sm btn-outline-secondary w-100 mt-2">
+                        <i class="fas fa-undo me-1"></i> Reset Filters
+                    </button>
+                </div>
+                
+                <!-- Legend -->
+                <div class="map-legend">
+                    <h6 class="mb-2">Property Value</h6>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #2c5282;"></div>
+                        <span>$0 - $250K</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #3182ce;"></div>
+                        <span>$250K - $500K</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #4299e1;"></div>
+                        <span>$500K - $750K</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #63b3ed;"></div>
+                        <span>$750K+</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- MarkerCluster JS -->
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<!-- Leaflet Heat JS -->
+<script src="https://unpkg.com/leaflet-heat@0.2.0/dist/leaflet-heat.js"></script>
+<!-- Range Slider JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Map initialization
+        const map = L.map('property-map').setView([47.7511, -120.7401], 7);
+        
+        // Add tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Initialize marker clusters
+        const markers = L.markerClusterGroup({
+            showCoverageOnHover: false,
+            maxClusterRadius: 50,
+            iconCreateFunction: function(cluster) {
+                const childCount = cluster.getChildCount();
+                
+                // Calculate average property value
+                let totalValue = 0;
+                let count = 0;
+                
+                cluster.getAllChildMarkers().forEach(marker => {
+                    if (marker.propertyValue) {
+                        totalValue += marker.propertyValue;
+                        count++;
+                    }
+                });
+                
+                const avgValue = count > 0 ? totalValue / count : 0;
+                
+                // Determine class based on average value
+                let c = ' marker-cluster-';
+                if (avgValue < 250000) {
+                    c += 'small';
+                } else if (avgValue < 500000) {
+                    c += 'medium';
+                } else if (avgValue < 750000) {
+                    c += 'large';
+                } else {
+                    c += 'xlarge';
+                }
+                
+                return new L.DivIcon({
+                    html: '<div><span>' + childCount + '</span></div>',
+                    className: 'marker-cluster' + c,
+                    iconSize: new L.Point(40, 40)
+                });
+            }
+        });
+        
+        map.addLayer(markers);
+        
+        // Initialize heat map layer (hidden by default)
+        let heatLayer;
+        
+        // Fetch data for property types filter
+        fetch('/api/map/property-types')
+            .then(response => response.json())
+            .then(data => {
+                const propertyTypeSelect = document.getElementById('property-type-filter');
+                data.property_types.forEach(type => {
+                    const option = document.createElement('option');
+                    option.value = type;
+                    option.textContent = type;
+                    propertyTypeSelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error fetching property types:', error));
+        
+        // Fetch data for cities filter
+        fetch('/api/map/cities')
+            .then(response => response.json())
+            .then(data => {
+                const citySelect = document.getElementById('city-filter');
+                data.cities.forEach(city => {
+                    const option = document.createElement('option');
+                    option.value = city;
+                    option.textContent = city;
+                    citySelect.appendChild(option);
+                });
+            })
+            .catch(error => console.error('Error fetching cities:', error));
+        
+        // Initialize the value range slider
+        fetch('/api/map/value-ranges')
+            .then(response => response.json())
+            .then(data => {
+                const minValue = data.min_value || 0;
+                const maxValue = data.max_value || 1000000;
+                
+                const valueSlider = document.getElementById('value-range-slider');
+                const sliderOptions = {
+                    start: [minValue, maxValue],
+                    connect: true,
+                    range: {
+                        'min': minValue,
+                        'max': maxValue
+                    },
+                    step: 10000,
+                    format: {
+                        to: function(value) {
+                            return Math.round(value);
+                        },
+                        from: function(value) {
+                            return Math.round(value);
+                        }
+                    }
+                };
+                
+                noUiSlider.create(valueSlider, sliderOptions);
+                
+                // Update value display and filter map
+                valueSlider.noUiSlider.on('update', function(values, handle) {
+                    const minValueDisplay = document.getElementById('min-value');
+                    const maxValueDisplay = document.getElementById('max-value');
+                    
+                    minValueDisplay.textContent = formatCurrency(values[0]);
+                    maxValueDisplay.textContent = formatCurrency(values[1]);
+                    
+                    loadMapData();
+                });
+                
+                // Display initial values
+                document.getElementById('min-value').textContent = formatCurrency(minValue);
+                document.getElementById('max-value').textContent = formatCurrency(maxValue);
+            })
+            .catch(error => console.error('Error fetching value ranges:', error));
+        
+        // Function to format currency values
+        function formatCurrency(value) {
+            value = parseInt(value);
+            if (value >= 1000000) {
+                return '$' + (value / 1000000).toFixed(1) + 'M';
+            } else if (value >= 1000) {
+                return '$' + (value / 1000).toFixed(0) + 'K';
+            } else {
+                return '$' + value;
+            }
+        }
+        
+        // Create a custom marker icon based on property value
+        function createMarkerIcon(propertyValue) {
+            let markerColor;
+            
+            if (propertyValue < 250000) {
+                markerColor = "#2c5282"; // Dark blue
+            } else if (propertyValue < 500000) {
+                markerColor = "#3182ce"; // Medium blue
+            } else if (propertyValue < 750000) {
+                markerColor = "#4299e1"; // Light blue
+            } else {
+                markerColor = "#63b3ed"; // Very light blue
+            }
+            
+            return L.divIcon({
+                className: 'custom-marker animated-marker',
+                html: `<div style="background-color: ${markerColor}; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3);"></div>`,
+                iconSize: [12, 12],
+                iconAnchor: [6, 6]
+            });
+        }
+        
+        // Create property popup content
+        function createPopupContent(property) {
+            return `
+                <div class="property-popup">
+                    <div class="property-popup-header">
+                        <h6 class="mb-0">${property.address || 'Property #' + property.id}</h6>
+                    </div>
+                    <div class="property-popup-body">
+                        <div class="property-detail">
+                            <div class="property-detail-label">Parcel ID:</div>
+                            <div class="property-detail-value">${property.parcel_id || 'N/A'}</div>
+                        </div>
+                        <div class="property-detail">
+                            <div class="property-detail-label">Property Type:</div>
+                            <div class="property-detail-value">${property.property_type || 'N/A'}</div>
+                        </div>
+                        <div class="property-detail">
+                            <div class="property-detail-label">Location:</div>
+                            <div class="property-detail-value">${property.city || 'N/A'}, ${property.state || 'N/A'}</div>
+                        </div>
+                        <div class="property-detail">
+                            <div class="property-detail-label">Assessed Value:</div>
+                            <div class="property-detail-value">${formatCurrency(property.total_value) || 'N/A'}</div>
+                        </div>
+                    </div>
+                    <div class="property-popup-footer">
+                        <a href="#" class="btn btn-sm btn-outline-primary" onclick="viewPropertyDetails(${property.id})">
+                            <i class="fas fa-info-circle me-1"></i> View Details
+                        </a>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Function to view property details (placeholder)
+        window.viewPropertyDetails = function(propertyId) {
+            alert('Property details viewer would open for property #' + propertyId);
+            // In a real implementation, this could open a modal or navigate to a details page
+        };
+        
+        // Function to load and filter map data
+        function loadMapData() {
+            // Get filter values
+            const propertyType = document.getElementById('property-type-filter').value;
+            const city = document.getElementById('city-filter').value;
+            let valueRange = [0, 10000000]; // Default range
+            
+            // Get value range if slider is initialized
+            const valueSlider = document.getElementById('value-range-slider').noUiSlider;
+            if (valueSlider) {
+                valueRange = valueSlider.get().map(Number);
+            }
+            
+            // Clear existing markers
+            markers.clearLayers();
+            
+            // Remove heat map if it exists
+            if (heatLayer && map.hasLayer(heatLayer)) {
+                map.removeLayer(heatLayer);
+            }
+            
+            // Fetch and filter properties
+            fetch('/api/map/data')
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.properties || data.properties.length === 0) {
+                        console.log('No property data available');
+                        return;
+                    }
+                    
+                    // Filter properties based on selection
+                    const filteredProperties = data.properties.filter(property => {
+                        const matchesType = propertyType === 'all' || property.property_type === propertyType;
+                        const matchesCity = city === 'all' || property.city === city;
+                        const matchesValue = property.total_value >= valueRange[0] && 
+                                            property.total_value <= valueRange[1];
+                        
+                        return matchesType && matchesCity && matchesValue;
+                    });
+                    
+                    // Heat map data preparation
+                    const heatData = [];
+                    
+                    // Add markers for filtered properties
+                    filteredProperties.forEach(property => {
+                        // Skip if no location data
+                        if (!property.latitude || !property.longitude) return;
+                        
+                        // Create marker
+                        const marker = L.marker([property.latitude, property.longitude], {
+                            icon: createMarkerIcon(property.total_value)
+                        });
+                        
+                        // Store property value for cluster calculations
+                        marker.propertyValue = property.total_value;
+                        
+                        // Add popup
+                        marker.bindPopup(createPopupContent(property));
+                        
+                        // Add to cluster layer
+                        markers.addLayer(marker);
+                        
+                        // Add to heat map data
+                        heatData.push([
+                            property.latitude, 
+                            property.longitude, 
+                            property.total_value / 1000000 // Scale down values for better heat map
+                        ]);
+                    });
+                    
+                    // Create heat map with the filtered data
+                    heatLayer = L.heatLayer(heatData, {
+                        radius: 25,
+                        blur: 15,
+                        maxZoom: 13,
+                        gradient: {
+                            0.0: '#63b3ed',
+                            0.5: '#3182ce',
+                            1.0: '#2c5282'
+                        }
+                    });
+                    
+                    // Show heat map if toggle is checked
+                    if (document.getElementById('heatmap-toggle').checked) {
+                        map.addLayer(heatLayer);
+                    }
+                    
+                    // If we have properties but none match the filter
+                    if (data.properties.length > 0 && filteredProperties.length === 0) {
+                        alert('No properties match the current filters. Try adjusting your criteria.');
+                    }
+                    
+                    // Fit bounds if we have filtered properties
+                    if (filteredProperties.length > 0) {
+                        const bounds = L.latLngBounds(filteredProperties.map(p => [p.latitude, p.longitude]));
+                        map.fitBounds(bounds, { padding: [50, 50] });
+                    }
+                })
+                .catch(error => console.error('Error loading map data:', error));
+        }
+        
+        // Event listeners for filters
+        document.getElementById('property-type-filter').addEventListener('change', loadMapData);
+        document.getElementById('city-filter').addEventListener('change', loadMapData);
+        
+        // Toggle clustering
+        document.getElementById('clustering-toggle').addEventListener('change', function(e) {
+            if (e.target.checked) {
+                // Re-enable clustering by reloading data
+                loadMapData();
+            } else {
+                // Disable clustering by adding markers directly to map
+                const allMarkers = [];
+                markers.eachLayer(function(layer) {
+                    allMarkers.push(layer);
+                });
+                
+                markers.clearLayers();
+                map.removeLayer(markers);
+                
+                allMarkers.forEach(function(marker) {
+                    map.addLayer(marker);
+                });
+            }
+        });
+        
+        // Toggle heat map
+        document.getElementById('heatmap-toggle').addEventListener('change', function(e) {
+            if (e.target.checked && heatLayer) {
+                map.addLayer(heatLayer);
+            } else if (heatLayer) {
+                map.removeLayer(heatLayer);
+            }
+        });
+        
+        // Reset filters
+        document.getElementById('reset-filters').addEventListener('click', function() {
+            document.getElementById('property-type-filter').value = 'all';
+            document.getElementById('city-filter').value = 'all';
+            
+            const valueSlider = document.getElementById('value-range-slider').noUiSlider;
+            if (valueSlider) {
+                valueSlider.reset();
+            }
+            
+            document.getElementById('clustering-toggle').checked = true;
+            document.getElementById('heatmap-toggle').checked = false;
+            
+            loadMapData();
+        });
+        
+        // Initial load
+        loadMapData();
+    });
+</script>
+{% endblock %}

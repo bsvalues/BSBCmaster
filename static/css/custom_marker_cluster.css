@@ -1,104 +1,96 @@
-/* Custom Marker Cluster Styling */
-
-.cluster-icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: rgba(44, 82, 130, 0.8);
-    border: 2px solid rgba(255, 255, 255, 0.8);
-    color: white;
-    border-radius: 50%;
-    text-align: center;
-    transition: all 0.2s ease;
-}
-
-.cluster-icon.small {
-    width: 30px;
-    height: 30px;
-    font-size: 12px;
-}
-
-.cluster-icon.medium {
-    width: 40px;
-    height: 40px;
-    font-size: 14px;
-}
-
-.cluster-icon.large {
-    width: 50px;
-    height: 50px;
-    font-size: 16px;
-}
-
-.cluster-icon:hover {
-    transform: scale(1.1);
-    background-color: rgba(49, 130, 206, 0.9);
-    box-shadow: 0 0 0 4px rgba(49, 130, 206, 0.3);
-}
-
-/* Animation for the marker clusters */
-@keyframes pulse {
-    0% {
-        transform: scale(1);
-        opacity: 1;
-    }
-    50% {
-        transform: scale(1.1);
-        opacity: 0.8;
-    }
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
-}
-
-.marker-cluster-small {
-    background-color: rgba(66, 153, 225, 0.6);
-}
-
-.marker-cluster-small div {
-    background-color: rgba(49, 130, 206, 0.8);
-}
-
-.marker-cluster-medium {
-    background-color: rgba(66, 153, 225, 0.7);
-}
-
-.marker-cluster-medium div {
-    background-color: rgba(49, 130, 206, 0.85);
-}
-
-.marker-cluster-large {
-    background-color: rgba(66, 153, 225, 0.8);
-}
-
-.marker-cluster-large div {
-    background-color: rgba(49, 130, 206, 0.9);
-}
-
+/* Custom styling for marker clusters */
 .marker-cluster {
-    border-radius: 50% !important;
-    border: 2px solid white;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-    transition: all 0.2s ease;
+    background-clip: padding-box;
+    border-radius: 20px;
+    background-color: rgba(44, 82, 130, 0.6);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
 }
 
 .marker-cluster:hover {
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+    transform: scale(1.1);
 }
 
 .marker-cluster div {
-    border-radius: 50% !important;
-    width: 85% !important;
-    height: 85% !important;
-    margin: 3px 0 0 3px !important;
+    width: 34px;
+    height: 34px;
+    margin-left: 3px;
+    margin-top: 3px;
     text-align: center;
-    font-family: 'Inter', sans-serif;
+    border-radius: 17px;
+    font-size: 13px;
     font-weight: 600;
-    font-size: 12px;
-    color: white;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    background-color: rgba(44, 82, 130, 0.9);
 }
 
-.marker-cluster span {
-    line-height: 28px;
+/* Different size clusters */
+.marker-cluster-small {
+    background-color: rgba(44, 82, 130, 0.7);
+}
+
+.marker-cluster-small div {
+    background-color: rgba(44, 82, 130, 0.9);
+}
+
+.marker-cluster-medium {
+    background-color: rgba(49, 130, 206, 0.7);
+}
+
+.marker-cluster-medium div {
+    background-color: rgba(49, 130, 206, 0.9);
+}
+
+.marker-cluster-large {
+    background-color: rgba(66, 153, 225, 0.7);
+}
+
+.marker-cluster-large div {
+    background-color: rgba(66, 153, 225, 0.9);
+}
+
+.marker-cluster-xlarge {
+    background-color: rgba(99, 179, 237, 0.7);
+}
+
+.marker-cluster-xlarge div {
+    background-color: rgba(99, 179, 237, 0.9);
+}
+
+/* Animation for cluster */
+@keyframes clusterFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.marker-cluster {
+    animation: clusterFadeIn 0.3s ease-out forwards;
+}
+
+/* Custom marker styling */
+.custom-marker {
+    transition: transform 0.3s ease;
+}
+
+.custom-marker:hover {
+    transform: scale(1.5);
+    z-index: 1000 !important;
+}
+
+.leaflet-marker-icon {
+    transition: transform 0.3s ease;
+}
+
+.leaflet-marker-icon:hover {
+    z-index: 1000 !important;
 }

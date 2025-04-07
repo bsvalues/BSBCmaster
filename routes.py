@@ -24,8 +24,8 @@ api_routes = Blueprint('api_routes', __name__)
 
 @api_routes.route('/')
 def index():
-    """Render the index page with API documentation."""
-    return render_template('index.html', title="MCP Assessor Agent API")
+    """Render the index page with minimalist design."""
+    return render_template('index_minimal.html', title="Benton County Assessor")
 
 @api_routes.route('/api-docs')
 def api_docs():
@@ -913,8 +913,8 @@ def visualization_value_trends():
 # Statistics routes
 @api_routes.route('/statistics-dashboard')
 def statistics_dashboard():
-    """Render the property statistics dashboard page."""
-    return render_template('statistics_dashboard.html', title="Property Statistics Dashboard")
+    """Render the property statistics dashboard page with minimalist design."""
+    return render_template('statistics_dashboard_minimal.html', title="Property Statistics")
 
 @api_routes.route('/api/statistics')
 def statistics_data():
@@ -924,8 +924,8 @@ def statistics_data():
 # Map visualization routes
 @api_routes.route('/map')
 def map_view():
-    """Render the property map visualization page."""
-    return render_template('map_view.html', title="Property Map Visualization")
+    """Render the property map visualization page with minimalist design."""
+    return render_template('map_view_minimal.html', title="Property Map")
 
 @api_routes.route('/api/map/data')
 def api_map_data():
