@@ -37,7 +37,7 @@ PROPERTY_CACHE = {
 
 def get_db_connection():
     """Get a database connection from the Flask application context."""
-    from main import db
+    from app_setup import db
     return db.session
 
 def get_cities_list() -> List[str]:

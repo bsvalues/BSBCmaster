@@ -5,7 +5,8 @@ It allows running the FastAPI application with Gunicorn and uvicorn workers.
 
 import os
 import logging
-from app import app as fastapi_app
+import sys
+from app.__init__ import app as fastapi_app
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
