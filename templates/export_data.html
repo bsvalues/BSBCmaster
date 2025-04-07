@@ -1,0 +1,437 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block head %}
+<style>
+    .export-section {
+        margin-bottom: 2rem;
+    }
+    
+    .export-card {
+        height: 100%;
+        transition: transform 0.3s ease;
+    }
+    
+    .export-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .api-url {
+        font-family: monospace;
+        background-color: rgba(0, 0, 0, 0.05);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+    
+    .tab-pane {
+        padding-top: 1.5rem;
+    }
+    
+    .export-icon {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+        color: var(--primary-color);
+    }
+    
+    .status-message {
+        display: none;
+        margin-top: 1rem;
+        padding: 0.75rem;
+        border-radius: 0.25rem;
+    }
+    
+    .status-message.success {
+        background-color: rgba(40, 167, 69, 0.1);
+        border: 1px solid rgba(40, 167, 69, 0.2);
+        color: #28a745;
+    }
+    
+    .status-message.error {
+        background-color: rgba(220, 53, 69, 0.1);
+        border: 1px solid rgba(220, 53, 69, 0.2);
+        color: #dc3545;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .animated {
+        animation: fadeIn 0.6s ease-out forwards;
+    }
+    
+    .animated-delay-1 {
+        animation-delay: 0.2s;
+        opacity: 0;
+    }
+    
+    .animated-delay-2 {
+        animation-delay: 0.4s;
+        opacity: 0;
+    }
+    
+    .animated-delay-3 {
+        animation-delay: 0.6s;
+        opacity: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <h1 class="animated">Export Property Data</h1>
+            <p class="lead animated animated-delay-1">
+                Export property assessment data in various formats for analysis and reporting.
+            </p>
+        </div>
+    </div>
+    
+    <!-- Export Options Tabs -->
+    <ul class="nav nav-tabs mb-4 animated animated-delay-1" id="exportTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="accounts-tab" data-bs-toggle="tab" data-bs-target="#accounts-pane" type="button" role="tab">
+                <i class="fas fa-user me-2"></i>Accounts
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="improvements-tab" data-bs-toggle="tab" data-bs-target="#improvements-pane" type="button" role="tab">
+                <i class="fas fa-home me-2"></i>Improvements
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="images-tab" data-bs-toggle="tab" data-bs-target="#images-pane" type="button" role="tab">
+                <i class="fas fa-image me-2"></i>Property Images
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="combined-tab" data-bs-toggle="tab" data-bs-target="#combined-pane" type="button" role="tab">
+                <i class="fas fa-table me-2"></i>Combined Data
+            </button>
+        </li>
+    </ul>
+    
+    <div class="tab-content" id="exportTabsContent">
+        <!-- Accounts Export Panel -->
+        <div class="tab-pane fade show active animated animated-delay-2" id="accounts-pane" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Export Account Data</h5>
+                </div>
+                <div class="card-body">
+                    <p>Export property account data including owner information, property addresses, and assessment values.</p>
+                    
+                    <form id="accounts-export-form">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="accounts-limit" class="form-label">Maximum Records</label>
+                                <input type="number" class="form-control" id="accounts-limit" name="limit" value="1000" min="1" max="10000">
+                                <div class="form-text">Maximum number of records to export (1-10,000)</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label">Export Format</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="accounts-format" id="accounts-csv" value="csv" checked>
+                                    <label class="form-check-label" for="accounts-csv">CSV</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="accounts-format" id="accounts-excel" value="excel">
+                                    <label class="form-check-label" for="accounts-excel">Excel</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex">
+                            <button type="button" class="btn btn-primary" onclick="exportAccounts()">
+                                <i class="fas fa-download me-2"></i>Export Accounts
+                            </button>
+                            <div id="accounts-status" class="status-message ms-3"></div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Improvements Export Panel -->
+        <div class="tab-pane fade animated animated-delay-2" id="improvements-pane" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Export Improvement Data</h5>
+                </div>
+                <div class="card-body">
+                    <p>Export property improvement data including structures, building details, and improvement values.</p>
+                    
+                    <form id="improvements-export-form">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="improvements-limit" class="form-label">Maximum Records</label>
+                                <input type="number" class="form-control" id="improvements-limit" name="limit" value="1000" min="1" max="10000">
+                                <div class="form-text">Maximum number of records to export (1-10,000)</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label">Export Format</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="improvements-format" id="improvements-csv" value="csv" checked>
+                                    <label class="form-check-label" for="improvements-csv">CSV</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="improvements-format" id="improvements-excel" value="excel">
+                                    <label class="form-check-label" for="improvements-excel">Excel</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex">
+                            <button type="button" class="btn btn-primary" onclick="exportImprovements()">
+                                <i class="fas fa-download me-2"></i>Export Improvements
+                            </button>
+                            <div id="improvements-status" class="status-message ms-3"></div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Property Images Export Panel -->
+        <div class="tab-pane fade animated animated-delay-2" id="images-pane" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Export Property Image Data</h5>
+                </div>
+                <div class="card-body">
+                    <p>Export property image metadata including image URLs, types, and dimensions.</p>
+                    
+                    <form id="images-export-form">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="images-limit" class="form-label">Maximum Records</label>
+                                <input type="number" class="form-control" id="images-limit" name="limit" value="1000" min="1" max="10000">
+                                <div class="form-text">Maximum number of records to export (1-10,000)</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label">Export Format</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="images-format" id="images-csv" value="csv" checked>
+                                    <label class="form-check-label" for="images-csv">CSV</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="images-format" id="images-excel" value="excel">
+                                    <label class="form-check-label" for="images-excel">Excel</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex">
+                            <button type="button" class="btn btn-primary" onclick="exportImages()">
+                                <i class="fas fa-download me-2"></i>Export Image Data
+                            </button>
+                            <div id="images-status" class="status-message ms-3"></div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Combined Data Export Panel -->
+        <div class="tab-pane fade animated animated-delay-2" id="combined-pane" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Export Combined Data</h5>
+                </div>
+                <div class="card-body">
+                    <p>Export combined data from multiple tables with account data as the base.</p>
+                    
+                    <form id="combined-export-form">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="combined-limit" class="form-label">Maximum Records</label>
+                                <input type="number" class="form-control" id="combined-limit" name="limit" value="1000" min="1" max="10000">
+                                <div class="form-text">Maximum number of records to export (1-10,000)</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label">Export Format</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="combined-format" id="combined-excel" value="excel" checked>
+                                    <label class="form-check-label" for="combined-excel">Excel (recommended for combined data)</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="combined-format" id="combined-csv" value="csv">
+                                    <label class="form-check-label" for="combined-csv">CSV</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex">
+                            <button type="button" class="btn btn-primary" onclick="exportCombined()">
+                                <i class="fas fa-download me-2"></i>Export Combined Data
+                            </button>
+                            <div id="combined-status" class="status-message ms-3"></div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- API Export Documentation -->
+    <div class="card mt-5 animated animated-delay-3">
+        <div class="card-header">
+            <h5 class="mb-0">API Export Options</h5>
+        </div>
+        <div class="card-body">
+            <p>For programmatic access, the following API endpoints are available for data export:</p>
+            
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Data Type</th>
+                            <th>Endpoint</th>
+                            <th>Parameters</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Accounts</td>
+                            <td><span class="api-url">/api/export/accounts/{format}</span></td>
+                            <td><code>limit</code> (optional, default: 1000)</td>
+                        </tr>
+                        <tr>
+                            <td>Improvements</td>
+                            <td><span class="api-url">/api/export/improvements/{format}</span></td>
+                            <td><code>limit</code> (optional, default: 1000)</td>
+                        </tr>
+                        <tr>
+                            <td>Property Images</td>
+                            <td><span class="api-url">/api/export/property-images/{format}</span></td>
+                            <td><code>limit</code> (optional, default: 1000)</td>
+                        </tr>
+                        <tr>
+                            <td>Combined Data</td>
+                            <td><span class="api-url">/api/export/combined/{format}</span></td>
+                            <td><code>limit</code> (optional, default: 1000)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <p class="mt-3">
+                <strong>Format:</strong> Replace <code>{format}</code> with either <code>csv</code> or <code>excel</code>.
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function showStatus(elementId, message, isSuccess) {
+        const statusEl = document.getElementById(elementId);
+        statusEl.textContent = message;
+        statusEl.style.display = 'block';
+        
+        if (isSuccess) {
+            statusEl.classList.add('success');
+            statusEl.classList.remove('error');
+        } else {
+            statusEl.classList.add('error');
+            statusEl.classList.remove('success');
+        }
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            statusEl.style.display = 'none';
+        }, 5000);
+    }
+    
+    function exportAccounts() {
+        const limit = document.getElementById('accounts-limit').value;
+        const format = document.querySelector('input[name="accounts-format"]:checked').value;
+        
+        // Show loading status
+        showStatus('accounts-status', 'Preparing export...', true);
+        
+        // Redirect to export endpoint
+        window.location.href = `/api/export/accounts/${format}?limit=${limit}`;
+    }
+    
+    function exportImprovements() {
+        const limit = document.getElementById('improvements-limit').value;
+        const format = document.querySelector('input[name="improvements-format"]:checked').value;
+        
+        // Show loading status
+        showStatus('improvements-status', 'Preparing export...', true);
+        
+        // Redirect to export endpoint
+        window.location.href = `/api/export/improvements/${format}?limit=${limit}`;
+    }
+    
+    function exportImages() {
+        const limit = document.getElementById('images-limit').value;
+        const format = document.querySelector('input[name="images-format"]:checked').value;
+        
+        // Show loading status
+        showStatus('images-status', 'Preparing export...', true);
+        
+        // Redirect to export endpoint
+        window.location.href = `/api/export/property-images/${format}?limit=${limit}`;
+    }
+    
+    function exportCombined() {
+        const limit = document.getElementById('combined-limit').value;
+        const format = document.querySelector('input[name="combined-format"]:checked').value;
+        
+        // Show loading status
+        showStatus('combined-status', 'Preparing combined export...', true);
+        
+        // Redirect to export endpoint
+        window.location.href = `/api/export/combined/${format}?limit=${limit}`;
+    }
+    
+    // Add input validation
+    document.querySelectorAll('input[type="number"]').forEach(input => {
+        input.addEventListener('change', function() {
+            const min = parseInt(this.min) || 1;
+            const max = parseInt(this.max) || 10000;
+            
+            if (parseInt(this.value) < min) {
+                this.value = min;
+            } else if (parseInt(this.value) > max) {
+                this.value = max;
+            }
+        });
+    });
+    
+    // Initialize tabs with animation
+    document.addEventListener('DOMContentLoaded', function() {
+        const tabTriggers = document.querySelectorAll('[data-bs-toggle="tab"]');
+        
+        tabTriggers.forEach(trigger => {
+            trigger.addEventListener('shown.bs.tab', function (event) {
+                const targetId = event.target.getAttribute('data-bs-target');
+                const targetPane = document.querySelector(targetId);
+                
+                // Add animation classes
+                targetPane.classList.add('animated');
+                targetPane.style.animationDelay = '0.1s';
+            });
+        });
+    });
+</script>
+{% endblock %}

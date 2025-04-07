@@ -27,6 +27,11 @@ def index():
     """Render the index page with minimalist design."""
     return render_template('index_minimal.html', title="Benton County Assessor")
 
+@api_routes.route('/export-data')
+def export_data_page():
+    """Render the data export page."""
+    return render_template('export_data.html', title="Export Property Data")
+
 @api_routes.route('/api-docs')
 def api_docs():
     """Proxy to FastAPI OpenAPI documentation."""
