@@ -115,8 +115,8 @@ def property_to_geojson(account: Account) -> Dict[str, Any]:
         "properties": {
             "account_id": account.id,
             "property_type": account.property_type,
-            "property_address": account.address,
-            "property_city": account.city,
+            "property_address": account.property_address,
+            "property_city": account.property_city,
             "owner_name": account.owner_name,
             "legal_description": account.legal_description,
             "assessed_value": account.assessed_value,
