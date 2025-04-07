@@ -24,11 +24,10 @@ PROPERTY_TYPE_BASE_VALUES = {
     'Industrial': 750000
 }
 
-# City value multipliers (relative to base value)
+# City value multipliers (relative to base value) - Benton County only
 CITY_MULTIPLIERS = {
     'Richland': 1.2,
     'Kennewick': 1.0,
-    'Pasco': 0.9,
     'West Richland': 1.1,
     'Benton City': 0.8,
     'Prosser': 0.85

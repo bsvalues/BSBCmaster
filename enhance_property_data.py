@@ -22,11 +22,10 @@ PROPERTY_TYPES = [
     "Industrial"
 ]
 
-# City names in Benton County area
+# City names in Benton County area (Pasco is in Franklin County)
 CITY_NAMES = [
     "Richland", 
     "Kennewick", 
-    "Pasco", 
     "West Richland", 
     "Benton City", 
     "Prosser"
@@ -39,7 +38,7 @@ def get_random_property_type():
 
 def get_random_city():
     """Get a random city with weighted distribution."""
-    weights = [0.5, 0.2, 0.15, 0.1, 0.03, 0.02]  # 50% Richland, 20% Kennewick, etc.
+    weights = [0.5, 0.25, 0.15, 0.05, 0.05]  # 50% Richland, 25% Kennewick, etc.
     return random.choices(CITY_NAMES, weights=weights, k=1)[0]
 
 def enhance_account_data():

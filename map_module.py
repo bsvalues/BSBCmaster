@@ -240,8 +240,9 @@ def get_cities():
             })
         except Exception as e:
             logger.error(f"Error fetching cities: {str(e)}")
+            # Only include cities in Benton County (Pasco is in Franklin County)
             return jsonify({
-                "cities": ["Richland", "Kennewick", "Pasco", "West Richland", "Prosser"]
+                "cities": ["Richland", "Kennewick", "West Richland", "Prosser", "Benton City"]
             })
 
 def get_property_images_for_map(account_id):
