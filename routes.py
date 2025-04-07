@@ -930,7 +930,7 @@ def statistics_data():
 @api_routes.route('/map')
 def map_view():
     """Render the property map visualization page with minimalist design."""
-    return render_template('map_view_minimal.html', title="Property Map")
+    return render_template('map_view_fixed.html', title="Property Map")
 
 @api_routes.route('/api/map/data')
 def api_map_data():

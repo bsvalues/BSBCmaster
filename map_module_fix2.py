@@ -14,7 +14,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from flask import jsonify
 import sqlalchemy as sa
 from sqlalchemy.engine import Engine
-from sqlalchemy.ext.declarative import DeclarativeBase
+from sqlalchemy.orm import declarative_base  # Import the correct base
 
 # Use relative import to work with both main.py and run_app.py entry points
 from app_setup import engine, Base

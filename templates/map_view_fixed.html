@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Map</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lexend:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <!-- Leaflet MarkerCluster CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css">
+    <!-- Nouislider for range sliders -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@14.7.0/distribute/nouislider.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/main.css">
+    <!-- Micro-interactions CSS -->
+    <link rel="stylesheet" href="/static/css/micro-interactions.css">
+    <style>
+        :root {
+            /* Color palette - light mode (default) */
+            --main-bg-color: #f5f7fa;
+            --card-bg-color: #ffffff;
+            --card-border-color: rgba(0, 0, 0, 0.08);
+            --text-color: #333;
+            --muted-text-color: #6c757d;
+            --primary-color: #3772ff;
+            --secondary-color: #44ca92;
+            --accent-color: #df486f;
+            --success-color: #44ca92;
+            --warning-color: #f9c66b;
+            --danger-color: #ff6b6b;
+            --light-color: #f5f7fa;
+            --dark-color: #333;
+            --shadow-color: rgba(0, 0, 0, 0.04);
+            --shadow-hover-color: rgba(0, 0, 0, 0.08);
+            --transition-speed: 0.3s;
+        }
+        
+        /* Map Specific Styles */
+        #map {
+            height: calc(100vh - 120px);
+            min-height: 500px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            z-index: 1;
+            position: relative;
+        }
+        
+        .full-height-map #map {
+            height: calc(100vh - 64px);
+        }
+        
+        .map-filters {
+            max-height: calc(100vh - 140px);
+            overflow-y: auto;
+        }
+        
+        .map-control-panel {
+            background: var(--card-bg-color);
+            padding: 18px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            margin-bottom: 16px;
+        }
+        
+        .custom-tooltip {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 14px;
+            border-radius: 6px;
+            box-shadow: 0 3px 14px rgba(0, 0, 0, 0.2);
+            border-left: 4px solid var(--primary-color);
+            font-family: 'Inter', sans-serif;
+            max-width: 320px;
+        }
+        
+        .custom-tooltip h5 {
+            margin-top: 0;
+            margin-bottom: 8px;
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+        
+        .custom-tooltip .tooltip-content {
+            margin-bottom: 6px;
+        }
+        
+        .custom-tooltip .tooltip-footer {
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            padding-top: 6px;
+            margin-top: 6px;
+        }
+        
+        .custom-tooltip .badge-value {
+            background: var(--light-color);
+            color: var(--dark-color);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        
+        .custom-tooltip .badge-tax {
+            background: var(--primary-color);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+        
+        /* Enhance map controls */
+        .leaflet-touch .leaflet-control-layers, 
+        .leaflet-touch .leaflet-bar {
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .leaflet-touch .leaflet-bar a {
+            width: 36px;
+            height: 36px;
+            line-height: 36px;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            background-color: white;
+            color: var(--primary-color);
+            transition: all 0.2s ease;
+        }
+        
+        .leaflet-touch .leaflet-bar a:hover {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        /* Loading animation */
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            border-radius: 12px;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .pulse-on-load {
+            animation: pulse 1.5s ease-in-out;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.7; }
+            50% { opacity: 1; }
+            100% { opacity: 1; }
+        }
+        
+        /* Fancy map marker styles */
+        .custom-marker {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background-color: var(--primary-color);
+            border: 3px solid white;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .custom-marker:hover {
+            transform: scale(1.15);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .marker-residential {
+            background-color: #4daf7c;
+        }
+        
+        .marker-commercial {
+            background-color: #3772ff;
+        }
+        
+        .marker-agricultural {
+            background-color: #f9c74f;
+            color: #333;
+        }
+        
+        .marker-industrial {
+            background-color: #9d4edd;
+        }
+        
+        /* Toasts */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+        
+        .custom-toast {
+            padding: 15px 20px;
+            margin-top: 10px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            max-width: 350px;
+            animation: slideIn 0.3s ease-out;
+            border-left: 4px solid;
+        }
+        
+        .toast-info {
+            border-left-color: var(--primary-color);
+        }
+        
+        .toast-success {
+            border-left-color: var(--success-color);
+        }
+        
+        .toast-warning {
+            border-left-color: var(--warning-color);
+        }
+        
+        .toast-error {
+            border-left-color: var(--danger-color);
+        }
+        
+        .toast-icon {
+            font-size: 1.5rem;
+        }
+        
+        .toast-info .toast-icon {
+            color: var(--primary-color);
+        }
+        
+        .toast-success .toast-icon {
+            color: var(--success-color);
+        }
+        
+        .toast-warning .toast-icon {
+            color: var(--warning-color);
+        }
+        
+        .toast-error .toast-icon {
+            color: var(--danger-color);
+        }
+        
+        .toast-message {
+            flex-grow: 1;
+        }
+        
+        .toast-close {
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: #6c757d;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+        
+        /* Map View modes */
+        .view-mode-btn.active {
+            background-color: var(--primary-color);
+            color: white;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            #map {
+                height: 60vh;
+            }
+            .map-control-panel {
+                margin-top: 16px;
+            }
+            .map-filters {
+                max-height: none;
+                overflow-y: visible;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid p-0">
+        <div class="row">
+            <div class="col-12 mb-4">
+                <div class="top-nav d-flex align-items-center justify-content-between p-3">
+                    <a href="/" class="text-decoration-none">
+                        <h3 class="m-0 text-primary">
+                            <i class="fas fa-home me-2"></i>
+                            Benton County Assessor
+                        </h3>
+                    </a>
+                    <div class="d-flex">
+                        <a href="/" class="btn btn-sm btn-outline-primary me-2">
+                            <i class="fas fa-home me-1"></i> Home
+                        </a>
+                        <a href="/properties" class="btn btn-sm btn-outline-primary me-2">
+                            <i class="fas fa-search me-1"></i> Properties
+                        </a>
+                        <a href="/statistics" class="btn btn-sm btn-outline-primary me-2">
+                            <i class="fas fa-chart-bar me-1"></i> Statistics
+                        </a>
+                        <a href="/export-data" class="btn btn-sm btn-outline-primary me-2">
+                            <i class="fas fa-file-export me-1"></i> Export
+                        </a>
+                        <a href="/map" class="btn btn-sm btn-primary">
+                            <i class="fas fa-map-marked-alt me-1"></i> Map
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="container-fluid px-4">
+            <div class="row mb-4">
+                <div class="col">
+                    <h1 class="fs-2 fw-bold d-flex align-items-center">
+                        <i class="fas fa-map-marked-alt me-3 text-primary"></i> 
+                        Interactive Property Map
+                    </h1>
+                    <p class="text-muted">
+                        Explore properties across Benton County with our interactive map. Filter by property type, location, and value range.
+                    </p>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Map Container -->
+                <div class="col-lg-9 col-md-12 mb-4">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body p-0 position-relative">
+                            <div id="map-container" class="position-relative">
+                                <div id="map"></div>
+                                <div id="loading-overlay" class="loading-overlay">
+                                    <div class="spinner"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Panel -->
+                <div class="col-lg-3 col-md-12">
+                    <div class="map-filters">
+                        <div class="map-control-panel">
+                            <h5 class="mb-3 d-flex align-items-center">
+                                <i class="fas fa-filter me-2 text-primary"></i> 
+                                Filter Properties
+                            </h5>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Property Type</label>
+                                <select id="property-type-filter" class="form-select form-select-sm">
+                                    <option value="all">All Types</option>
+                                    <option value="Residential">Residential</option>
+                                    <option value="Commercial">Commercial</option>
+                                    <option value="Agricultural">Agricultural</option>
+                                    <option value="Industrial">Industrial</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">City</label>
+                                <select id="city-filter" class="form-select form-select-sm">
+                                    <option value="all">All Cities</option>
+                                    <option value="Richland">Richland</option>
+                                    <option value="Kennewick">Kennewick</option>
+                                    <option value="Pasco">Pasco</option>
+                                    <option value="West Richland">West Richland</option>
+                                    <option value="Prosser">Prosser</option>
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label d-flex justify-content-between">
+                                    <span>Property Value Range</span>
+                                    <span class="text-muted" id="value-range-display">$0 - $1,000,000</span>
+                                </label>
+                                <div id="value-range-slider" class="mb-3"></div>
+                            </div>
+                            
+                            <div class="d-grid gap-2">
+                                <button id="refresh-btn" class="btn btn-primary">
+                                    <i class="fas fa-filter me-1"></i> Apply Filters
+                                </button>
+                                <button id="reset-btn" class="btn btn-outline-secondary">
+                                    <i class="fas fa-undo me-1"></i> Reset Filters
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="map-control-panel">
+                            <h5 class="mb-3 d-flex align-items-center">
+                                <i class="fas fa-eye me-2 text-primary"></i>
+                                View Options
+                            </h5>
+                            
+                            <div class="btn-group w-100 mb-3" role="group">
+                                <button type="button" class="btn btn-outline-primary view-mode-btn active" data-mode="markers">
+                                    <i class="fas fa-map-marker-alt me-1"></i> Markers
+                                </button>
+                                <button type="button" class="btn btn-outline-primary view-mode-btn" data-mode="clusters">
+                                    <i class="fas fa-object-group me-1"></i> Clusters
+                                </button>
+                                <button type="button" class="btn btn-outline-primary view-mode-btn" data-mode="heat">
+                                    <i class="fas fa-fire me-1"></i> Heat Map
+                                </button>
+                            </div>
+                            
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="toggle-fullscreen">
+                                <label class="form-check-label" for="toggle-fullscreen">
+                                    <i class="fas fa-expand me-1"></i> Fullscreen Map
+                                </label>
+                            </div>
+                            
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="toggle-labels">
+                                <label class="form-check-label" for="toggle-labels">
+                                    <i class="fas fa-tag me-1"></i> Show Value Labels
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="map-control-panel">
+                            <h5 class="mb-3 d-flex align-items-center">
+                                <i class="fas fa-info-circle me-2 text-primary"></i>
+                                Map Legend
+                            </h5>
+                            
+                            <div class="d-flex flex-column gap-2">
+                                <div class="d-flex align-items-center">
+                                    <div class="custom-marker marker-residential me-2" style="width: 24px; height: 24px;">
+                                        <small>R</small>
+                                    </div>
+                                    <span>Residential</span>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div class="custom-marker marker-commercial me-2" style="width: 24px; height: 24px;">
+                                        <small>C</small>
+                                    </div>
+                                    <span>Commercial</span>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div class="custom-marker marker-agricultural me-2" style="width: 24px; height: 24px;">
+                                        <small>A</small>
+                                    </div>
+                                    <span>Agricultural</span>
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <div class="custom-marker marker-industrial me-2" style="width: 24px; height: 24px;">
+                                        <small>I</small>
+                                    </div>
+                                    <span>Industrial</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Toast Container -->
+        <div class="toast-container"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/nouislider@14.7.0/distribute/nouislider.min.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([46.2604, -119.2807], 11); // Centered on Benton County
+        
+        // Add OpenStreetMap tiles with attribution
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Create a marker cluster group for efficient handling of many markers
+        const markers = L.markerClusterGroup({
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+            zoomToBoundsOnClick: true,
+            maxClusterRadius: 40
+        });
+        
+        // Reference UI elements
+        const propertyTypeSelect = document.getElementById('property-type-filter');
+        const citySelect = document.getElementById('city-filter');
+        const valueRangeDisplay = document.getElementById('value-range-display');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const viewModeButtons = document.querySelectorAll('.view-mode-btn');
+        const toggleFullscreen = document.getElementById('toggle-fullscreen');
+        const toggleLabels = document.getElementById('toggle-labels');
+        const mapContainer = document.getElementById('map-container');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        
+        // Initialize global variables
+        let propertyType = 'all';
+        let city = 'all';
+        let valueRange = [0, 1000000]; // Default value range
+        let viewMode = 'markers';
+        let heatLayer = null;
+        let showLabels = false;
+        
+        // Initialize range slider
+        const valueSlider = document.getElementById('value-range-slider');
+        if (valueSlider) {
+            noUiSlider.create(valueSlider, {
+                start: [0, 1000000],
+                connect: true,
+                step: 10000,
+                range: {
+                    'min': 0,
+                    'max': 1000000
+                },
+                format: {
+                    to: function (value) {
+                        return Math.round(value);
+                    },
+                    from: function (value) {
+                        return Number(value);
+                    }
+                }
+            });
+            
+            valueSlider.noUiSlider.on('update', function (values, handle) {
+                valueRange = values;
+                valueRangeDisplay.textContent = `$${numberWithCommas(values[0])} - $${numberWithCommas(values[1])}`;
+            });
+        }
+        
+        // Event listeners
+        if (propertyTypeSelect) {
+            propertyTypeSelect.addEventListener('change', function() {
+                propertyType = this.value;
+            });
+        }
+        
+        if (citySelect) {
+            citySelect.addEventListener('change', function() {
+                city = this.value;
+            });
+        }
+        
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', function() {
+                this.disabled = true;
+                this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
+                loadMapData();
+            });
+        }
+        
+        if (resetBtn) {
+            resetBtn.addEventListener('click', function() {
+                // Reset filters to default values
+                propertyType = 'all';
+                city = 'all';
+                valueRange = [0, 1000000];
+                
+                // Reset UI elements
+                if (propertyTypeSelect) propertyTypeSelect.value = 'all';
+                if (citySelect) citySelect.value = 'all';
+                if (valueSlider) valueSlider.noUiSlider.set([0, 1000000]);
+                
+                // Reload map data
+                loadMapData();
+            });
+        }
+        
+        // View mode toggle
+        viewModeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Remove active class from all buttons
+                viewModeButtons.forEach(btn => btn.classList.remove('active'));
+                
+                // Add active class to clicked button
+                this.classList.add('active');
+                
+                // Set view mode
+                viewMode = this.getAttribute('data-mode');
+                
+                // Reload map data to apply the new view mode
+                loadMapData();
+            });
+        });
+        
+        // Toggle fullscreen map
+        if (toggleFullscreen) {
+            toggleFullscreen.addEventListener('change', function() {
+                document.querySelector('.col-lg-9').classList.toggle('col-lg-12', this.checked);
+                document.querySelector('.col-lg-9').classList.toggle('col-lg-9', !this.checked);
+                document.querySelector('.col-lg-3').classList.toggle('d-none', this.checked);
+                document.querySelector('body').classList.toggle('full-height-map', this.checked);
+                
+                // Trigger a resize event to update the map
+                setTimeout(() => {
+                    map.invalidateSize();
+                }, 300);
+            });
+        }
+        
+        // Toggle value labels
+        if (toggleLabels) {
+            toggleLabels.addEventListener('change', function() {
+                showLabels = this.checked;
+                loadMapData();
+            });
+        }
+        
+        // Helper function to format numbers with commas
+        function numberWithCommas(x) {
+            return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        
+        // Helper function to show toast notifications
+        function showToast(message, type = 'info') {
+            const toastContainer = document.querySelector('.toast-container');
+            
+            let icon = '';
+            switch(type) {
+                case 'success':
+                    icon = '<i class="fas fa-check-circle toast-icon"></i>';
+                    break;
+                case 'warning':
+                    icon = '<i class="fas fa-exclamation-triangle toast-icon"></i>';
+                    break;
+                case 'error':
+                    icon = '<i class="fas fa-times-circle toast-icon"></i>';
+                    break;
+                default: // info
+                    icon = '<i class="fas fa-info-circle toast-icon"></i>';
+            }
+            
+            const toast = document.createElement('div');
+            toast.className = `custom-toast toast-${type}`;
+            toast.innerHTML = `
+                ${icon}
+                <div class="toast-message">${message}</div>
+                <div class="toast-close">&times;</div>
+            `;
+            
+            // Add to container
+            toastContainer.appendChild(toast);
+            
+            // Set up close button
+            const closeBtn = toast.querySelector('.toast-close');
+            closeBtn.addEventListener('click', () => {
+                toast.style.animation = 'slideOut 0.3s forwards';
+                setTimeout(() => {
+                    toastContainer.removeChild(toast);
+                }, 300);
+            });
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (toast.parentNode === toastContainer) {
+                    toast.style.animation = 'slideOut 0.3s forwards';
+                    setTimeout(() => {
+                        if (toast.parentNode === toastContainer) {
+                            toastContainer.removeChild(toast);
+                        }
+                    }, 300);
+                }
+            }, 5000);
+        }
+        
+        // Function to create a custom property marker
+        function createPropertyMarker(property, latlng) {
+            // Determine marker class based on property type
+            let markerClass = 'marker-residential'; // Default
+            let typeInitial = 'R';
+            
+            if (property.property_type) {
+                const type = property.property_type.toLowerCase();
+                
+                if (type.includes('commercial')) {
+                    markerClass = 'marker-commercial';
+                    typeInitial = 'C';
+                } else if (type.includes('agricultural')) {
+                    markerClass = 'marker-agricultural';
+                    typeInitial = 'A';
+                } else if (type.includes('industrial')) {
+                    markerClass = 'marker-industrial';
+                    typeInitial = 'I';
+                }
+            }
+            
+            // Create custom icon
+            const customIcon = L.divIcon({
+                className: `custom-marker ${markerClass} ${showLabels ? 'with-label' : ''}`,
+                html: `<span>${typeInitial}</span>${showLabels ? `<div class="marker-label">$${numberWithCommas(Math.round(property.assessed_value || 0))}</div>` : ''}`,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
+            
+            return L.marker(latlng, { icon: customIcon, riseOnHover: true });
+        }
+        
+        // Function to create a custom tooltip
+        function createPropertyTooltip(property) {
+            const addressHtml = property.property_address 
+                ? `<div class="tooltip-content"><strong>Address:</strong> ${property.property_address}, ${property.property_city || 'Unknown'}</div>`
+                : `<div class="tooltip-content"><strong>Location:</strong> ${property.property_city || 'Unknown'}</div>`;
+                
+            const ownerHtml = property.owner_name
+                ? `<div class="tooltip-content"><strong>Owner:</strong> ${property.owner_name}</div>`
+                : '';
+                
+            return `
+                <div class="custom-tooltip">
+                    <h5>${property.property_type || 'Property'} #${property.account_id || 'Unknown'}</h5>
+                    ${addressHtml}
+                    ${ownerHtml}
+                    <div class="tooltip-footer">
+                        <span class="badge-value">Assessed: $${numberWithCommas(Math.round(property.assessed_value || 0))}</span>
+                        <span class="badge-tax">Tax: $${numberWithCommas(Math.round(property.tax_amount || 0))}</span>
+                    </div>
+                    <a href="/property/${property.account_id}" class="btn btn-sm btn-primary mt-2 w-100">
+                        <i class="fas fa-info-circle me-1"></i> View Details
+                    </a>
+                </div>
+            `;
+        }
+        
+        // Main function to load map data
+        function loadMapData() {
+            // Clear existing markers
+            markers.clearLayers();
+            
+            // Remove heat map if it exists
+            if (heatLayer && map.hasLayer(heatLayer)) {
+                map.removeLayer(heatLayer);
+            }
+            
+            // Add subtle loading animation to map
+            mapContainer.classList.add('pulse-on-load');
+            
+            // Fetch and filter properties
+            fetch('/api/map/data')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Map data received:', data); // Debug log
+                    
+                    // Hide loading overlay
+                    if (loadingOverlay.parentNode === mapContainer) {
+                        mapContainer.removeChild(loadingOverlay);
+                    }
+                    
+                    // Reset button
+                    if (refreshBtn) {
+                        refreshBtn.disabled = false;
+                        refreshBtn.innerHTML = '<i class="fas fa-filter me-1"></i> Apply Filters';
+                    }
+                    
+                    // Check if data has the correct structure
+                    if (!data.geojson || !data.geojson.features || data.geojson.features.length === 0) {
+                        console.log('No property data available');
+                        showToast('No property data available', 'warning');
+                        return;
+                    }
+                    
+                    // Convert GeoJSON features to properties array
+                    const properties = data.geojson.features.map(feature => {
+                        return {
+                            ...feature.properties,
+                            latitude: feature.geometry.coordinates[1],
+                            longitude: feature.geometry.coordinates[0]
+                        };
+                    });
+                    
+                    console.log('Converted properties:', properties.slice(0, 2)); // Debug log
+                    
+                    // Filter properties based on selection
+                    const filteredProperties = properties.filter(property => {
+                        const matchesType = propertyType === 'all' || property.property_type === propertyType;
+                        const matchesCity = city === 'all' || property.property_city === city;
+                        const matchesValue = property.assessed_value >= valueRange[0] && 
+                                           property.assessed_value <= valueRange[1];
+                        
+                        return matchesType && matchesCity && matchesValue;
+                    });
+                    
+                    // Heat map data preparation
+                    const heatData = [];
+                    
+                    // Add markers for filtered properties with staggered animation
+                    filteredProperties.forEach((property, index) => {
+                        // Skip if no location data
+                        if (!property.latitude || !property.longitude) return;
+                        
+                        // Initialize enhanced marker if available
+                        const latlng = [property.latitude, property.longitude];
+                        
+                        // Add point to heat map data (weighted by property value)
+                        if (property.assessed_value) {
+                            // Normalize value for heat intensity (0.2 to 1.0)
+                            const intensity = 0.2 + (property.assessed_value / 1000000) * 0.8;
+                            heatData.push([property.latitude, property.longitude, Math.min(intensity, 1.0)]);
+                        } else {
+                            heatData.push([property.latitude, property.longitude, 0.3]); // Default intensity
+                        }
+                        
+                        // Only add markers in markers or clusters view mode
+                        if (viewMode !== 'heat') {
+                            const marker = createPropertyMarker(property, latlng);
+                            
+                            // Add tooltip with property info
+                            marker.bindTooltip(createPropertyTooltip(property), { 
+                                direction: 'top',
+                                offset: [0, -18],
+                                opacity: 1
+                            });
+                            
+                            // Add click listener to view property details
+                            marker.on('click', function() {
+                                window.location.href = `/property/${property.account_id}`;
+                            });
+                            
+                            // Add marker to cluster group with staggered delay for animation effect
+                            setTimeout(() => {
+                                markers.addLayer(marker);
+                            }, index * 5); // 5ms delay between markers for smoother loading
+                        }
+                    });
+                    
+                    // Update the map based on selected view mode
+                    if (viewMode === 'markers' || viewMode === 'clusters') {
+                        map.addLayer(markers);
+                        
+                        // In markers mode, disable clustering by setting a very high disableClusteringAtZoom
+                        if (viewMode === 'markers') {
+                            markers.options.disableClusteringAtZoom = 1; // Disable clustering at all zoom levels
+                        } else {
+                            markers.options.disableClusteringAtZoom = 18; // Re-enable clustering
+                        }
+                        
+                        // Refresh the cluster group to apply changes
+                        markers.refreshClusters();
+                    } else if (viewMode === 'heat') {
+                        // Create and add heat map layer
+                        heatLayer = L.heatLayer(heatData, {
+                            radius: 25,
+                            blur: 15,
+                            maxZoom: 17,
+                            gradient: {
+                                0.1: '#3772ff', 
+                                0.3: '#44ca92',
+                                0.5: '#f9c74f',
+                                0.7: '#f8961e',
+                                0.9: '#df486f'
+                            }
+                        }).addTo(map);
+                    }
+                    
+                    // Set map bounds based on filtered properties
+                    if (filteredProperties.length > 0) {
+                        if (data.bounds) {
+                            map.fitBounds([
+                                [data.bounds.south, data.bounds.west],
+                                [data.bounds.north, data.bounds.east]
+                            ]);
+                        } else {
+                            try {
+                                const latLngs = filteredProperties
+                                    .filter(p => p.latitude && p.longitude)
+                                    .map(p => [p.latitude, p.longitude]);
+                                
+                                if (latLngs.length > 0) {
+                                    map.fitBounds(latLngs);
+                                }
+                            } catch (error) {
+                                console.error('Error setting map bounds', error);
+                            }
+                        }
+                    }
+                    
+                    // Show toast with property count
+                    showToast(`Displaying ${filteredProperties.length} properties on the map.`, 'info');
+                })
+                .catch(error => {
+                    console.error('Error loading map data:', error);
+                    showToast('Error loading map data. Please try again.', 'error');
+                    
+                    // Reset button
+                    if (refreshBtn) {
+                        refreshBtn.disabled = false;
+                        refreshBtn.innerHTML = '<i class="fas fa-filter me-1"></i> Apply Filters';
+                    }
+                })
+                .finally(() => {
+                    // Remove pulse animation class
+                    setTimeout(() => {
+                        mapContainer.classList.remove('pulse-on-load');
+                    }, 1500);
+                });
+        }
+        
+        // Initialize the map with data
+        loadMapData();
+    </script>
+</body>
+</html>

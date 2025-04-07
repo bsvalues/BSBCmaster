@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Property Map</title>
+    <!-- Include CSS and JS files as in original template -->
+</head>
+<body>
+    <!-- Original body content here -->
+
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([46.2604, -119.2807], 11); // Centered on Benton County
+        
+        // Add OpenStreetMap tiles with attribution
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Create a marker cluster group for efficient handling of many markers
+        const markers = L.markerClusterGroup({
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+            zoomToBoundsOnClick: true,
+            maxClusterRadius: 40
+        });
+        
+        // Reference UI elements
+        const propertyTypeSelect = document.getElementById('property-type-filter');
+        const citySelect = document.getElementById('city-filter');
+        const valueRangeDisplay = document.getElementById('value-range-display');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const viewModeButtons = document.querySelectorAll('.view-mode-btn');
+        const toggleFullscreen = document.getElementById('toggle-fullscreen');
+        const toggleLabels = document.getElementById('toggle-labels');
+        const mapContainer = document.getElementById('map-container');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        
+        // Initialize global variables
+        let propertyType = 'all';
+        let city = 'all';
+        let valueRange = [0, 1000000]; // Default value range
+        let viewMode = 'markers';
+        let heatLayer = null;
+        let showLabels = false;
+        
+        // Helper function to format numbers with commas
+        function numberWithCommas(x) {
+            return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+        }
+        
+        // Helper function to show toast notifications
+        function showToast(message, type = 'info') {
+            const toastContainer = document.querySelector('.toast-container');
+            
+            let icon = '';
+            switch(type) {
+                case 'success':
+                    icon = '<i class="fas fa-check-circle toast-icon"></i>';
+                    break;
+                case 'warning':
+                    icon = '<i class="fas fa-exclamation-triangle toast-icon"></i>';
+                    break;
+                case 'error':
+                    icon = '<i class="fas fa-times-circle toast-icon"></i>';
+                    break;
+                default: // info
+                    icon = '<i class="fas fa-info-circle toast-icon"></i>';
+            }
+            
+            const toast = document.createElement('div');
+            toast.className = `custom-toast toast-${type}`;
+            toast.innerHTML = `
+                ${icon}
+                <div class="toast-message">${message}</div>
+                <div class="toast-close">&times;</div>
+            `;
+            
+            // Add to container
+            toastContainer.appendChild(toast);
+            
+            // Auto-remove after 5 seconds
+            setTimeout(() => toast.remove(), 5000);
+        }
+        
+        // Function to create a custom property marker
+        function createPropertyMarker(property, latlng) {
+            // Determine marker class based on property type
+            let markerClass = 'marker-residential'; // Default
+            let typeInitial = 'R';
+            
+            if (property.property_type) {
+                const type = property.property_type.toLowerCase();
+                
+                if (type.includes('commercial')) {
+                    markerClass = 'marker-commercial';
+                    typeInitial = 'C';
+                } else if (type.includes('agricultural')) {
+                    markerClass = 'marker-agricultural';
+                    typeInitial = 'A';
+                } else if (type.includes('industrial')) {
+                    markerClass = 'marker-industrial';
+                    typeInitial = 'I';
+                }
+            }
+            
+            // Create custom icon
+            const customIcon = L.divIcon({
+                className: `custom-marker ${markerClass}`,
+                html: `<span>${typeInitial}</span>`,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
+            
+            return L.marker(latlng, { icon: customIcon, riseOnHover: true });
+        }
+        
+        // Function to create a custom tooltip
+        function createPropertyTooltip(property) {
+            return `
+                <div class="custom-tooltip">
+                    <h5>${property.property_type || 'Property'} #${property.account_id || 'Unknown'}</h5>
+                    <div class="tooltip-content"><strong>Location:</strong> ${property.property_city || 'Unknown'}</div>
+                    <div class="tooltip-content"><strong>Owner:</strong> ${property.owner_name || 'Unknown'}</div>
+                    <div class="tooltip-footer">
+                        <span class="badge-value">Assessed: $${numberWithCommas(Math.round(property.assessed_value || 0))}</span>
+                        <span class="badge-tax">Tax: $${numberWithCommas(Math.round(property.tax_amount || 0))}</span>
+                    </div>
+                    <a href="/property/${property.account_id}" class="btn btn-sm btn-primary mt-2 w-100">
+                        <i class="fas fa-info-circle me-1"></i> View Details
+                    </a>
+                </div>
+            `;
+        }
+        
+        // Main function to load map data
+        function loadMapData() {
+            // Clear existing markers
+            markers.clearLayers();
+            
+            // Remove heat map if it exists
+            if (heatLayer && map.hasLayer(heatLayer)) {
+                map.removeLayer(heatLayer);
+            }
+            
+            // Add subtle loading animation to map
+            mapContainer.classList.add('pulse-on-load');
+            
+            // Fetch and filter properties
+            fetch('/api/map/data')
+                .then(response => response.json())
+                .then(data => {
+                    // Hide loading overlay
+                    if (loadingOverlay.parentNode === mapContainer) {
+                        mapContainer.removeChild(loadingOverlay);
+                    }
+                    
+                    // Reset button
+                    if (refreshBtn) {
+                        refreshBtn.disabled = false;
+                        refreshBtn.innerHTML = '<i class="fas fa-undo me-1"></i> Reset Filters';
+                    }
+                    
+                    // Check if data has the correct structure
+                    if (!data.geojson || !data.geojson.features || data.geojson.features.length === 0) {
+                        console.log('No property data available');
+                        showToast('No property data available', 'warning');
+                        return;
+                    }
+                    
+                    // Convert GeoJSON features to properties array
+                    const properties = data.geojson.features.map(feature => {
+                        return {
+                            ...feature.properties,
+                            latitude: feature.geometry.coordinates[1],
+                            longitude: feature.geometry.coordinates[0]
+                        };
+                    });
+                    
+                    // Filter properties based on selection
+                    const filteredProperties = properties.filter(property => {
+                        const matchesType = propertyType === 'all' || property.property_type === propertyType;
+                        const matchesCity = city === 'all' || property.property_city === city;
+                        const matchesValue = property.assessed_value >= valueRange[0] && 
+                                           property.assessed_value <= valueRange[1];
+                        
+                        return matchesType && matchesCity && matchesValue;
+                    });
+                    
+                    // Heat map data preparation
+                    const heatData = [];
+                    
+                    // Add markers for filtered properties
+                    filteredProperties.forEach((property, index) => {
+                        // Skip if no location data
+                        if (!property.latitude || !property.longitude) return;
+                        
+                        // Initialize enhanced marker
+                        const latlng = [property.latitude, property.longitude];
+                        const marker = createPropertyMarker(property, latlng);
+                        
+                        // Add tooltip with property info
+                        marker.bindTooltip(createPropertyTooltip(property), { 
+                            direction: 'top',
+                            offset: [0, -18],
+                            opacity: 1
+                        });
+                        
+                        // Add marker to cluster group
+                        markers.addLayer(marker);
+                        
+                        // Add point to heat map data
+                        heatData.push([property.latitude, property.longitude, property.assessed_value / 100000]);
+                    });
+                    
+                    // Add markers to map
+                    map.addLayer(markers);
+                    
+                    // Show toast with property count
+                    showToast(`Displaying ${filteredProperties.length} properties on the map.`, 'info');
+                    
+                    // Fit bounds to show all properties
+                    if (filteredProperties.length > 0) {
+                        if (data.bounds) {
+                            map.fitBounds([
+                                [data.bounds.south, data.bounds.west],
+                                [data.bounds.north, data.bounds.east]
+                            ]);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading map data:', error);
+                    showToast('Error loading map data. Please try again.', 'error');
+                    
+                    // Reset button
+                    if (refreshBtn) {
+                        refreshBtn.disabled = false;
+                        refreshBtn.innerHTML = '<i class="fas fa-filter me-1"></i> Apply Filters';
+                    }
+                })
+                .finally(() => {
+                    // Remove pulse animation class
+                    setTimeout(() => {
+                        mapContainer.classList.remove('pulse-on-load');
+                    }, 1500);
+                });
+        }
+        
+        // Initialize the map with data
+        loadMapData();
+        
+        // Event listeners (simplified)
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', loadMapData);
+        }
+        
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                propertyType = 'all';
+                city = 'all';
+                valueRange = [0, 1000000];
+                loadMapData();
+            });
+        }
+    </script>
+</body>
+</html>
