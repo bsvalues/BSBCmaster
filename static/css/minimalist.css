@@ -408,6 +408,7 @@ a:hover {
 .property-image {
     width: 100%;
     aspect-ratio: 16/9;
+    height: 280px;
     object-fit: cover;
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
