@@ -1064,7 +1064,7 @@ def parameterized_query():
 @app.route('/')
 def index():
     """Handle the root route."""
-    return render_template('index.html', title="MCP Assessor Agent API")
+    return render_template('index_minimal.html', title="Benton County Assessor")
 
 
 @app.route('/query-builder')
