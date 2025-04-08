@@ -4,12 +4,12 @@
 
 {% block head %}
 <style>
-    /* Modern hero section with Benton County background image - Updated to match their style */
+    /* Cleaner hero section to match the Benton County reference design */
     .hero {
         position: relative;
-        padding: 6rem 0;
+        padding: 0;
+        height: 400px;
         margin-bottom: 3rem;
-        background-color: #006699; /* Benton blue */
         overflow: hidden;
         color: white;
     }
@@ -25,7 +25,6 @@
         background-size: cover;
         background-position: center;
         background-repeat: no-repeat;
-        opacity: 0.8;
         z-index: 0;
     }
     
@@ -35,22 +34,26 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: linear-gradient(to bottom, rgba(0, 102, 153, 0.6) 0%, rgba(0, 102, 153, 0.7) 100%);
+        background: rgba(0, 0, 0, 0.2);
         z-index: 1;
     }
     
     .hero-content {
         position: relative;
         z-index: 2;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
     
     .hero-section {
         text-align: center;
-        margin-bottom: 3rem;
+        margin-bottom: 2rem;
     }
     
     .hero-section h1 {
-        font-size: 3.5rem;
+        font-size: 3rem;
         font-weight: 700;
         text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         margin-bottom: 0.5rem;
@@ -59,10 +62,10 @@
     }
     
     .hero-section p {
-        font-size: 1.5rem;
-        font-weight: 300;
+        font-size: 1.2rem;
+        font-weight: 400;
         text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
-        margin-bottom: 2rem;
+        margin-bottom: 1.5rem;
         max-width: 800px;
         margin-left: auto;
         margin-right: auto;
@@ -70,21 +73,19 @@
     
     .search-container {
         position: relative;
-        max-width: 700px;
+        max-width: 500px;
         margin: 0 auto;
-        margin-top: 2rem;
         background: rgba(255, 255, 255, 0.95);
-        border-radius: 6px;
-        padding: 1.5rem;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
-        border: 1px solid rgba(0, 102, 153, 0.2);
+        border-radius: 4px;
+        padding: 1.25rem;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
     }
     
     .search-title {
         text-align: center;
         color: #333;
-        margin-bottom: 1.25rem;
-        font-size: 1.75rem;
+        margin-bottom: 1rem;
+        font-size: 1.25rem;
         font-weight: 600;
     }
     
@@ -95,17 +96,16 @@
     
     .search-input {
         flex: 1;
-        padding: 0.85rem 1rem;
-        border: 1px solid #ccc;
+        padding: 0.6rem 1rem;
+        border: 1px solid #dee2e6;
         border-radius: 4px 0 0 4px;
-        font-size: 1rem;
-        box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        font-size: 0.9rem;
     }
     
     .search-input:focus {
         border-color: #006699;
         outline: none;
-        box-shadow: inset 0 1px 3px rgba(0,0,0,0.1), 0 0 0 3px rgba(0, 102, 153, 0.2);
+        box-shadow: 0 0 0 2px rgba(0, 102, 153, 0.2);
     }
     
     .search-button {
@@ -113,15 +113,13 @@
         color: white;
         border: none;
         border-radius: 0 4px 4px 0;
-        padding: 0.85rem 1.5rem;
+        padding: 0.6rem 1rem;
         cursor: pointer;
-        transition: all 0.3s ease;
-        font-weight: 500;
+        transition: all 0.2s ease;
     }
     
     .search-button:hover {
         background-color: #005580; /* Darker blue */
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
     }
     
     /* Benton County button styles */
@@ -332,7 +330,7 @@
 {% endblock %}
 
 {% block content %}
-<!-- Hero Section - Benton County Style -->
+<!-- Hero Section - Benton County Style, updated to match reference -->
 <div class="hero">
     <div class="hero-overlay"></div>
     <div class="container hero-content">
@@ -350,10 +348,9 @@
                     <i class="fas fa-search"></i>
                 </button>
             </div>
-            <div class="mt-4 text-center">
+            <div class="mt-2 text-center">
                 <div class="view-pills">
                     <div class="view-pill active">Map View</div>
-                    <div class="view-pill">List View</div>
                 </div>
             </div>
         </div>

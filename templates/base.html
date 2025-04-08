@@ -135,12 +135,12 @@
             color: white;
         }
         
-        /* Benton County header styling */
+        /* Benton County header styling - Updated to match reference design */
         .benton-header {
             background-color: white;
-            box-shadow: var(--box-shadow);
             padding: 0.5rem 0;
             border-bottom: 3px solid var(--benton-green);
+            box-shadow: none;
         }
         
         .benton-logo-container {
@@ -149,21 +149,25 @@
         }
         
         .benton-logo {
-            height: 50px;
-            margin-right: 1rem;
+            height: 30px;
+            margin-right: 0.5rem;
         }
         
         .benton-title {
-            font-size: 1.5rem;
+            font-size: 1.1rem;
             font-weight: 600;
             margin: 0;
             color: var(--benton-blue);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         .benton-subtitle {
-            font-size: 1rem;
+            font-size: 0.8rem;
             color: var(--benton-green);
             margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
         
         /* Navigation styling - Benton County style */
@@ -390,7 +394,7 @@
     {% block head %}{% endblock %}
 </head>
 <body>
-    <!-- Benton County Header -->
+    <!-- Benton County Header - Simplified for clean design -->
     <header class="benton-header">
         <div class="container">
             <div class="benton-logo-container">
@@ -403,10 +407,10 @@
         </div>
     </header>
     
-    <!-- Navbar -->
+    <!-- Simplified Navbar for Benton County Style -->
     <nav class="navbar navbar-expand-lg">
         <div class="container">
-            <a class="navbar-brand pulse-on-load" href="/">
+            <a class="navbar-brand" href="/">
                 <span>Property Assessment</span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -415,36 +419,28 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link ripple" href="/">
-                            <i class="fas fa-home"></i>Home
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home"></i> Home
                         </a>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="propertiesDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-building"></i>Properties
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="/property-search">Search Properties</a></li>
-                            <li><a class="dropdown-item" href="/map">Property Map</a></li>
-                        </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link ripple" href="/statistics-minimal">
-                            <i class="fas fa-chart-bar"></i>Statistics
+                        <a class="nav-link" href="/property-search">
+                            <i class="fas fa-building"></i> Properties
                         </a>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="dataDropdown" role="button" data-bs-toggle="dropdown">
-                            <i class="fas fa-database"></i>Data
-                        </a>
-                        <ul class="dropdown-menu">
-                            <li><a class="dropdown-item" href="/api/imported-data/accounts">Account Data</a></li>
-                            <li><a class="dropdown-item" href="/export-data">Export Data</a></li>
-                        </ul>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link ripple" href="/api-docs">
-                            <i class="fas fa-book"></i>Documentation
+                        <a class="nav-link" href="/statistics-minimal">
+                            <i class="fas fa-chart-bar"></i> Statistics
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/export-data">
+                            <i class="fas fa-database"></i> Data
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/api-docs">
+                            <i class="fas fa-book"></i> Documentation
                         </a>
                     </li>
                 </ul>
