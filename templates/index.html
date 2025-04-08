@@ -1,26 +1,23 @@
+
 {% extends "base.html" %}
 
 {% block content %}
-<div class="main-content">
-  <div class="container">
-    <div class="search-container">
-      <h1 class="text-center mb-4">Benton County Property Search</h1>
-      <div class="search-box">
-        <form action="/property-search" method="get" class="search-form">
-          <div class="input-group">
-            <input type="text" name="property_address" class="form-control" placeholder="Enter address or parcel number">
-            <button class="btn btn-primary" type="submit">
-              <i class="fas fa-search"></i> Search
-            </button>
-          </div>
-        </form>
-      </div>
+<div class="container mt-5">
+  <div class="search-section">
+    <h1 class="text-center mb-4">Benton County Property Search</h1>
+    <div class="search-box">
+      <form action="/property-search" method="get" class="search-form">
+        <div class="input-group">
+          <input type="text" name="property_address" class="form-control" placeholder="Enter address or parcel number">
+          <button class="btn btn-primary" type="submit">
+            <i class="fas fa-search"></i> Search
+          </button>
+        </div>
+      </form>
     </div>
   </div>
-</div>
-
-<div class="container mt-5">
-  <div class="row">
+  
+  <div class="row mt-5">
     <div class="col-md-4">
       <div class="card">
         <div class="card-body">
@@ -54,33 +51,24 @@
 
 {% block styles %}
 <style>
-.main-content {
-  padding: 4rem 0;
-  color: var(--text-primary);
-}
-
-.search-container {
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 2rem;
-}
-
-.search-container {
-  max-width: 600px;
-  margin: 0 auto;
+.search-section {
+  padding: 2rem 0;
 }
 
 .search-box {
-  background: white;
+  max-width: 600px;
+  margin: 0 auto;
   padding: 2rem;
+  background: white;
   border-radius: var(--border-radius);
-  box-shadow: var(--box-shadow-lg);
+  box-shadow: var(--box-shadow);
 }
 
 .card {
   height: 100%;
   transition: transform 0.2s;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .card:hover {
@@ -90,6 +78,16 @@
 .card-title i {
   margin-right: 0.5rem;
   color: var(--primary-color);
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+  background-color: var(--secondary-color);
+  border-color: var(--secondary-color);
 }
 </style>
 {% endblock %}
