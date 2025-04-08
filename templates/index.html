@@ -2,8 +2,8 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-5">
-  <div class="search-section">
+<div class="search-wrapper">
+  <div class="container">
     <h1 class="text-center mb-4">Benton County Property Search</h1>
     <div class="search-box">
       <form action="/property-search" method="get" class="search-form">
@@ -16,12 +16,14 @@
       </form>
     </div>
   </div>
-  
-  <div class="row mt-5">
+</div>
+
+<div class="container mt-5">
+  <div class="row">
     <div class="col-md-4">
       <div class="card">
         <div class="card-body">
-          <h5 class="card-title"><i class="fas fa-home"></i> Property Search</h5>
+          <h5 class="card-title"><i class="fas fa-search"></i> Property Search</h5>
           <p class="card-text">Search properties by address, owner name, or parcel number.</p>
           <a href="/property-search" class="btn btn-outline-primary">Advanced Search</a>
         </div>
@@ -51,17 +53,15 @@
 
 {% block styles %}
 <style>
-.search-section {
-  padding: 2rem 0;
+.search-wrapper {
+  padding: 4rem 0;
+  background: white;
 }
 
 .search-box {
   max-width: 600px;
   margin: 0 auto;
   padding: 2rem;
-  background: white;
-  border-radius: var(--border-radius);
-  box-shadow: var(--box-shadow);
 }
 
 .card {
