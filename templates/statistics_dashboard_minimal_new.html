@@ -1,0 +1,532 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block head %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Chart.js Plugins -->
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+<!-- Helper Functions -->
+<script src="{{ url_for('static', filename='js/chart_update_functions.js') }}"></script>
+<script src="{{ url_for('static', filename='js/statistics_dashboard.js') }}"></script>
+
+<style>
+    .stats-container {
+        margin-bottom: 3rem;
+    }
+    
+    .chart-container {
+        position: relative;
+        height: 300px;
+        margin-bottom: 2rem;
+    }
+    
+    .stat-card {
+        border-left: 4px solid var(--primary-color);
+        transition: transform 0.3s ease;
+    }
+    
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+    
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--primary-color);
+    }
+    
+    .stat-change {
+        font-size: 0.875rem;
+        margin-left: 0.5rem;
+    }
+    
+    .stat-change.positive {
+        color: #38a169;
+    }
+    
+    .stat-change.negative {
+        color: #e53e3e;
+    }
+    
+    .stat-label {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .chart-card {
+        height: 100%;
+    }
+    
+    .chart-title {
+        font-size: 1.1rem;
+        color: var(--text-primary);
+        margin-bottom: 1rem;
+    }
+    
+    /* Filter controls */
+    .filter-controls {
+        background-color: var(--card-bg-color);
+        border-radius: var(--border-radius);
+        padding: 1.25rem;
+        margin-bottom: 2rem;
+        box-shadow: var(--box-shadow);
+    }
+    
+    .filter-label {
+        font-weight: 500;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .filter-group {
+        margin-bottom: 1rem;
+    }
+    
+    /* Table styling */
+    .stats-table th {
+        font-weight: 600;
+        color: var(--text-secondary);
+        border-top: none;
+    }
+    
+    .stats-table td {
+        vertical-align: middle;
+    }
+    
+    /* Value trend styles */
+    .trend-change {
+        background-color: rgba(0,0,0,0.05);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+    
+    .trend-up {
+        color: #38a169;
+    }
+    
+    .trend-down {
+        color: #e53e3e;
+    }
+    
+    .trend-neutral {
+        color: var(--text-secondary);
+    }
+    
+    /* Animations */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .animate-fade-in {
+        animation: fadeInUp 0.5s ease-out forwards;
+    }
+    
+    .animate-delay-1 {
+        animation-delay: 0.1s;
+        opacity: 0;
+    }
+    
+    .animate-delay-2 {
+        animation-delay: 0.2s;
+        opacity: 0;
+    }
+    
+    .animate-delay-3 {
+        animation-delay: 0.3s;
+        opacity: 0;
+    }
+    
+    .animate-delay-4 {
+        animation-delay: 0.4s;
+        opacity: 0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="mb-3">Property Statistics</h1>
+            <p class="lead">Analyze property values by type, location, and assessment year.</p>
+        </div>
+    </div>
+    
+    <!-- Filter Controls -->
+    <div class="row">
+        <div class="col-12">
+            <div class="filter-controls animate-fade-in">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="filter-group">
+                            <div class="filter-label">Property Type</div>
+                            <select id="property-type-filter" class="form-select focus-interaction">
+                                <option value="all">All Types</option>
+                                <!-- Populated by JavaScript -->
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="filter-group">
+                            <div class="filter-label">City</div>
+                            <select id="city-filter" class="form-select focus-interaction">
+                                <option value="all">All Cities</option>
+                                <!-- Populated by JavaScript -->
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="filter-group">
+                            <div class="filter-label">Year</div>
+                            <select id="year-filter" class="form-select focus-interaction">
+                                <option value="all">All Years</option>
+                                <option value="2025">2025</option>
+                                <option value="2024">2024</option>
+                                <option value="2023">2023</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="filter-group">
+                            <div class="filter-label">Action</div>
+                            <button id="refresh-stats" class="btn btn-primary w-100 ripple">
+                                <i class="fas fa-sync-alt me-2"></i>Update Statistics
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Summary Statistics Cards -->
+    <div class="stats-container">
+        <div class="row">
+            <div class="col-md-3 mb-4 animate-fade-in animate-delay-1">
+                <div class="card stat-card stat-card-interactive">
+                    <div class="card-body">
+                        <div class="stat-label">Total Properties</div>
+                        <div class="d-flex align-items-baseline">
+                            <div class="stat-value" id="total-properties">--</div>
+                            <div class="stat-change positive" id="property-change">
+                                <i class="fas fa-arrow-up"></i> 5%
+                            </div>
+                        </div>
+                        <small class="text-muted">From all property types</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4 animate-fade-in animate-delay-1">
+                <div class="card stat-card stat-card-interactive">
+                    <div class="card-body">
+                        <div class="stat-label">Average Value</div>
+                        <div class="d-flex align-items-baseline">
+                            <div class="stat-value" id="avg-value">--</div>
+                            <div class="stat-change positive" id="avg-change">
+                                <i class="fas fa-arrow-up"></i> 3.2%
+                            </div>
+                        </div>
+                        <small class="text-muted">Across all properties</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4 animate-fade-in animate-delay-2">
+                <div class="card stat-card stat-card-interactive">
+                    <div class="card-body">
+                        <div class="stat-label">Highest Value</div>
+                        <div class="d-flex align-items-baseline">
+                            <div class="stat-value" id="highest-value">--</div>
+                        </div>
+                        <small class="text-muted" id="highest-property-type">Commercial property</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4 animate-fade-in animate-delay-2">
+                <div class="card stat-card stat-card-interactive">
+                    <div class="card-body">
+                        <div class="stat-label">Most Common Type</div>
+                        <div class="d-flex align-items-baseline">
+                            <div class="stat-value" id="common-type">--</div>
+                        </div>
+                        <small class="text-muted" id="common-type-count">15 properties</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-md-6 mb-4 animate-fade-in animate-delay-3">
+            <div class="card chart-card hover-lift">
+                <div class="card-body">
+                    <h5 class="chart-title">Property Value by Type</h5>
+                    <div class="chart-container">
+                        <canvas id="property-type-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4 animate-fade-in animate-delay-3">
+            <div class="card chart-card hover-lift">
+                <div class="card-body">
+                    <h5 class="chart-title">Value Distribution</h5>
+                    <div class="chart-container">
+                        <canvas id="value-distribution-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-12 animate-fade-in animate-delay-4">
+            <div class="card chart-card hover-lift">
+                <div class="card-body">
+                    <h5 class="chart-title">Property Value Trends by Year</h5>
+                    <div class="chart-container">
+                        <canvas id="value-trends-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Property Type Table -->
+    <div class="row mb-4">
+        <div class="col-12 animate-fade-in animate-delay-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="chart-title">Property Types Summary</h5>
+                    <div class="table-responsive">
+                        <table class="table stats-table table-hover-row">
+                            <thead>
+                                <tr>
+                                    <th>Property Type</th>
+                                    <th>Count</th>
+                                    <th>Average Value</th>
+                                    <th>Min Value</th>
+                                    <th>Max Value</th>
+                                    <th>Annual Change</th>
+                                </tr>
+                            </thead>
+                            <tbody id="property-type-table">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- City Statistics Table -->
+    <div class="row mb-4">
+        <div class="col-12 animate-fade-in animate-delay-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="chart-title">City Statistics</h5>
+                    <div class="table-responsive">
+                        <table class="table stats-table table-hover-row">
+                            <thead>
+                                <tr>
+                                    <th>City</th>
+                                    <th>Property Count</th>
+                                    <th>Average Value</th>
+                                    <th>Most Common Type</th>
+                                    <th>YoY Change</th>
+                                </tr>
+                            </thead>
+                            <tbody id="city-stats-table">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart initialization -->
+<script>
+// Chart instances
+let propertyTypeChart = null;
+let valueDistributionChart = null;
+let valueTrendsChart = null;
+
+// When the document is loaded, set up event handlers and load initial data
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up the refresh button to load data with filters
+    document.getElementById('refresh-stats').addEventListener('click', function() {
+        // Get filter values
+        const propertyType = document.getElementById('property-type-filter').value;
+        const city = document.getElementById('city-filter').value;
+        const year = document.getElementById('year-filter').value;
+        
+        // Build query parameters
+        let params = new URLSearchParams();
+        if (propertyType !== 'all') params.append('property_type', propertyType);
+        if (city !== 'all') params.append('city', city);
+        if (year !== 'all') params.append('year', year);
+        
+        // Fetch filtered data from API
+        fetchStatistics(params.toString());
+    });
+    
+    // Load initial data when page loads
+    fetchStatistics();
+});
+
+// Fetch statistics data from the API
+function fetchStatistics(queryParams = '') {
+    const url = `/api/statistics${queryParams ? '?' + queryParams : ''}`;
+    
+    fetch(url)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                updateDashboard(data.statistics);
+            } else {
+                console.error('Error loading statistics:', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching statistics:', error);
+        });
+}
+
+// Update the dashboard with the statistics data
+function updateDashboard(stats) {
+    // Update summary cards
+    document.getElementById('total-properties').textContent = stats.total_properties || 0;
+    document.getElementById('avg-value').textContent = formatCurrency(stats.average_value || 0);
+    document.getElementById('highest-value').textContent = formatCurrency(stats.highest_value || 0);
+    document.getElementById('common-type').textContent = stats.most_common_type || 'Residential';
+    document.getElementById('common-type-count').textContent = `${stats.most_common_type_count || 0} properties`;
+    document.getElementById('highest-property-type').textContent = stats.highest_value_type || 'Commercial';
+    
+    // Update charts
+    if (stats.property_types) {
+        updatePropertyTypeChart(stats.property_types);
+    }
+    
+    if (stats.value_distribution) {
+        updateValueDistributionChart(stats.value_distribution);
+    }
+    
+    if (stats.value_trends) {
+        updateValueTrendsChart(stats.value_trends);
+    }
+    
+    // Update tables
+    if (stats.property_type_stats) {
+        updatePropertyTypeTable(stats.property_type_stats);
+    }
+    
+    if (stats.city_stats) {
+        updateCityStatsTable(stats.city_stats);
+    }
+    
+    // Populate filters if they aren't already populated
+    populateFilters(stats);
+}
+
+// Helper function to format currency values
+function formatCurrency(value) {
+    if (value === null || value === undefined) return '--';
+    
+    value = parseFloat(value);
+    if (isNaN(value)) return '--';
+    
+    if (value >= 1000000) {
+        return '$' + (value / 1000000).toFixed(1) + 'M';
+    } else if (value >= 1000) {
+        return '$' + (value / 1000).toFixed(0) + 'K';
+    } else {
+        return '$' + value.toFixed(0);
+    }
+}
+
+// Populate filter dropdowns with data
+function populateFilters(stats) {
+    // Only populate if not already populated
+    if (document.getElementById('property-type-filter').options.length <= 1 && stats.property_types) {
+        const propertyTypeFilter = document.getElementById('property-type-filter');
+        stats.property_types.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.property_type;
+            option.textContent = item.property_type;
+            propertyTypeFilter.appendChild(option);
+        });
+    }
+    
+    if (document.getElementById('city-filter').options.length <= 1 && stats.city_stats) {
+        const cityFilter = document.getElementById('city-filter');
+        stats.city_stats.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.city;
+            option.textContent = item.city;
+            cityFilter.appendChild(option);
+        });
+    }
+}
+
+// Update the property types table
+function updatePropertyTypeTable(propertyTypesData) {
+    const tableBody = document.getElementById('property-type-table');
+    tableBody.innerHTML = '';
+    
+    propertyTypesData.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${item.property_type}</td>
+            <td>${item.count}</td>
+            <td>${formatCurrency(item.average_value)}</td>
+            <td>${formatCurrency(item.min_value)}</td>
+            <td>${formatCurrency(item.max_value)}</td>
+            <td>${item.annual_change.toFixed(1)}%</td>
+        `;
+        tableBody.appendChild(row);
+    });
+}
+
+// Update the city statistics table
+function updateCityStatsTable(cityStatsData) {
+    const tableBody = document.getElementById('city-stats-table');
+    tableBody.innerHTML = '';
+    
+    cityStatsData.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${item.city}</td>
+            <td>${item.count}</td>
+            <td>${formatCurrency(item.average_value)}</td>
+            <td>${item.most_common_type}</td>
+            <td>${item.yoy_change.toFixed(1)}%</td>
+        `;
+        tableBody.appendChild(row);
+    });
+}
+</script>
+{% endblock %}
