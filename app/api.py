@@ -3,9 +3,7 @@ This module defines the API routes and handlers.
 """
 
 import logging
-import re
 from typing import Optional, Dict, Any, List, Union
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_500_INTERNAL_SERVER_ERROR
 from starlette.responses import JSONResponse
@@ -15,7 +13,7 @@ from app.models import (
     SQLQuery, NLPrompt, QueryResult, SQLTranslation, ParameterizedSQLQuery,
     SchemaResponse, SchemaSummary, HealthResponse, SchemaItem
 )
-from app.openai_service import translate_nl_to_sql
+from app.openai_service import translate_nl_to_sql 
 from app.security import get_api_key
 
 # Configure logging
@@ -27,26 +25,71 @@ router = APIRouter()
 
 @router.get("/health", response_model=HealthResponse)
 async def health_check():
-    """
-    Check the health of the API and its database connections.
-    
-    Returns:
-        HealthResponse: The health status of the API and its database connections
-    """
-    import time
-    from app import start_time
-    
-    # Test database connections
+    """Health check endpoint."""
     db_connections = test_db_connections()
-    
     return {
         "status": "success" if any(db_connections.values()) else "error",
         "message": "API is operational",
         "database_status": db_connections,
-        "databases": [],  # Detailed database info would be added here in a full implementation
-        "api_version": "1.0.0",  # Set API version
-        "uptime": time.time() - start_time  # Calculate uptime in seconds
+        "api_version": "1.0.0"
     }
+
+@router.post("/agent/query", response_model=QueryResult)
+async def agent_query(
+    query: str = Query(..., description="Natural language query to process"),
+    api_key: str = Depends(get_api_key)
+):
+    """Process agent query and return results."""
+    try:
+        # Translate natural language to SQL
+        translation = await translate_nl_to_sql(query, "postgres", "")
+
+        if translation.get("status") == "error":
+            raise HTTPException(
+                status_code=HTTP_400_BAD_REQUEST,
+                detail=translation.get("message", "Translation failed")
+            )
+
+        # Execute the translated SQL
+        result = await execute_parameterized_query(
+            db="postgres",
+            query=translation["sql"],
+            params=translation.get("parameters", {}),
+            page=1,
+            page_size=100
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Agent query error: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"Agent processing error: {str(e)}"
+        )
+
+@router.get("/agent/status")
+async def agent_status(api_key: str = Depends(get_api_key)):
+    """Get agent status and configuration."""
+    try:
+        return {
+            "status": "active",
+            "capabilities": [
+                "natural_language_queries",
+                "sql_translation",
+                "schema_discovery"
+            ],
+            "models": {
+                "default": "gpt-3.5-turbo",
+                "available": ["gpt-3.5-turbo", "gpt-4"] 
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting agent status: {str(e)}")
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to get agent status"
+        )
 
 @router.post("/run-query", response_model=QueryResult)
 async def run_sql_query(

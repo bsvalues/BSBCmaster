@@ -1,14 +1,11 @@
-"""
-This module provides OpenAI integration for natural language to SQL translation.
-"""
+"""OpenAI service for natural language processing"""
 
+import os
 import json
 import logging
-import os
 import time
 import asyncio
-from datetime import datetime
-from typing import Dict, Any, List, Optional, Tuple, Union
+from typing import Dict, Any, Optional
 
 from app.cache import cache
 from app.settings import settings
@@ -22,198 +19,82 @@ logger = logging.getLogger(__name__)
 client = None
 
 def initialize_openai_client():
-    """Initialize the OpenAI client if not already initialized."""
+    """Initialize the OpenAI client."""
     global client
-    
     if client is not None:
         return
-    
-    openai_api_key = settings.OPENAI.API_KEY
-    if not openai_api_key:
-        logger.warning("OpenAI API key not set. Natural language translation will be unavailable.")
-        return
-    
-    try:
-        import openai
-        client = openai.OpenAI(api_key=openai_api_key)
-        logger.info("OpenAI client initialized successfully")
-    except ImportError:
-        logger.error("Failed to import openai module. Please ensure it's installed.")
-    except Exception as e:
-        logger.error(f"Error initializing OpenAI client: {str(e)}")
 
-# Initialize client at module load time
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=settings.OPENAI.API_KEY)
+        logger.info("OpenAI client initialized successfully")
+    except Exception as e:
+        logger.error(f"OpenAI client initialization failed: {str(e)}")
+
 initialize_openai_client()
 
-@cache(ttl_seconds=300)  # Cache results for 5 minutes
+@cache(ttl_seconds=300)
 async def translate_nl_to_sql(
-    prompt: str, 
-    db_type: str, 
+    prompt: str,
+    db_type: str,
     schema_info: str
 ) -> Dict[str, Any]:
-    """
-    Translate natural language to SQL using OpenAI.
-    
-    Args:
-        prompt: The natural language prompt
-        db_type: The database type (postgres or mssql)
-        schema_info: Schema information to provide context
-        
-    Returns:
-        Dictionary containing:
-            - sql: The translated SQL query
-            - explanation: An explanation of the SQL query
-            - parameters: Extracted parameters (if any)
-            - status: Status of the translation (success, error)
-    """
-    # Validate the natural language prompt
-    validation = validate_natural_language_prompt(prompt)
-    if not validation["valid"]:
+    """Translate natural language to SQL."""
+    try:
+        if not client:
+            initialize_openai_client()
+
+        if not client:
+            logger.warning("OpenAI client unavailable")
+            return {
+                "status": "error",
+                "message": "Translation service unavailable",
+                "sql": None
+            }
+
+        # Validate prompt
+        validation = validate_natural_language_prompt(prompt)
+        if not validation["valid"]:
+            return {
+                "status": "error",
+                "message": f"Invalid prompt: {validation['issues']}",
+                "sql": None
+            }
+
+        # Create system message
+        system_message = f"""
+        Translate natural language to {db_type} SQL.
+        Schema: {schema_info}
+        """
+
+        response = await asyncio.wait_for(
+            asyncio.to_thread(
+                client.chat.completions.create,
+                model=settings.OPENAI.MODEL,
+                messages=[
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3
+            ),
+            timeout=10.0
+        )
+
+        result = {
+            "status": "success",
+            "sql": response.choices[0].message.content,
+            "explanation": "Translated query"
+        }
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Translation error: {str(e)}")
         return {
             "status": "error",
-            "message": f"Invalid prompt: {', '.join(validation['issues'])}",
-            "sql": None,
-            "explanation": None,
-            "parameters": {}
+            "message": f"Translation failed: {str(e)}",
+            "sql": None
         }
-    
-    # Initialize OpenAI client if not already initialized
-    if client is None:
-        initialize_openai_client()
-    
-    # Check if client is initialized
-    if client is None:
-        logger.warning("OpenAI client not available, using fallback translation")
-        result = await fallback_nl_to_sql(prompt, db_type, schema_info)
-        result["status"] = "fallback"
-        return result
-        
-    try:
-        # Create a more detailed system message with enhanced schema understanding
-        system_message = f"""
-        You are an expert SQL translator for {db_type.upper()} databases specializing in real estate assessment data.
-        Translate natural language queries to SQL based on the following schema:
-
-        {schema_info}
-
-        CONTEXT ABOUT REAL ESTATE DATA:
-        - Parcels table contains the main assessment records with unique parcel_id, address, and valuation data
-          * land_value represents the value of the land only
-          * improvement_value represents the value of buildings and structures on the land
-          * total_value is the sum of land_value and improvement_value
-          * assessment_year indicates when the property was last assessed
-        
-        - Properties table contains physical characteristics like square_footage, bedrooms, bathrooms
-          * property_type categorizes properties (residential, commercial, industrial, etc.)
-          * year_built indicates the construction year of the main structure
-          * condition and quality are qualitative ratings of the property
-          * lot_size and lot_size_unit represent the land area (typical units: acres, square feet)
-        
-        - Sales table contains historical sale transactions with sale_date and sale_price
-          * sale_type categorizes transactions (standard, foreclosure, auction, etc.)
-          * Multiple sales records may exist for the same parcel representing transaction history
-          * buyer_name and seller_name contain the transaction parties
-        
-        RELATIONSHIPS:
-        - Properties and Sales tables both link to Parcels via parcel_id foreign key
-        - One parcel can have one property record and multiple sales records (one-to-many)
-        
-        COMMON TERMINOLOGY:
-        - "Recent sales" typically means sales from the last 1-2 years
-        - "High-value properties" are usually those with total_value > 500000
-        - "Luxury properties" typically have 4+ bedrooms, 3+ bathrooms, and higher quality ratings
-        - "Investment properties" often have multiple sales within short periods
-        - "New construction" refers to properties built within the last 5 years
-        - "Market trends" typically involve analyzing sales prices over time periods
-        - "Assessment ratio" compares sale_price to total_value to evaluate assessment accuracy
-        
-        SQL OPTIMIZATION TIPS FOR {db_type.upper()}:
-        - Use appropriate indexes (parcels.parcel_id, sales.sale_date, properties.property_type)
-        - For date comparisons in {db_type.upper()}, use appropriate date functions
-        - When joining tables, start with the most restrictive table in the FROM clause
-        - Consider using windowing functions for trend analysis over time
-
-        Please follow these guidelines:
-        - Generate ONLY {db_type.upper()} SQL syntax
-        - Include appropriate JOINs when needed
-        - Use proper column and table names from the schema
-        - Format the SQL query with proper indentation and clear structure
-        - Use parameterized queries with placeholders (like :param) for user input values
-        - Provide a brief explanation of the query including business context and potential use cases
-        - Identify extractable parameters from the query with appropriate data types
-        - For date ranges, use proper date functions appropriate for {db_type.upper()}
-        - When calculating averages or totals, handle NULL values appropriately (COALESCE or similar)
-        - Include proper ORDER BY clauses for meaningful sorting
-        - For queries expected to return many rows, include LIMIT :limit and OFFSET :offset parameters
-        - Add comments to complex sections of SQL for better readability
-        
-        Response format:
-        {{
-            "sql": "Your SQL query here",
-            "explanation": "Detailed explanation of what the query does and business context",
-            "parameters": {{
-                "param1": "description of parameter 1 with expected data type",
-                "param2": "description of parameter 2 with expected data type",
-                ...
-            }},
-            "suggested_visualizations": [
-                "Brief description of visualizations that would work well with this data"
-            ]
-        }}
-        
-        Return ONLY valid JSON.
-        """
-        
-        # Start timing
-        start_time = time.time()
-        
-        # Call the OpenAI API with timeout
-        try:
-            response = await asyncio.wait_for(
-                asyncio.to_thread(
-                    client.chat.completions.create,
-                    model=settings.OPENAI.MODEL,
-                    messages=[
-                        {"role": "system", "content": system_message},
-                        {"role": "user", "content": f"Translate this to SQL: {prompt}"}
-                    ],
-                    response_format={"type": "json_object"},
-                    temperature=settings.OPENAI.TEMPERATURE,
-                    max_tokens=settings.OPENAI.MAX_TOKENS
-                ),
-                timeout=settings.OPENAI.TIMEOUT
-            )
-        except asyncio.TimeoutError:
-            logger.error(f"OpenAI API timeout after {settings.OPENAI.TIMEOUT} seconds")
-            result = await fallback_nl_to_sql(prompt, db_type, schema_info)
-            result["status"] = "timeout"
-            return result
-        
-        # Calculate execution time
-        execution_time = time.time() - start_time
-        
-        # Parse the JSON response
-        result_text = response.choices[0].message.content
-        result = json.loads(result_text)
-        
-        # Add status and execution time
-        result["status"] = "success"
-        result["execution_time"] = execution_time
-        
-        # Ensure parameters field exists
-        if "parameters" not in result:
-            result["parameters"] = {}
-        
-        # Log the result
-        logger.info(f"OpenAI translation completed in {execution_time:.2f}s: {result['sql'][:100]}...")
-        
-        return result
-    except Exception as e:
-        logger.error(f"Error translating natural language to SQL: {str(e)}")
-        result = await fallback_nl_to_sql(prompt, db_type, schema_info)
-        result["status"] = "error"
-        result["error"] = str(e)
-        return result
 
 async def fallback_nl_to_sql(
     prompt: str, 
