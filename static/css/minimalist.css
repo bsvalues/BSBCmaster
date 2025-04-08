@@ -4,7 +4,7 @@
 /* CSS Variables - Light Mode (Default) */
 :root {
     /* Color palette */
-    --main-bg-color: #f8fafc;
+    --main-bg-color: #f8f9fa; /* Changed to match edited styles */
     --card-bg-color: #ffffff;
     --card-border-color: rgba(0, 0, 0, 0.08);
     --navbar-bg-color: #ffffff;
@@ -63,10 +63,10 @@
 
 /* Base styles */
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: var(--main-bg-color);
+    font-family: 'Inter', sans-serif; /*Simplified font stack*/
+    line-height: 1.6; /* from edited styles */
+    background: var(--main-bg-color); /* Use variable for consistency */
     color: var(--text-primary);
-    line-height: 1.5;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -74,7 +74,7 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-    font-family: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Lexend', sans-serif;
     font-weight: 500;
     margin-bottom: var(--spacing-md);
 }
@@ -404,7 +404,7 @@ a:hover {
     transform: translateY(-2px) !important;
 }
 
-/* Image handling */
+/* Image handling - removed hover effect to maintain minimalism */
 .property-image {
     width: 100%;
     aspect-ratio: 16/9;
@@ -412,12 +412,8 @@ a:hover {
     object-fit: cover;
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
-    transition: transform var(--transition-speed);
 }
 
-.property-image:hover {
-    transform: scale(1.02);
-}
 
 .image-gallery {
     display: grid;
@@ -449,15 +445,81 @@ a:hover {
     }
 }
 
-.hero-section {
-  padding: 4rem 0;
-  color: white;
+/*Removed hero section from original, added from edited*/
+.hero {
+    background: #fff;
+    padding: 4rem 0;
+    border-bottom: 1px solid #e9ecef;
 }
 
-.minimalist-hero {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-  min-height: 400px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.search-container {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.search-title {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    color: #212529;
+}
+
+.search-form {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.search-input {
+    flex: 1;
+    padding: 1rem;
+    border: 2px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.search-button {
+    padding: 1rem 2rem;
+    background: #0d6efd;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.search-button:hover {
+    background: #0b5ed7;
+}
+
+/* Quick links */
+.quick-link-card {
+    display: block;
+    padding: 1.5rem;
+    background: white;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #212529;
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #e9ecef;
+}
+
+.quick-link-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.quick-link-icon {
+    font-size: 2rem;
+    color: #0d6efd;
+    margin-bottom: 1rem;
+}
+
+.quick-link-title {
+    font-size: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+.quick-link-desc {
+    color: #6c757d;
+    margin: 0;
 }
