@@ -302,8 +302,8 @@ function updateValueTrendsChart(trendsData) {
         const color = colors[index % colors.length];
         const colorBase = color.replace('1)', '');
         
-        gradientFill.addColorStop(0, `${colorBase}0.3)`);
-        gradientFill.addColorStop(1, `${colorBase}0.02)`);
+        gradientFill.addColorStop(0, colorBase + '0.3)');
+        gradientFill.addColorStop(1, colorBase + '0.02)');
         
         return {
             label: dataset.label,
@@ -381,7 +381,7 @@ function updateValueTrendsChart(trendsData) {
                             if (context.dataIndex > 0 && firstValue > 0) {
                                 const percentChange = ((currentValue - firstValue) / firstValue * 100).toFixed(1);
                                 const changeString = percentChange >= 0 ? `+${percentChange}%` : `${percentChange}%`;
-                                return `${label}${currentValue} (${changeString} from ${trendsData.labels[0]})`;
+                                return `${label}${currentValue} (${changeString} from first year)`;
                             }
                             
                             return `${label}${currentValue}`;
