@@ -34,6 +34,13 @@ from sqlalchemy import create_engine, inspect
 from app.validators import validate_query
 import map_module
 
+# Import statistics routes
+try:
+    from app.api.statistics_routes import statistics_api
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.error(f"Failed to import statistics API routes: {e}")
+
 # Import minimalist routes
 try:
     from routes_minimal import register_minimalist_routes
@@ -47,6 +54,13 @@ except ImportError as e:
 
 # Register routes
 app.register_blueprint(api_routes)
+
+# Register statistics API routes
+try:
+    app.register_blueprint(statistics_api)
+    logger.info("Statistics API routes registered successfully")
+except Exception as e:
+    logger.error(f"Failed to register statistics API routes: {e}")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

@@ -360,18 +360,14 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Include chart update functions -->
+<script src="{{ url_for('static', filename='js/statistics_dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/chart_update_functions.js') }}"></script>
 <script>
-// Helper functions to extract data from the API response
-function getMostExpensivePropertyValue(stats) {
-    // Find the property type with highest average value
-    let highestAvg = 0;
-    Object.values(stats.property_type_statistics).forEach(type => {
-        if (type.average_value > highestAvg) {
-            highestAvg = type.average_value;
-        }
-    });
-    return highestAvg;
-}
+// Chart instances
+let propertyTypeChart = null;
+let valueDistributionChart = null;
+let valueTrendsChart = null;
 
 function getHighestValue(stats) {
     // Find the highest property value across all types

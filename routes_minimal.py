@@ -33,7 +33,7 @@ def statistics_dashboard_minimal():
         avg_value = db.session.query(func.avg(Account.assessed_value)).scalar() or 0
         
         # Get cities
-        cities = db.session.query(Account.city).filter(Account.city != None).distinct().all()
+        cities = db.session.query(Account.property_city).filter(Account.property_city != None).distinct().all()
         cities = [city[0] for city in cities if city[0]]
         
         # Get property types
@@ -50,14 +50,14 @@ def statistics_dashboard_minimal():
         for prop, account, parcel in properties:
             property_list.append({
                 'parcel_id': parcel.parcel_id if parcel else '',
-                'address': prop.address if prop else '',
-                'city': account.city if account else '',
+                'address': parcel.address if parcel else '',
+                'city': account.property_city if account else '',
                 'property_type': account.property_type if account else '',
                 'assessed_value': account.assessed_value if account else 0
             })
             
         return render_template(
-            'statistics_dashboard_new.html',
+            'statistics_dashboard_minimal.html',
             property_count=property_count,
             avg_value=f"{int(avg_value):,d}",
             city_count=len(cities),
@@ -70,8 +70,13 @@ def statistics_dashboard_minimal():
         logger.error(f"Error rendering statistics dashboard: {e}")
         return render_template('error.html', error=str(e))
 
+def statistics_redirect():
+    """Redirect from /statistics to the minimalist statistics dashboard."""
+    return redirect(url_for('statistics_dashboard_minimal'))
+
 def register_minimalist_routes(app):
     """Register all minimalist design routes with the Flask application."""
     app.add_url_rule('/minimal', view_func=index_minimal)
     app.add_url_rule('/map-minimal', view_func=map_view_minimal)
     app.add_url_rule('/statistics-minimal', view_func=statistics_dashboard_minimal)
+    app.add_url_rule('/statistics', view_func=statistics_redirect)
