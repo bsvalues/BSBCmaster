@@ -4,7 +4,7 @@
 
 {% block head %}
 <style>
-    /* Exact match with the Benton County reference design */
+    /* Simple clean hero section */
     .hero {
         position: relative;
         padding: 0;
@@ -28,11 +28,6 @@
         z-index: 0;
     }
     
-    /* Remove the dark overlay */
-    .hero-overlay {
-        display: none;
-    }
-    
     .hero-content {
         position: relative;
         z-index: 2;
@@ -40,67 +35,7 @@
         display: flex;
         flex-direction: column;
         justify-content: center;
-    }
-    
-    /* Center text overlay with large transparent letters */
-    .hero-section {
-        text-align: center;
-        margin-bottom: 2rem;
-        position: relative;
-    }
-    
-    /* Large Benton County text with transparency */
-    .county-text-overlay {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -80%);
-        text-align: center;
-        z-index: 1;
-        width: 100%;
-    }
-    
-    .county-text-overlay h1 {
-        font-size: 5rem;
-        font-weight: 800;
-        letter-spacing: 0.1em;
-        color: rgba(255, 255, 255, 0.7);
-        text-transform: uppercase;
-        margin-bottom: 0;
-        line-height: 1;
-        text-shadow: 2px 2px 6px rgba(0,0,0,0.2);
-    }
-    
-    .county-text-overlay p {
-        font-size: 2.5rem;
-        font-weight: 400;
-        letter-spacing: 0.3em;
-        color: rgba(255, 255, 255, 0.7);
-        text-transform: uppercase;
-        margin-top: 0;
-        text-shadow: 2px 2px 6px rgba(0,0,0,0.2);
-    }
-    
-    /* Regular title */
-    .hero-section h1 {
-        font-size: 2.5rem;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
-        letter-spacing: 0.05em;
-        color: white;
-        position: relative;
-        z-index: 2;
-    }
-    
-    .hero-section p {
-        font-size: 1.2rem;
-        font-weight: 400;
-        margin-bottom: 1.5rem;
-        max-width: 800px;
-        margin-left: auto;
-        margin-right: auto;
-        position: relative;
-        z-index: 2;
+        align-items: center;
     }
     
     .search-container {
@@ -362,23 +297,10 @@
 {% endblock %}
 
 {% block content %}
-<!-- Hero Section - Benton County Style, exact match with reference -->
+<!-- Clean Hero Section -->
 <div class="hero">
-    <div class="hero-overlay"></div>
     <div class="container hero-content">
-        <!-- Large County Name Watermark Overlay -->
-        <div class="county-text-overlay">
-            <h1>BENTON</h1>
-            <p>COUNTY</p>
-            <p style="font-size: 1.8rem; margin-top: -10px; letter-spacing: 0.4em;">WASHINGTON</p>
-        </div>
-        
-        <div class="hero-section">
-            <h1>PROPERTY ASSESSMENT</h1>
-            <p>Explore comprehensive property data and assessment information for Benton County</p>
-        </div>
-        
-        <!-- Search Container -->
+        <!-- Just the search box, nothing else -->
         <div class="search-container animated animated-delay-1">
             <h2 class="search-title">Find a Property</h2>
             <div class="search-form">
@@ -386,11 +308,6 @@
                 <button class="search-button">
                     <i class="fas fa-search"></i>
                 </button>
-            </div>
-            <div class="mt-2 text-center">
-                <div class="view-pills">
-                    <div class="view-pill active">Map View</div>
-                </div>
             </div>
         </div>
     </div>
