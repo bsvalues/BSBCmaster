@@ -5,34 +5,34 @@
 {% block head %}
 <style>
     .search-header {
-        background: linear-gradient(135deg, rgba(44, 82, 130, 0.05) 0%, rgba(44, 82, 130, 0.1) 100%);
+        /* Removed background image */
         border-radius: var(--border-radius-lg);
         padding: 2rem;
         margin-bottom: 2rem;
     }
-    
+
     .search-form {
         position: relative;
     }
-    
+
     .search-form .btn-search {
         height: calc(3rem + 2px);
     }
-    
+
     .range-container {
         padding: 0 10px;
     }
-    
+
     .property-card {
         transition: transform 0.2s ease, box-shadow 0.2s ease;
         height: 100%;
     }
-    
+
     .property-card:hover {
         transform: translateY(-5px);
         box-shadow: var(--box-shadow-lg);
     }
-    
+
     .property-image {
         height: 180px;
         background-color: #f8f9fa;
@@ -41,7 +41,7 @@
         border-top-left-radius: calc(var(--border-radius) - 1px);
         border-top-right-radius: calc(var(--border-radius) - 1px);
     }
-    
+
     .property-type-badge {
         position: absolute;
         top: 10px;
@@ -53,33 +53,33 @@
         font-weight: 600;
         color: var(--primary-color);
     }
-    
+
     .property-value {
         font-size: 1.5rem;
         font-weight: 700;
         color: var(--primary-color);
         margin-bottom: 0.5rem;
     }
-    
+
     .property-address {
         color: var(--text-primary);
         margin-bottom: 0.5rem;
         font-weight: 500;
     }
-    
+
     .property-location {
         color: var(--text-secondary);
         font-size: 0.875rem;
         margin-bottom: 1rem;
     }
-    
+
     .filters-section {
         background-color: var(--card-bg);
         border-radius: var(--border-radius);
         padding: 1.5rem;
         margin-bottom: 2rem;
     }
-    
+
     .filter-title {
         color: var(--text-primary);
         font-weight: 600;
@@ -87,7 +87,7 @@
         padding-bottom: 0.5rem;
         border-bottom: 1px solid var(--card-border-color);
     }
-    
+
     /* Animation for search results */
     @keyframes fadeInUp {
         from {
@@ -99,11 +99,11 @@
             transform: translateY(0);
         }
     }
-    
+
     .animate-fade-in {
         animation: fadeInUp 0.5s ease forwards;
     }
-    
+
     /* Stagger animation delay for search results */
     .search-results-list .col-lg-4:nth-child(1) { animation-delay: 0.1s; }
     .search-results-list .col-lg-4:nth-child(2) { animation-delay: 0.2s; }
@@ -111,17 +111,17 @@
     .search-results-list .col-lg-4:nth-child(4) { animation-delay: 0.4s; }
     .search-results-list .col-lg-4:nth-child(5) { animation-delay: 0.5s; }
     .search-results-list .col-lg-4:nth-child(6) { animation-delay: 0.6s; }
-    
+
     /* Pagination styles */
     .pagination-container {
         margin-top: 2rem;
     }
-    
+
     .pagination .page-link {
         color: var(--primary-color);
         border-color: var(--card-border-color);
     }
-    
+
     .search-container {
         background: var(--card-bg-color);
         padding: 1.5rem;
@@ -157,16 +157,16 @@
         gap: 1rem;
         margin-top: 1rem;
     }
-    
+
     /* Range slider styling */
     .noUi-connect {
         background: var(--primary-color);
     }
-    
+
     .noUi-horizontal {
         height: 8px;
     }
-    
+
     .noUi-horizontal .noUi-handle {
         width: 20px;
         height: 20px;
@@ -177,42 +177,42 @@
         border: 2px solid #fff;
         right: -10px;
     }
-    
+
     .noUi-handle:before,
     .noUi-handle:after {
         display: none;
     }
-    
+
     /* Filter accordion */
     #filterAccordion .accordion-button {
         padding: 0.75rem 1rem;
         font-size: 0.9rem;
         font-weight: 600;
     }
-    
+
     #filterAccordion .accordion-button:not(.collapsed) {
         background-color: rgba(44, 82, 130, 0.05);
         color: var(--primary-color);
     }
-    
+
     .filter-item {
         margin-bottom: 1.5rem;
     }
-    
+
     .filter-label {
         font-size: 0.85rem;
         font-weight: 600;
         margin-bottom: 0.5rem;
         color: var(--text-secondary);
     }
-    
+
     /* No results message */
     .no-results {
         text-align: center;
         padding: 3rem;
         color: var(--text-secondary);
     }
-    
+
     .no-results-icon {
         font-size: 3rem;
         margin-bottom: 1rem;
@@ -228,14 +228,14 @@
         <h1 class="mb-4">Property Search</h1>
         <p class="lead mb-0">Search for Benton County properties by address, owner, property type, and value.</p>
     </div>
-    
+
     <!-- Main Content Area -->
     <div class="row">
         <!-- Filters Sidebar -->
         <div class="col-lg-3 mb-4">
             <div class="filters-section">
                 <h5 class="filter-title">Search Filters</h5>
-                
+
                 <form action="/property-search" method="get">
                     <!-- Property Address -->
                     <div class="filter-item">
@@ -244,7 +244,7 @@
                                placeholder="Enter street address"
                                value="{{ search_params.property_address or '' }}">
                     </div>
-                    
+
                     <!-- Owner Name -->
                     <div class="filter-item">
                         <div class="filter-label">Owner Name</div>
@@ -252,7 +252,7 @@
                                placeholder="Enter owner name"
                                value="{{ search_params.owner_name or '' }}">
                     </div>
-                    
+
                     <!-- Property Type -->
                     <div class="filter-item">
                         <div class="filter-label">Property Type</div>
@@ -263,7 +263,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    
+
                     <!-- City -->
                     <div class="filter-item">
                         <div class="filter-label">City</div>
@@ -274,7 +274,7 @@
                             {% endfor %}
                         </select>
                     </div>
-                    
+
                     <!-- Value Range -->
                     <div class="filter-item">
                         <div class="filter-label">Value Range</div>
@@ -288,13 +288,13 @@
                         <input type="hidden" id="minPriceInput" name="min_price" value="{{ search_params.min_price or min_value }}">
                         <input type="hidden" id="maxPriceInput" name="max_price" value="{{ search_params.max_price or max_value }}">
                     </div>
-                    
+
                     <!-- Search Button -->
                     <button type="submit" class="btn btn-primary w-100 ripple">
                         <i class="fas fa-search me-2"></i> Search Properties
                     </button>
                 </form>
-                
+
                 {% if is_search %}
                 <div class="mt-3">
                     <a href="/property-search" class="btn btn-outline-secondary w-100 ripple">
@@ -303,7 +303,7 @@
                 </div>
                 {% endif %}
             </div>
-            
+
             <!-- Search Tips -->
             <div class="card mt-4">
                 <div class="card-body">
@@ -317,7 +317,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Search Results -->
         <div class="col-lg-9">
             {% if is_search %}
@@ -330,7 +330,7 @@
                             No Properties Found
                         {% endif %}
                     </h5>
-                    
+
                     {% if search_results|length > 0 %}
                     <div class="d-flex gap-2">
                         <div class="btn-group">
@@ -350,7 +350,7 @@
                     </div>
                     {% endif %}
                 </div>
-                
+
                 {% if search_results|length > 0 %}
                 <!-- Grid View of Properties -->
                 <div class="row search-results-list" id="gridView">
@@ -372,7 +372,7 @@
                     </div>
                     {% endfor %}
                 </div>
-                
+
                 <!-- List View of Properties (hidden by default) -->
                 <div class="card mb-4" id="listView" style="display: none;">
                     <div class="list-group list-group-flush">
@@ -397,7 +397,7 @@
                         {% endfor %}
                     </div>
                 </div>
-                
+
                 <!-- Pagination -->
                 <nav aria-label="Search results pages" class="pagination-container">
                     <ul class="pagination justify-content-center">
@@ -478,13 +478,13 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize range slider
         const valueSlider = document.getElementById('valueRange');
-        
+
         if (valueSlider) {
             const minPrice = {{ min_value }};
             const maxPrice = {{ max_value }};
             const initialMinPrice = {{ search_params.min_price or min_value }};
             const initialMaxPrice = {{ search_params.max_price or max_value }};
-            
+
             noUiSlider.create(valueSlider, {
                 start: [initialMinPrice, initialMaxPrice],
                 connect: true,
@@ -502,15 +502,15 @@
                     }
                 }
             });
-            
+
             const minPriceInput = document.getElementById('minPriceInput');
             const maxPriceInput = document.getElementById('maxPriceInput');
             const valueMinDisplay = document.getElementById('valueMin');
             const valueMaxDisplay = document.getElementById('valueMax');
-            
+
             valueSlider.noUiSlider.on('update', function (values, handle) {
                 const value = values[handle];
-                
+
                 if (handle === 0) {
                     minPriceInput.value = value;
                     valueMinDisplay.innerHTML = '$' + parseInt(value).toLocaleString();
@@ -520,21 +520,21 @@
                 }
             });
         }
-        
+
         // Toggle between grid and list view
         const gridViewBtn = document.getElementById('gridViewBtn');
         const listViewBtn = document.getElementById('listViewBtn');
         const gridView = document.getElementById('gridView');
         const listView = document.getElementById('listView');
-        
+
         if (gridViewBtn && listViewBtn) {
             gridViewBtn.addEventListener('click', function() {
                 gridView.style.display = 'flex';
                 listView.style.display = 'none';
-                
+
                 gridViewBtn.classList.add('active');
                 listViewBtn.classList.remove('active');
-                
+
                 // Re-trigger animations
                 document.querySelectorAll('#gridView .animate-fade-in').forEach(el => {
                     el.style.opacity = '0';
@@ -543,14 +543,14 @@
                     }, 10);
                 });
             });
-            
+
             listViewBtn.addEventListener('click', function() {
                 gridView.style.display = 'none';
                 listView.style.display = 'block';
-                
+
                 gridViewBtn.classList.remove('active');
                 listViewBtn.classList.add('active');
-                
+
                 // Re-trigger animations
                 document.querySelectorAll('#listView .animate-fade-in').forEach(el => {
                     el.style.opacity = '0';
@@ -560,7 +560,7 @@
                 });
             });
         }
-        
+
         // Initialize animation observer for search results
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
@@ -572,7 +572,7 @@
         }, {
             threshold: 0.1
         });
-        
+
         // Observe all animated elements
         document.querySelectorAll('.animate-fade-in').forEach(el => {
             observer.observe(el);
