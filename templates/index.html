@@ -1,113 +1,89 @@
 {% extends "base.html" %}
 
-{% block title %}MCP Assessor Agent API{% endblock %}
-
 {% block content %}
-<div class="container-fluid px-4 py-5">
-    <div class="row mb-5">
-        <div class="col-12 text-center">
-            <h1 class="display-4 mb-3">MCP Assessor Agent API</h1>
-            <p class="lead text-secondary">
-                A sophisticated multi-database querying service for intelligent property and assessment data analysis.
-            </p>
-        </div>
+<div class="hero-section">
+  <div class="container">
+    <div class="search-container">
+      <h1 class="text-center mb-4">Benton County Property Search</h1>
+      <div class="search-box">
+        <form action="/property-search" method="get" class="search-form">
+          <div class="input-group">
+            <input type="text" name="property_address" class="form-control" placeholder="Enter address or parcel number">
+            <button class="btn btn-primary" type="submit">
+              <i class="fas fa-search"></i> Search
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
-
-    <div class="row g-4 py-3">
-        <div class="col-md-6 col-lg-3">
-            <div class="card bg-dark text-white h-100 border-0 shadow">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="rounded-circle bg-primary p-2 me-3">
-                            <i class="bi bi-book fs-4"></i>
-                        </div>
-                        <h5 class="card-title mb-0">API Documentation</h5>
-                    </div>
-                    <p class="card-text">Interactive API documentation and testing interface for the MCP Assessor Agent API.</p>
-                    <a href="/api-docs" class="btn btn-outline-light stretched-link">View Documentation</a>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6 col-lg-3">
-            <div class="card bg-dark text-white h-100 border-0 shadow">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="rounded-circle bg-success p-2 me-3">
-                            <i class="bi bi-code-square fs-4"></i>
-                        </div>
-                        <h5 class="card-title mb-0">Query Builder</h5>
-                    </div>
-                    <p class="card-text">Build and execute SQL queries for property assessment data with an interactive interface.</p>
-                    <a href="/query-builder" class="btn btn-outline-light stretched-link">Build Queries</a>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6 col-lg-3">
-            <div class="card bg-dark text-white h-100 border-0 shadow">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="rounded-circle bg-info p-2 me-3">
-                            <i class="bi bi-bar-chart-line fs-4"></i>
-                        </div>
-                        <h5 class="card-title mb-0">Data Visualization</h5>
-                    </div>
-                    <p class="card-text">Interactive data visualization dashboard for property assessments with advanced filtering.</p>
-                    <a href="/visualize" class="btn btn-outline-light stretched-link">Explore Visualizations</a>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6 col-lg-3">
-            <div class="card bg-dark text-white h-100 border-0 shadow">
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <div class="rounded-circle bg-warning p-2 me-3">
-                            <i class="bi bi-database fs-4"></i>
-                        </div>
-                        <h5 class="card-title mb-0">Imported Data</h5>
-                    </div>
-                    <p class="card-text">View and analyze imported property assessment data with advanced filtering and export options.</p>
-                    <a href="/imported-data" class="btn btn-outline-light stretched-link">View Data</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row mt-5">
-        <div class="col-12">
-            <div class="card bg-dark border-light">
-                <div class="card-header">
-                    <h5 class="mb-0">Key Features</h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-4">
-                            <ul class="list-unstyled">
-                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Advanced property data querying</li>
-                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Multi-database support</li>
-                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Interactive visualization dashboards</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-4">
-                            <ul class="list-unstyled">
-                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Real-time assessment data</li>
-                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Advanced export capabilities</li>
-                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Customizable data views</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-4">
-                            <ul class="list-unstyled">
-                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Detailed property records</li>
-                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Statistical analysis tools</li>
-                                <li class="mb-2"><i class="bi bi-check-circle-fill text-success me-2"></i> Performance-optimized APIs</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+  </div>
 </div>
+
+<div class="container mt-5">
+  <div class="row">
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-home"></i> Property Search</h5>
+          <p class="card-text">Search properties by address, owner name, or parcel number.</p>
+          <a href="/property-search" class="btn btn-outline-primary">Advanced Search</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-chart-bar"></i> Statistics</h5>
+          <p class="card-text">View property assessment statistics and trends.</p>
+          <a href="/statistics" class="btn btn-outline-primary">View Statistics</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title"><i class="fas fa-map-marked-alt"></i> Map View</h5>
+          <p class="card-text">Explore properties using our interactive map.</p>
+          <a href="/map" class="btn btn-outline-primary">Open Map</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+.hero-section {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+  padding: 4rem 0;
+  color: white;
+}
+
+.search-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.search-box {
+  background: white;
+  padding: 2rem;
+  border-radius: var(--border-radius);
+  box-shadow: var(--box-shadow-lg);
+}
+
+.card {
+  height: 100%;
+  transition: transform 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+}
+
+.card-title i {
+  margin-right: 0.5rem;
+  color: var(--primary-color);
+}
+</style>
 {% endblock %}
