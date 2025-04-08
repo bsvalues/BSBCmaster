@@ -23,34 +23,56 @@
 <style>
     /* Modern color palette */
     :root {
-        --primary-blue: #3b82f6;
+        --primary-blue: #2563eb;
         --primary-green: #10b981;
         --primary-yellow: #f59e0b;
         --primary-red: #ef4444;
         --primary-purple: #8b5cf6;
-        --gradient-start: rgba(59, 130, 246, 0.8);
+        --gradient-start: rgba(37, 99, 235, 0.8);
         --gradient-end: rgba(16, 185, 129, 0.8);
-        --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        --card-hover-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-        --dashboard-bg: #f5f7fa;
+        --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        --card-hover-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --dashboard-bg: #f8fafc;
         --card-bg: #ffffff;
         --header-bg: #1e3a8a;
-        --text-primary: #1f2937;
-        --text-secondary: #6b7280;
+        --text-primary: #111827;
+        --text-secondary: #4b5563;
         --border-color: #e5e7eb;
     }
     
     /* Layout and spacing */
     body {
         overflow-x: hidden;
-        background-color: var(--dashboard-bg);
+        background-color: #f8fafc;
     }
     
     .dashboard-header {
-        background-color: var(--header-bg);
+        background-color: #1e3a8a;
+        background-image: url('/static/images/benton-county-landscape.jpg');
+        background-size: cover;
+        background-position: center;
+        background-blend-mode: overlay;
         color: white;
-        padding: 1.5rem 0;
+        padding: 2.5rem 0;
         margin-bottom: 2rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        position: relative;
+    }
+    
+    .dashboard-header::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(to right, rgba(30, 58, 138, 0.9), rgba(30, 58, 138, 0.7));
+        z-index: 0;
+    }
+    
+    .dashboard-header > div {
+        position: relative;
+        z-index: 1;
     }
     
     .dashboard-title {
@@ -171,25 +193,24 @@
     }
     
     .stat-card:hover {
-        transform: translateY(-8px);
+        transform: translateY(-5px);
         box-shadow: var(--card-hover-shadow);
     }
     
     .stat-card:hover::before {
-        opacity: 0.06;
+        opacity: 0.05;
     }
     
     .card-body {
         position: relative;
         z-index: 1;
+        padding: 1.5rem;
     }
     
     .stat-value {
         font-size: 2.25rem;
         font-weight: 700;
-        background: linear-gradient(90deg, var(--primary-blue), var(--primary-green));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        color: var(--primary-blue);
         display: inline-block;
     }
     
@@ -232,11 +253,15 @@
     
     .chart-card:hover {
         box-shadow: var(--card-hover-shadow);
-        transform: translateY(-5px);
+        transform: translateY(-4px);
+    }
+    
+    .chart-card .card-body {
+        padding: 1.75rem;
     }
     
     .chart-title {
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         font-weight: 600;
         color: var(--text-primary);
         margin-bottom: 1.5rem;
@@ -250,8 +275,8 @@
         bottom: 0;
         left: 0;
         height: 3px;
-        width: 50px;
-        background: linear-gradient(90deg, var(--primary-blue), var(--primary-green));
+        width: 40px;
+        background-color: var(--primary-blue);
         border-radius: 3px;
     }
     
