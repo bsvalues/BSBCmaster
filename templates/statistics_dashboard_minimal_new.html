@@ -549,8 +549,14 @@ function formatCurrency(value) {
 
 // Populate filter dropdowns with data
 function populateFilters(stats) {
+    // If stats is not provided, this is an initialization call that we can skip
+    if (!stats) {
+        return;
+    }
+    
     // Only populate if not already populated
-    if (document.getElementById('property-type-filter').options.length <= 1) {
+    if (document.getElementById('property-type-filter').options.length <= 1 && 
+        stats.property_type_statistics) {
         const propertyTypeFilter = document.getElementById('property-type-filter');
         // Get property types from property_type_statistics
         Object.keys(stats.property_type_statistics).forEach(type => {
@@ -561,7 +567,8 @@ function populateFilters(stats) {
         });
     }
     
-    if (document.getElementById('city-filter').options.length <= 1) {
+    if (document.getElementById('city-filter').options.length <= 1 && 
+        stats.city_statistics) {
         const cityFilter = document.getElementById('city-filter');
         // Get cities from city_statistics
         Object.keys(stats.city_statistics).forEach(city => {

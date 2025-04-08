@@ -278,8 +278,7 @@ function showErrorMessage(message) {
 
 // Initialize on document load
 document.addEventListener('DOMContentLoaded', function() {
-    // Populate filters
-    populateFilters();
+    // We'll handle filter population after data loads
     
     // Load initial data
     loadStatistics();
