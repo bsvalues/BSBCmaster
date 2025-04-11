@@ -307,151 +307,162 @@ function updateValueDistributionChart(valueDistribution) {
 
 // Function to update the value trends chart
 function updateValueTrendsChart(trendsData) {
-    const ctx = document.getElementById('value-trends-chart').getContext('2d');
-    
-    // Destroy existing chart if it exists
-    if (valueTrendsChart) {
-        valueTrendsChart.destroy();
-    }
-    
-    // Generate modernized colors
-    const colors = [
-        'rgba(59, 130, 246, 1)',   // Blue
-        'rgba(16, 185, 129, 1)',   // Green
-        'rgba(245, 158, 11, 1)',   // Yellow
-        'rgba(239, 68, 68, 1)',    // Red
-        'rgba(139, 92, 246, 1)'    // Purple
-    ];
-    
-    // Create enhanced datasets with better gradients
-    const datasets = trendsData.datasets.map((dataset, index) => {
-        const gradientFill = ctx.createLinearGradient(0, 0, 0, 400);
-        const color = colors[index % colors.length];
-        const colorBase = color.replace('1)', '');
+    try {
+        console.log("Updating value trends chart with data:", trendsData);
+        const canvas = document.getElementById('value-trends-chart');
+        if (!canvas) {
+            console.error("Value trends chart canvas not found");
+            return;
+        }
         
-        gradientFill.addColorStop(0, colorBase + '0.3)');
-        gradientFill.addColorStop(1, colorBase + '0.02)');
+        const ctx = canvas.getContext('2d');
         
-        return {
-            label: dataset.label,
-            data: dataset.data,
-            borderColor: color,
-            backgroundColor: gradientFill,
-            borderWidth: 3,
-            fill: true,
-            tension: 0.4,
-            pointBackgroundColor: color,
-            pointBorderColor: '#fff',
-            pointBorderWidth: 2,
-            pointRadius: 5,
-            pointHoverRadius: 7,
-            pointHoverBackgroundColor: color,
-            pointHoverBorderColor: '#fff',
-            pointHoverBorderWidth: 2
-        };
-    });
-    
-    // Create new chart with enhanced animations and interactions
-    valueTrendsChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: trendsData.labels,
-            datasets: datasets
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: {
-                duration: 1400,
-                easing: 'easeOutQuart'
+        // Destroy existing chart if it exists
+        if (valueTrendsChart) {
+            valueTrendsChart.destroy();
+        }
+        
+        // Generate modernized colors
+        const colors = [
+            'rgba(59, 130, 246, 1)',   // Blue
+            'rgba(16, 185, 129, 1)',   // Green
+            'rgba(245, 158, 11, 1)',   // Yellow
+            'rgba(239, 68, 68, 1)',    // Red
+            'rgba(139, 92, 246, 1)'    // Purple
+        ];
+        
+        // Create enhanced datasets with better gradients
+        const datasets = trendsData.datasets.map((dataset, index) => {
+            const gradientFill = ctx.createLinearGradient(0, 0, 0, 400);
+            const color = colors[index % colors.length];
+            const colorBase = color.replace('1)', '');
+            
+            gradientFill.addColorStop(0, colorBase + '0.3)');
+            gradientFill.addColorStop(1, colorBase + '0.02)');
+            
+            return {
+                label: dataset.label,
+                data: dataset.data,
+                borderColor: color,
+                backgroundColor: gradientFill,
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: color,
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                pointHoverBackgroundColor: color,
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 2
+            };
+        });
+        
+        // Create new chart with enhanced animations and interactions
+        valueTrendsChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: trendsData.labels,
+                datasets: datasets
             },
-            interaction: {
-                mode: 'index',
-                intersect: false
-            },
-            plugins: {
-                legend: {
-                    position: 'top',
-                    align: 'center',
-                    labels: {
-                        usePointStyle: true,
-                        padding: 20,
-                        font: {
-                            size: 12
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 1400,
+                    easing: 'easeOutQuart'
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        align: 'center',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20,
+                            font: {
+                                size: 12
+                            },
+                            boxWidth: 10,
+                            boxHeight: 10
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleFont: {
+                            size: 14,
+                            weight: 'bold'
                         },
-                        boxWidth: 10,
-                        boxHeight: 10
+                        bodyFont: {
+                            size: 13
+                        },
+                        padding: 15,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                // Calculate percentage increase from first year
+                                const dataPoints = context.dataset.data;
+                                const currentValue = context.raw;
+                                const firstValue = dataPoints[0];
+                                
+                                if (context.dataIndex > 0 && firstValue > 0) {
+                                    const percentChange = ((currentValue - firstValue) / firstValue * 100).toFixed(1);
+                                    const changeString = percentChange >= 0 ? `+${percentChange}%` : `${percentChange}%`;
+                                    return `${label}${currentValue} (${changeString} from first year)`;
+                                }
+                                
+                                return `${label}${currentValue}`;
+                            }
+                        }
                     }
                 },
-                tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    titleFont: {
-                        size: 14,
-                        weight: 'bold'
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Properties',
+                            font: {
+                                size: 13,
+                                weight: 'bold'
+                            },
+                            color: 'rgba(59, 130, 246, 0.9)'
+                        },
+                        ticks: {
+                            font: {
+                                size: 11
+                            },
+                            padding: 8
+                        },
+                        grid: {
+                            drawBorder: false,
+                            color: 'rgba(0, 0, 0, 0.05)'
+                        }
                     },
-                    bodyFont: {
-                        size: 13
-                    },
-                    padding: 15,
-                    cornerRadius: 8,
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            // Calculate percentage increase from first year
-                            const dataPoints = context.dataset.data;
-                            const currentValue = context.raw;
-                            const firstValue = dataPoints[0];
-                            
-                            if (context.dataIndex > 0 && firstValue > 0) {
-                                const percentChange = ((currentValue - firstValue) / firstValue * 100).toFixed(1);
-                                const changeString = percentChange >= 0 ? `+${percentChange}%` : `${percentChange}%`;
-                                return `${label}${currentValue} (${changeString} from first year)`;
-                            }
-                            
-                            return `${label}${currentValue}`;
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            },
+                            padding: 10
                         }
                     }
                 }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Number of Properties',
-                        font: {
-                            size: 13,
-                            weight: 'bold'
-                        },
-                        color: 'rgba(59, 130, 246, 0.9)'
-                    },
-                    ticks: {
-                        font: {
-                            size: 11
-                        },
-                        padding: 8
-                    },
-                    grid: {
-                        drawBorder: false,
-                        color: 'rgba(0, 0, 0, 0.05)'
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false
-                    },
-                    ticks: {
-                        font: {
-                            size: 12,
-                            weight: 'bold'
-                        },
-                        padding: 10
-                    }
-                }
             }
-        }
-    });
+        });
+    } catch (e) {
+        console.error("Error in updateValueTrendsChart:", e);
+    }
 }
