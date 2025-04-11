@@ -721,7 +721,7 @@ class ValuationAgent(Agent):
                         payload={
                             "success": False,
                             "error": f"Property with ID {property_id} not found",
-                            "original_request": payload
+                            "original_request": content
                         },
                         correlation_id=message.message_id
                     )
@@ -765,7 +765,7 @@ class ValuationAgent(Agent):
                 payload={
                     "success": False,
                     "error": str(e),
-                    "original_request": payload
+                    "original_request": content
                 },
                 correlation_id=message.message_id
             )
@@ -897,7 +897,7 @@ class ValuationAgent(Agent):
                         payload={
                             "success": False,
                             "error": f"Property with ID {property_id} not found",
-                            "original_request": payload
+                            "original_request": content
                         },
                         correlation_id=message.message_id
                     )
@@ -1017,7 +1017,7 @@ class ValuationAgent(Agent):
                 payload={
                     "success": False,
                     "error": str(e),
-                    "original_request": payload
+                    "original_request": content
                 },
                 correlation_id=message.message_id
             )
