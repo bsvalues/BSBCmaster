@@ -77,10 +77,18 @@ function loadStatistics() {
         .then(data => {
             console.log("Received data:", data);
             hideLoading();
-            if (data.status === 'success') {
-                updateDashboard(data.statistics);
+            if (data.status === 'success' && data.statistics) {
+                // Log what we're using to update the dashboard
+                console.log("Updating dashboard with statistics:", data.statistics);
+                try {
+                    updateDashboard(data.statistics);
+                    console.log("Dashboard updated successfully");
+                } catch (e) {
+                    console.error("Error while updating dashboard:", e);
+                    showErrorMessage('Error processing statistics data: ' + e.message);
+                }
             } else {
-                console.error('Error loading statistics:', data.message);
+                console.error('Error loading statistics:', data.message || 'No statistics data available');
                 showErrorMessage('Failed to load statistics data');
             }
         })
