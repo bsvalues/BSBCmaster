@@ -40,18 +40,15 @@ function updatePropertyTypeChart(propertyTypes) {
         if (propertyTypeChart) {
             propertyTypeChart.destroy();
         }
-    } catch (e) {
-        console.error("Error in updatePropertyTypeChart:", e);
-    }
-    
-    // Create animated gradient background
-    const blueGradient = ctx.createLinearGradient(0, 0, 0, 400);
-    blueGradient.addColorStop(0, 'rgba(59, 130, 246, 0.8)');
-    blueGradient.addColorStop(1, 'rgba(59, 130, 246, 0.2)');
-    
-    const greenGradient = ctx.createLinearGradient(0, 0, 0, 400);
-    greenGradient.addColorStop(0, 'rgba(16, 185, 129, 0.8)');
-    greenGradient.addColorStop(1, 'rgba(16, 185, 129, 0.2)');
+        
+        // Create animated gradient background
+        const blueGradient = ctx.createLinearGradient(0, 0, 0, 400);
+        blueGradient.addColorStop(0, 'rgba(59, 130, 246, 0.8)');
+        blueGradient.addColorStop(1, 'rgba(59, 130, 246, 0.2)');
+        
+        const greenGradient = ctx.createLinearGradient(0, 0, 0, 400);
+        greenGradient.addColorStop(0, 'rgba(16, 185, 129, 0.8)');
+        greenGradient.addColorStop(1, 'rgba(16, 185, 129, 0.2)');
     
     // Create new chart with animations
     propertyTypeChart = new Chart(ctx, {

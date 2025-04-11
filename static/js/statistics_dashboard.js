@@ -77,6 +77,30 @@ function loadStatistics() {
         .then(data => {
             console.log("Received data:", data);
             hideLoading();
+            
+            // Detailed inspection of received data
+            console.log("Data type:", typeof data);
+            console.log("Data keys:", Object.keys(data));
+            if (data.statistics) {
+                console.log("Statistics property exists");
+                console.log("Statistics keys:", Object.keys(data.statistics));
+                
+                if (data.statistics.property_type_statistics) {
+                    console.log("Property type statistics exist");
+                    console.log("Property type keys:", Object.keys(data.statistics.property_type_statistics));
+                }
+                
+                if (data.statistics.city_statistics) {
+                    console.log("City statistics exist");
+                    console.log("City statistics keys:", Object.keys(data.statistics.city_statistics));
+                }
+                
+                if (data.statistics.value_distribution) {
+                    console.log("Value distribution exists");
+                    console.log("Value distribution:", data.statistics.value_distribution);
+                }
+            }
+            
             if (data.status === 'success' && data.statistics) {
                 // Log what we're using to update the dashboard
                 console.log("Updating dashboard with statistics:", data.statistics);
@@ -115,11 +139,28 @@ function updateDashboard(stats) {
     const highestPropertyType = getHighestValuePropertyType(stats);
     document.getElementById('highest-property-type').textContent = highestPropertyType || 'N/A';
     
-    // Update charts
-    const propertyTypeData = getPropertyTypesForChart(stats);
-    updatePropertyTypeChart(propertyTypeData);
-    updateValueDistributionChart(stats.value_distribution);
-    updateValueTrendsChart(createValueTrendsFromDistribution(stats.value_distribution));
+    // Update charts with detailed logging
+    try {
+        console.log("Preparing property type chart data");
+        const propertyTypeData = getPropertyTypesForChart(stats);
+        console.log("Property type data:", propertyTypeData);
+        
+        console.log("Calling updatePropertyTypeChart");
+        updatePropertyTypeChart(propertyTypeData);
+        
+        console.log("Preparing value distribution chart data");
+        console.log("Value distribution data:", stats.value_distribution);
+        updateValueDistributionChart(stats.value_distribution);
+        
+        console.log("Preparing value trends chart data");
+        const trendsData = createValueTrendsFromDistribution(stats.value_distribution);
+        console.log("Trends data:", trendsData);
+        updateValueTrendsChart(trendsData);
+        
+        console.log("All charts updated successfully");
+    } catch (e) {
+        console.error("Error updating charts:", e);
+    }
     
     // Update tables
     updatePropertyTypesTable(createPropertyTypesTableData(stats.property_type_statistics));
