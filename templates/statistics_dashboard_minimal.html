@@ -369,11 +369,42 @@
 let propertyTypeChart = null;
 let valueDistributionChart = null;
 let valueTrendsChart = null;
+
+// Format currency values for display
+function formatCurrency(value) {
+    if (value === null || value === undefined) return '$0';
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(value);
+}
+
+// Helper function to safely update an element's text content
+function safelyUpdateElement(id, value) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.textContent = value;
+        return true;
+    } else {
+        console.warn(`Element with ID '${id}' not found`);
+        return false;
+    }
+}
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize charts with data when the page loads
+    console.log('Fetching statistics from /api/statistics');
     fetch('/api/statistics')
-        .then(response => response.json())
+        .then(response => {
+            console.log('Fetch response status:', response.status);
+            if (!response.ok) {
+                throw new Error('Network response was not ok: ' + response.status);
+            }
+            return response.json();
+        })
         .then(data => {
+            console.log('Received data:', data);
             if (data.status === 'success') {
                 updateDashboard(data.statistics);
             } else {
@@ -398,28 +429,38 @@ document.addEventListener('DOMContentLoaded', function() {
         if (year !== 'all') params.append('year', year);
         
         // Fetch filtered data from API
+        console.log('Fetching filtered statistics with params:', params.toString());
         fetch(`/api/statistics?${params.toString()}`)
-            .then(response => response.json())
+            .then(response => {
+                console.log('Filtered fetch response status:', response.status);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok: ' + response.status);
+                }
+                return response.json();
+            })
             .then(data => {
+                console.log('Received filtered data:', data);
                 if (data.status === 'success') {
                     updateDashboard(data.statistics);
                 } else {
-                    console.error('Error loading statistics:', data.message);
+                    console.error('Error loading filtered statistics:', data.message);
                 }
             })
             .catch(error => {
-                console.error('Error fetching statistics:', error);
+                console.error('Error fetching filtered statistics:', error);
             });
     });
     
     // Update dashboard with statistics data
     function updateDashboard(stats) {
+        console.log('Updating dashboard with statistics', stats);
+        
         // Update summary cards with data
-        document.getElementById('total-properties').textContent = stats.data_summary?.total_properties || 0;
+        safelyUpdateElement('total-properties', stats.data_summary?.total_properties || 0);
         
         // Find the average value of residential properties
         const residentialStats = stats.property_type_statistics?.Residential || {};
-        document.getElementById('avg-value').textContent = formatCurrency(residentialStats.average_value || 0);
+        safelyUpdateElement('avg-value', formatCurrency(residentialStats.average_value || 0));
         
         // Get highest value from any property type
         let highestValue = 0;
@@ -434,8 +475,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        document.getElementById('highest-value').textContent = formatCurrency(highestValue || 0);
-        document.getElementById('highest-property-type').textContent = highestValueType;
+        safelyUpdateElement('highest-value', formatCurrency(highestValue || 0));
+        safelyUpdateElement('highest-property-type', highestValueType);
         
         // Find most common property type
         let mostCommonType = 'Residential';
@@ -450,8 +491,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        document.getElementById('common-type').textContent = mostCommonType;
-        document.getElementById('common-type-count').textContent = `${mostCommonCount || 0} properties`;
+        safelyUpdateElement('common-type', mostCommonType);
+        safelyUpdateElement('common-type-count', `${mostCommonCount || 0} properties`);
         
         // Update property type chart - convert property_type_statistics to chart format
         if (stats.property_type_statistics) {
@@ -543,7 +584,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Function to update the city statistics table
 function updateCityStatsTable(cityStatsData) {
-    const tableBody = document.getElementById('city-stats-table-body');
+    const tableBody = document.getElementById('city-stats-table');
+    if (!tableBody) {
+        console.error('City stats table element not found');
+        return;
+    }
     tableBody.innerHTML = '';
     
     // Sort data by count (descending)
