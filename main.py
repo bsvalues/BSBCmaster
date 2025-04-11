@@ -41,6 +41,13 @@ except ImportError as e:
     logger = logging.getLogger(__name__)
     logger.error(f"Failed to import statistics API routes: {e}")
 
+# Import data quality routes
+try:
+    from data_quality.api import router as data_quality_api
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.error(f"Failed to import data quality API routes: {e}")
+
 # Import minimalist routes
 try:
     from routes_minimal import register_minimalist_routes
@@ -61,6 +68,17 @@ try:
     logger.info("Statistics API routes registered successfully")
 except Exception as e:
     logger.error(f"Failed to register statistics API routes: {e}")
+
+# Register data quality API routes
+try:
+    from fastapi import APIRouter
+    # Convert FastAPI router to Flask blueprint
+    from app.api.fastapi_to_flask import fastapi_router_to_blueprint
+    data_quality_blueprint = fastapi_router_to_blueprint(data_quality_api)
+    app.register_blueprint(data_quality_blueprint)
+    logger.info("Data Quality API routes registered successfully")
+except Exception as e:
+    logger.error(f"Failed to register data quality API routes: {e}")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
