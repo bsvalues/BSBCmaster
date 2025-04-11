@@ -1,0 +1,23 @@
+{
+  "test_data_path": "testing/test_data",
+  "authentic_data_only": true,
+  "parallel_tests": false,
+  "max_workers": 4,
+  "test_timeout": 30,
+  "log_level": "INFO",
+  "log_dir": "logs/testing",
+  "use_agent_coordinator": true,
+  "record_agent_performance": true,
+  "use_test_database": false,
+  "preserve_test_data": true,
+  "coverage_threshold": 80,
+  "generate_coverage_report": true,
+  "wa_compliance_check": true,
+  "benton_county_specific_checks": true,
+  "test_categories": {
+    "validation": 30,
+    "compliance": 30,
+    "performance": 20,
+    "integration": 20
+  }
+}
