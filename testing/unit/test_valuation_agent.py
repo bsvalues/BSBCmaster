@@ -70,8 +70,8 @@ class TestValuationAgent(unittest.TestCase):
             "methodology": "all"
         }
         
-        # Mock the database connection to return None for property query
-        with patch('mcp.agents.valuation.agent.db') as mock_db:
+        # Mock the imported app_setup.db
+        with patch('app_setup.db') as mock_db:
             # Configure the mock to return None for property query
             mock_engine = MagicMock()
             mock_connection = MagicMock()
