@@ -1,3 +1,8 @@
+// Initialize chart instances
+let propertyTypeChart = null;
+let valueDistributionChart = null;
+let valueTrendsChart = null;
+
 // Helper function to format currency values
 function formatCurrency(value) {
     if (value === null || value === undefined) return '--';
@@ -16,16 +21,27 @@ function formatCurrency(value) {
 
 // Function to update the property type chart
 function updatePropertyTypeChart(propertyTypes) {
-    const ctx = document.getElementById('property-type-chart').getContext('2d');
-    
-    // Prepare data for chart
-    const labels = propertyTypes.map(item => item.property_type);
-    const counts = propertyTypes.map(item => item.count);
-    const values = propertyTypes.map(item => item.average_value);
-    
-    // Destroy existing chart if it exists
-    if (propertyTypeChart) {
-        propertyTypeChart.destroy();
+    try {
+        console.log("Updating property type chart with data:", propertyTypes);
+        const canvas = document.getElementById('property-type-chart');
+        if (!canvas) {
+            console.error("Property type chart canvas not found");
+            return;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Prepare data for chart
+        const labels = propertyTypes.map(item => item.property_type);
+        const counts = propertyTypes.map(item => item.count);
+        const values = propertyTypes.map(item => item.average_value);
+        
+        // Destroy existing chart if it exists
+        if (propertyTypeChart) {
+            propertyTypeChart.destroy();
+        }
+    } catch (e) {
+        console.error("Error in updatePropertyTypeChart:", e);
     }
     
     // Create animated gradient background
@@ -177,105 +193,116 @@ function updatePropertyTypeChart(propertyTypes) {
 
 // Function to update the value distribution chart
 function updateValueDistributionChart(valueDistribution) {
-    const ctx = document.getElementById('value-distribution-chart').getContext('2d');
+    try {
+        console.log("Updating value distribution chart with data:", valueDistribution);
+        const canvas = document.getElementById('value-distribution-chart');
+        if (!canvas) {
+            console.error("Value distribution chart canvas not found");
+            return;
+        }
+        
+        const ctx = canvas.getContext('2d');
+        
+        // Prepare data for chart
+        const labels = Object.keys(valueDistribution);
+        const data = Object.values(valueDistribution);
+        
+        // Destroy existing chart if it exists
+        if (valueDistributionChart) {
+            valueDistributionChart.destroy();
+        }
     
-    // Prepare data for chart
-    const labels = Object.keys(valueDistribution);
-    const data = Object.values(valueDistribution);
-    
-    // Destroy existing chart if it exists
-    if (valueDistributionChart) {
-        valueDistributionChart.destroy();
-    }
-    
-    // Generate enhanced colors with more transparency for better visual effect
-    const colors = [
-        'rgba(59, 130, 246, 0.75)',   // Blue
-        'rgba(16, 185, 129, 0.75)',   // Green
-        'rgba(245, 158, 11, 0.75)',   // Yellow
-        'rgba(239, 68, 68, 0.75)',    // Red
-        'rgba(139, 92, 246, 0.75)'    // Purple
-    ];
-    
-    // Create new chart with enhanced visuals and animations
-    valueDistributionChart = new Chart(ctx, {
-        type: 'doughnut', // Changed from pie to doughnut for modern look
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: colors,
-                borderColor: colors.map(color => color.replace('0.75', '1')),
-                borderWidth: 2,
-                hoverOffset: 15,
-                borderRadius: 4,
-                spacing: 3, // Add spacing between segments
-                hoverBorderColor: '#ffffff'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            cutout: '60%', // Doughnut hole size
-            animation: {
-                animateRotate: true,
-                animateScale: true,
-                duration: 1200,
-                easing: 'easeOutQuart' 
+        // Generate enhanced colors with more transparency for better visual effect
+        const colors = [
+            'rgba(59, 130, 246, 0.75)',   // Blue
+            'rgba(16, 185, 129, 0.75)',   // Green
+            'rgba(245, 158, 11, 0.75)',   // Yellow
+            'rgba(239, 68, 68, 0.75)',    // Red
+            'rgba(139, 92, 246, 0.75)'    // Purple
+        ];
+        
+        // Create new chart with enhanced visuals and animations
+        valueDistributionChart = new Chart(ctx, {
+            type: 'doughnut', // Changed from pie to doughnut for modern look
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: colors,
+                    borderColor: colors.map(color => color.replace('0.75', '1')),
+                    borderWidth: 2,
+                    hoverOffset: 15,
+                    borderRadius: 4,
+                    spacing: 3, // Add spacing between segments
+                    hoverBorderColor: '#ffffff'
+                }]
             },
-            layout: {
-                padding: 15
-            },
-            plugins: {
-                legend: {
-                    position: 'right',
-                    align: 'center',
-                    labels: {
-                        usePointStyle: true,
-                        padding: 15,
-                        font: {
-                            size: 12
-                        },
-                        generateLabels: function(chart) {
-                            // Get default labels
-                            const original = Chart.overrides.pie.plugins.legend.labels.generateLabels(chart);
-                            
-                            // Add percentage to each label
-                            original.forEach((label, i) => {
-                                const value = chart.data.datasets[0].data[i];
-                                const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-                                const percentage = Math.round((value / total) * 100);
-                                label.text = `${label.text} (${percentage}%)`;
-                            });
-                            
-                            return original;
-                        }
-                    }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%', // Doughnut hole size
+                animation: {
+                    animateRotate: true,
+                    animateScale: true,
+                    duration: 1200,
+                    easing: 'easeOutQuart' 
                 },
-                tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    titleFont: {
-                        size: 14,
-                        weight: 'bold'
+                layout: {
+                    padding: 15
+                },
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        align: 'center',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 15,
+                            font: {
+                                size: 12
+                            },
+                            generateLabels: function(chart) {
+                                // Get default labels
+                                const original = Chart.overrides.pie.plugins.legend.labels.generateLabels(chart);
+                                
+                                // Add percentage to each label
+                                original.forEach((label, i) => {
+                                    const value = chart.data.datasets[0].data[i];
+                                    const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    label.text = `${label.text} (${percentage}%)`;
+                                });
+                                
+                                return original;
+                            }
+                        }
                     },
-                    bodyFont: {
-                        size: 13
-                    },
-                    padding: 15,
-                    cornerRadius: 8,
-                    callbacks: {
-                        label: function(context) {
-                            const label = context.label || '';
-                            const value = context.raw;
-                            const total = data.reduce((a, b) => a + b, 0);
-                            const percentage = Math.round((value / total) * 100);
-                            return `${label}: ${value} (${percentage}%)`;
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleFont: {
+                            size: 14,
+                            weight: 'bold'
+                        },
+                        bodyFont: {
+                            size: 13
+                        },
+                        padding: 15,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw;
+                                const total = data.reduce((a, b) => a + b, 0);
+                                const percentage = Math.round((value / total) * 100);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
                         }
                     }
                 }
             }
-        }
-    });
+        });
+    } catch (e) {
+        console.error("Error in updateValueDistributionChart:", e);
+    }
 }
 
 // Function to update the value trends chart
