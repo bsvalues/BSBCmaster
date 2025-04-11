@@ -52,7 +52,14 @@ class CoreHub:
         self.config = CoreConfig(config_path)
         
         # Set up logging
-        self.logger = logging.getLogger("core_hub")
+        log_config = self.config.get_logging_config()
+        self.log_manager = create_log_manager(log_config)
+        
+        # Create main logger with context
+        self.logger = create_logger("core_hub", {
+            "component": "CoreHub",
+            "version": self.config.get("core.version", "3.0.0")
+        })
         
         # Message handlers by event type
         self.message_handlers = {

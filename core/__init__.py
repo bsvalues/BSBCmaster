@@ -8,6 +8,7 @@ configuration, orchestration, and integration for the MCP and Agent Army.
 from .config import CoreConfig
 from .message import Message, CommandMessage, ResponseMessage, ErrorMessage, StatusUpdateMessage, AssistanceRequestMessage, EventType, Priority
 from .experience import Experience, create_replay_buffer
+from .logging import LogManager, ContextAdapter, create_log_manager, create_logger
 from .hub import CoreHub
 
 __all__ = [
@@ -22,5 +23,9 @@ __all__ = [
     'EventType',
     'Priority',
     'Experience',
-    'create_replay_buffer'
+    'create_replay_buffer',
+    'LogManager',
+    'ContextAdapter',
+    'create_log_manager',
+    'create_logger'
 ]

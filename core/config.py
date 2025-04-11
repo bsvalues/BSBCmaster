@@ -48,10 +48,29 @@ class CoreConfig:
             "core": {
                 "name": "BentonCountyAssessorCore",
                 "version": "3.0.0",
-                "log_level": "info",
-                "log_dir": "logs/core",
                 "data_dir": "data/core",
                 "master_prompt_refresh_interval": 3600  # seconds
+            },
+            "logging": {
+                "log_level": "info",
+                "log_dir": "logs/core",
+                "console": {
+                    "enabled": True,
+                    "level": "info",
+                    "structured": False,
+                    "include_context": True,
+                    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+                },
+                "file": {
+                    "enabled": True,
+                    "level": "debug",
+                    "structured": True,
+                    "include_context": True,
+                    "filename": "core.log",
+                    "max_bytes": 10485760,  # 10 MB
+                    "backup_count": 5
+                },
+                "propagate": False
             },
             "communication": {
                 "protocol": "rest",  # rest, redis, mqtt
@@ -387,3 +406,12 @@ class CoreConfig:
             Dashboard configuration
         """
         return self.config.get("dashboard", {})
+        
+    def get_logging_config(self) -> Dict[str, Any]:
+        """
+        Get logging configuration.
+        
+        Returns:
+            Logging configuration
+        """
+        return self.config.get("logging", {})
