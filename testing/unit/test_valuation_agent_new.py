@@ -167,17 +167,18 @@ class TestValuationAgent(unittest.TestCase):
         # Get the arguments passed to send_message
         args, kwargs = mock_send_message.call_args
         
-        # Check that send_message was called with the correct parameters
-        self.assertEqual(kwargs.get("target_agent_id"), message.source_agent_id)
+        # In this implementation, send_message is called with a Message object directly
+        response_message = args[0]
         
-        # Get the content/payload for validation
-        payload = kwargs.get("payload", {})
+        # Validate the content of the response message
+        content = response_message.content
+        self.assertTrue(content.get("success", False))
+        self.assertEqual(content.get("property_id"), 1)
+        self.assertIn("cost_approach", content.get("results", {}))
+        self.assertEqual(content.get("results", {}).get("cost_approach", {}).get("total_value"), 350000)
         
-        # Validate the content
-        self.assertTrue(payload.get("success", False))
-        self.assertEqual(payload.get("property_id"), 1)
-        self.assertIn("cost_approach", payload.get("results", {}))
-        self.assertEqual(payload.get("results", {}).get("cost_approach", {}).get("total_value"), 350000)
+        # Verify the target_agent_id is correctly set to the source_agent_id of the original message
+        self.assertEqual(response_message.target_agent_id, message.source_agent_id)
     
     def test_calculate_cost_approach(self):
         """Test calculation of property value using cost approach."""
@@ -274,11 +275,13 @@ class TestValuationAgent(unittest.TestCase):
         # Call the handler
         self.agent._handle_trend_analysis_request(message)
         
-        # Check that send_message was called with correct parameters
+        # Check that send_message was called
         mock_send_message.assert_called_once()
         
-        # Check message parameters
+        # Get the arguments passed to send_message
         args, kwargs = mock_send_message.call_args
+        
+        # Verify message parameters
         self.assertEqual(kwargs.get("message_type"), MessageType.TREND_ANALYSIS_RESPONSE)
         self.assertEqual(kwargs.get("target_agent_id"), message.source_agent_id)
         
@@ -412,11 +415,13 @@ class TestValuationAgent(unittest.TestCase):
         # Call the handler
         self.agent._handle_comparative_analysis_request(message)
         
-        # Check that send_message was called with correct parameters
+        # Check that send_message was called
         mock_send_message.assert_called_once()
         
-        # Check message parameters
+        # Get the arguments passed to send_message
         args, kwargs = mock_send_message.call_args
+        
+        # Verify message parameters
         self.assertEqual(kwargs.get("message_type"), MessageType.COMPARATIVE_ANALYSIS_RESPONSE)
         self.assertEqual(kwargs.get("target_agent_id"), message.source_agent_id)
         
