@@ -1017,7 +1017,7 @@ class ValuationAgent(Agent):
                 payload={
                     "success": False,
                     "error": str(e),
-                    "original_request": content
+                    "original_request": payload
                 },
                 correlation_id=message.message_id
             )
