@@ -233,7 +233,7 @@ class ValuationAgent(Agent):
                 }
                 
                 # Create response using the response builder in Message class
-                response_message = message.create_response(content=response)
+                response_message = message.create_response(payload=response)
                 # Send the response
                 self.send_message(response_message)
                 
@@ -244,7 +244,7 @@ class ValuationAgent(Agent):
             
             # Create error response using Message's response builder
             error_response = message.create_response(
-                content={
+                payload={
                     "success": False,
                     "property_id": property_id,
                     "valuation_date": valuation_date,
@@ -690,10 +690,10 @@ class ValuationAgent(Agent):
             message: Trend analysis request message
         """
         try:
-            # Extract request data from message content
-            content = message.content
-            property_id = content.get("property_id")
-            years = content.get("years", 3)  # Number of years to analyze
+            # Extract request data from message payload
+            payload = message.payload
+            property_id = payload.get("property_id")
+            years = payload.get("years", 3)  # Number of years to analyze
             
             logger.info(f"Processing trend analysis request for property {property_id}")
             
