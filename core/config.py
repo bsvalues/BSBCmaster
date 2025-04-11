@@ -1,264 +1,172 @@
 """
-Core Configuration Module for Benton County Assessor's Office AI Platform
+Configuration Module for Benton County Assessor's Office AI Platform
 
-This module provides the central configuration for the Core, MCP, and Agent Army,
-defining roles, communication protocols, and master prompt directives.
+This module provides configuration management for the Core Hub,
+including loading from files, validation, and defaults.
 """
 
 import os
 import json
 import yaml
 import logging
-from typing import Dict, Any, List, Optional
-from pathlib import Path
-import datetime
-
-
-# Default master prompt for all agents
-MASTER_PROMPT = """
-Attention all agents: As part of our integrated system, each agent is responsible for executing its domain-specific tasks while maintaining communication using our standard JSON messaging format. The Core serves as the master hub, ensuring configuration consistency and orchestrating cross-module activities. The Replit AI Agent is your real-time coordinator, while the MCP monitors overall performance and directs task assignments when issues occur.
-
-Every action you perform must be logged in the shared replay buffer. On completion of every major task, review your performance metrics and, if performance thresholds are not met, issue a 'task_request' for assistance. Furthermore, please ensure that you adhere to our established protocols for communication and security. Report any anomalies immediately to the MCP.
-
-This directive remains effective in both standalone and integrated modes. Adapt and execute tasks based on real-time feedback while maintaining alignment with the overall system objectives. Your collaborative efforts drive continuous improvement and system optimization. End of directive.
-"""
+from typing import Dict, Any, List, Optional, Union
 
 
 class CoreConfig:
     """
-    Core configuration for the AI platform.
+    Configuration manager for the Core Hub.
     
-    This class provides configuration settings for the Core, MCP, 
-    and Agent Army, and handles loading and saving configuration files.
+    This class provides methods for loading, saving, and accessing
+    configuration settings for the Core Hub and related components.
     """
-    
-    # Default configuration values
-    DEFAULT_CONFIG = {
-        # Core settings
-        "core": {
-            "name": "BentonCountyAssessorCore",
-            "version": "3.0.0",
-            "log_level": "INFO",
-            "log_dir": "logs/core",
-            "data_dir": "data/core",
-            "master_prompt": MASTER_PROMPT,
-            "master_prompt_refresh_interval": 3600  # seconds
-        },
-        
-        # Communication settings
-        "communication": {
-            "protocol": "redis",  # redis, mqtt, rest
-            "message_format": "json",
-            "retry_attempts": 3,
-            "retry_delay": 1.0,  # seconds
-            "timeout": 30.0,  # seconds
-            "heartbeat_interval": 60.0,  # seconds
-            "redis": {
-                "host": "localhost",
-                "port": 6379,
-                "db": 0,
-                "password": None,
-                "channels": {
-                    "commands": "benton.commands",
-                    "events": "benton.events",
-                    "heartbeats": "benton.heartbeats",
-                    "errors": "benton.errors",
-                    "status": "benton.status"
-                }
-            },
-            "mqtt": {
-                "broker": "localhost",
-                "port": 1883,
-                "username": None,
-                "password": None,
-                "topics": {
-                    "commands": "benton/commands",
-                    "events": "benton/events",
-                    "heartbeats": "benton/heartbeats",
-                    "errors": "benton/errors",
-                    "status": "benton/status"
-                }
-            },
-            "rest": {
-                "host": "localhost",
-                "port": 8000,
-                "base_url": "/api/v1",
-                "endpoints": {
-                    "commands": "/commands",
-                    "events": "/events",
-                    "heartbeats": "/heartbeats",
-                    "errors": "/errors",
-                    "status": "/status"
-                }
-            }
-        },
-        
-        # MCP settings
-        "mcp": {
-            "name": "MasterControlProgram",
-            "host": "localhost",
-            "port": 8001,
-            "log_level": "INFO",
-            "log_dir": "logs/mcp",
-            "data_dir": "data/mcp",
-            "max_agents": 50,
-            "performance_check_interval": 300,  # seconds
-            "task_timeout": 120,  # seconds
-            "max_retry_attempts": 3
-        },
-        
-        # Agent Army settings
-        "agent_army": {
-            "log_dir": "logs/agents",
-            "data_dir": "data/agents",
-            "default_log_level": "INFO",
-            "shared_replay_buffer": True,
-            "agents": [
-                {
-                    "name": "DataQualityAgent",
-                    "type": "data_quality",
-                    "description": "Validates property assessment data against Washington State standards",
-                    "capabilities": ["validate_data", "detect_anomalies", "enhance_data"],
-                    "performance_threshold": 0.7,
-                    "enabled": True
-                },
-                {
-                    "name": "ComplianceAgent",
-                    "type": "compliance",
-                    "description": "Ensures compliance with Washington State assessment regulations",
-                    "capabilities": ["check_compliance", "verify_exemption", "create_audit_record"],
-                    "performance_threshold": 0.8,
-                    "enabled": True
-                },
-                {
-                    "name": "ValuationAgent",
-                    "type": "valuation",
-                    "description": "Calculates property values using advanced models",
-                    "capabilities": ["estimate_value", "analyze_trends", "compare_properties"],
-                    "performance_threshold": 0.75,
-                    "enabled": False  # Will be enabled in Phase 3
-                },
-                {
-                    "name": "UserInteractionAgent",
-                    "type": "user_interaction",
-                    "description": "Handles staff queries and interface interactions",
-                    "capabilities": ["answer_query", "provide_recommendation", "explain_result"],
-                    "performance_threshold": 0.8,
-                    "enabled": False  # Will be enabled in Phase 3
-                }
-            ]
-        },
-        
-        # Experience replay buffer settings
-        "replay_buffer": {
-            "type": "redis",  # redis, postgres, file
-            "capacity": 100000,
-            "alpha": 0.6,  # Prioritization factor
-            "beta": 0.4,  # Importance sampling factor
-            "beta_increment": 0.001,
-            "save_dir": "data/experiences",
-            "redis": {
-                "host": "localhost",
-                "port": 6379,
-                "db": 1,
-                "password": None,
-                "key_prefix": "benton:experience:"
-            },
-            "postgres": {
-                "host": "localhost",
-                "port": 5432,
-                "database": "benton_experiences",
-                "user": "postgres",
-                "password": None,
-                "table_name": "experiences"
-            }
-        },
-        
-        # Training settings
-        "training": {
-            "enabled": True,
-            "trigger_type": "size",  # size, time, manual
-            "size_threshold": 1000,  # Min experiences before training
-            "time_interval": 3600,  # seconds
-            "batch_size": 64,
-            "save_dir": "data/models",
-            "log_dir": "logs/training"
-        },
-        
-        # Monitoring settings
-        "monitoring": {
-            "enabled": True,
-            "dashboard_type": "streamlit",  # streamlit, grafana, custom
-            "port": 8501,
-            "refresh_interval": 10,  # seconds
-            "metrics": [
-                "agent_status",
-                "message_throughput",
-                "task_throughput",
-                "error_rate",
-                "response_time",
-                "replay_buffer_size",
-                "training_cycles"
-            ],
-            "log_dir": "logs/monitoring",
-            "alert_thresholds": {
-                "error_rate": 0.1,
-                "response_time": 5.0,  # seconds
-                "agent_downtime": 300  # seconds
-            }
-        },
-        
-        # Security settings
-        "security": {
-            "encrypt_messages": True,
-            "authentication_required": True,
-            "api_key_header": "X-API-Key",
-            "token_expiration": 86400  # seconds (24 hours)
-        }
-    }
     
     def __init__(self, config_path: Optional[str] = None):
         """
-        Initialize core configuration.
+        Initialize the configuration manager.
         
         Args:
-            config_path: Path to configuration file (YAML or JSON)
+            config_path: Path to configuration file
         """
-        self.config_path = config_path
-        self.config = self.DEFAULT_CONFIG.copy()
-        
         # Set up logging
-        self._setup_logging()
+        self.logger = logging.getLogger("core_config")
+        
+        # Initialize configuration with defaults
+        self.config = self._get_default_config()
         
         # Load configuration from file if provided
         if config_path:
             self.load_config(config_path)
     
-    def _setup_logging(self) -> None:
-        """Set up logging for the core configuration."""
-        log_dir = self.config["core"]["log_dir"]
-        os.makedirs(log_dir, exist_ok=True)
+    def _get_default_config(self) -> Dict[str, Any]:
+        """
+        Get default configuration.
         
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_file = os.path.join(log_dir, f"core_config_{timestamp}.log")
-        
-        logging.basicConfig(
-            level=getattr(logging, self.config["core"]["log_level"]),
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            handlers=[
-                logging.FileHandler(log_file),
-                logging.StreamHandler()
-            ]
-        )
-        
-        self.logger = logging.getLogger("core_config")
+        Returns:
+            Dictionary with default configuration
+        """
+        return {
+            "core": {
+                "name": "BentonCountyAssessorCore",
+                "version": "3.0.0",
+                "log_level": "info",
+                "log_dir": "logs/core",
+                "data_dir": "data/core",
+                "master_prompt_refresh_interval": 3600  # seconds
+            },
+            "communication": {
+                "protocol": "rest",  # rest, redis, mqtt
+                "host": "localhost",
+                "rest": {
+                    "host": "0.0.0.0",
+                    "port": 8000,
+                    "api_prefix": "/api/v1/core"
+                },
+                "redis": {
+                    "host": "localhost",
+                    "port": 6379,
+                    "db": 0,
+                    "channels": {
+                        "commands": "core:commands",
+                        "events": "core:events",
+                        "errors": "core:errors",
+                        "status": "core:status"
+                    }
+                },
+                "mqtt": {
+                    "broker": "localhost",
+                    "port": 1883,
+                    "topics": {
+                        "commands": "core/commands",
+                        "events": "core/events",
+                        "errors": "core/errors",
+                        "status": "core/status"
+                    }
+                }
+            },
+            "agents": {
+                "enabled": [
+                    {
+                        "id": "data_quality_agent",
+                        "name": "Data Quality Agent",
+                        "type": "data_quality",
+                        "description": "Validates property assessment data against Washington State standards",
+                        "capabilities": ["validate_data", "detect_anomalies", "enhance_data"],
+                        "enabled": True
+                    },
+                    {
+                        "id": "compliance_agent",
+                        "name": "Compliance Agent",
+                        "type": "compliance",
+                        "description": "Ensures compliance with Washington State assessment regulations",
+                        "capabilities": ["check_compliance", "verify_exemption", "create_audit_record"],
+                        "enabled": True
+                    },
+                    {
+                        "id": "valuation_agent",
+                        "name": "Valuation Agent",
+                        "type": "valuation",
+                        "description": "Calculates property values using advanced models",
+                        "capabilities": ["estimate_value", "analyze_trends", "compare_properties"],
+                        "enabled": False  # Not yet implemented
+                    },
+                    {
+                        "id": "tax_agent",
+                        "name": "Tax Calculation Agent",
+                        "type": "tax",
+                        "description": "Calculates property taxes based on mill rates and exemptions",
+                        "capabilities": ["calculate_tax", "apply_exemptions", "generate_tax_report"],
+                        "enabled": False  # Not yet implemented
+                    },
+                    {
+                        "id": "user_agent",
+                        "name": "User Interaction Agent",
+                        "type": "user_interaction",
+                        "description": "Handles user queries and interactions",
+                        "capabilities": ["process_query", "generate_response", "follow_up"],
+                        "enabled": False  # Not yet implemented
+                    }
+                ]
+            },
+            "replay_buffer": {
+                "type": "memory",  # memory, file, redis
+                "capacity": 10000,
+                "alpha": 0.6,  # prioritization factor
+                "beta": 0.4,  # importance sampling factor
+                "beta_increment": 0.001,
+                "file": {
+                    "save_dir": "data/core/replay_buffer"
+                },
+                "redis": {
+                    "host": "localhost",
+                    "port": 6379,
+                    "db": 1,
+                    "key_prefix": "replay:"
+                }
+            },
+            "dashboard": {
+                "enabled": True,
+                "type": "streamlit",  # streamlit, flask
+                "host": "0.0.0.0",
+                "port": 8501,
+                "update_interval": 10,  # seconds
+                "metrics_history_size": 100
+            },
+            "master_prompt": (
+                "You are an AI assistant working for the Benton County Assessor's Office. "
+                "Your role is to help with property assessment, valuation, and tax calculations "
+                "in accordance with Washington State law and Benton County regulations. "
+                "Always be helpful, accurate, and compliant with all applicable regulations. "
+                "Focus on providing factual information and follow the specific "
+                "guidelines for your agent type."
+            )
+        }
     
     def load_config(self, config_path: str) -> bool:
         """
-        Load configuration from a file.
+        Load configuration from file.
         
         Args:
-            config_path: Path to configuration file (YAML or JSON)
+            config_path: Path to configuration file
             
         Returns:
             True if successful, False otherwise
@@ -268,196 +176,214 @@ class CoreConfig:
                 self.logger.warning(f"Configuration file not found: {config_path}")
                 return False
             
-            with open(config_path, 'r') as f:
-                if config_path.endswith('.json'):
-                    loaded_config = json.load(f)
-                elif config_path.endswith(('.yaml', '.yml')):
+            # Determine file type based on extension
+            _, ext = os.path.splitext(config_path)
+            
+            if ext.lower() in ['.yaml', '.yml']:
+                with open(config_path, 'r') as f:
                     loaded_config = yaml.safe_load(f)
-                else:
-                    self.logger.error(f"Unsupported configuration file format: {config_path}")
-                    return False
+            elif ext.lower() == '.json':
+                with open(config_path, 'r') as f:
+                    loaded_config = json.load(f)
+            else:
+                self.logger.error(f"Unsupported configuration file type: {ext}")
+                return False
             
-            # Update configuration with loaded values
-            self._update_config_recursive(self.config, loaded_config)
+            # Merge loaded config with defaults
+            self._merge_config(loaded_config)
             
-            self.logger.info(f"Configuration loaded from {config_path}")
+            self.logger.info(f"Loaded configuration from {config_path}")
             return True
-        
+            
         except Exception as e:
-            self.logger.error(f"Error loading configuration from {config_path}: {e}")
+            self.logger.error(f"Error loading configuration: {e}")
             return False
     
-    def _update_config_recursive(self, target: Dict, source: Dict) -> None:
+    def _merge_config(self, loaded_config: Dict[str, Any]) -> None:
         """
-        Update target dictionary with values from source dictionary recursively.
+        Merge loaded configuration with defaults.
         
         Args:
-            target: Target dictionary to update
-            source: Source dictionary with new values
+            loaded_config: Loaded configuration
         """
-        for key, value in source.items():
-            if key in target and isinstance(target[key], dict) and isinstance(value, dict):
-                self._update_config_recursive(target[key], value)
-            else:
-                target[key] = value
+        def _merge_dicts(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
+            """Merge two dictionaries recursively."""
+            for key, value in overlay.items():
+                if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                    _merge_dicts(base[key], value)
+                else:
+                    base[key] = value
+            return base
+        
+        _merge_dicts(self.config, loaded_config)
     
-    def save_config(self, config_path: Optional[str] = None) -> bool:
+    def save_config(self, config_path: str, format: str = 'json') -> bool:
         """
-        Save configuration to a file.
+        Save configuration to file.
         
         Args:
-            config_path: Path to save configuration file (YAML or JSON)
+            config_path: Path to configuration file
+            format: Format to save in ('json' or 'yaml')
             
         Returns:
             True if successful, False otherwise
         """
-        if config_path is None:
-            config_path = self.config_path
-        
-        if config_path is None:
-            self.logger.error("No configuration path specified")
-            return False
-        
         try:
+            # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(config_path), exist_ok=True)
             
-            with open(config_path, 'w') as f:
-                if config_path.endswith('.json'):
-                    json.dump(self.config, f, indent=2)
-                elif config_path.endswith(('.yaml', '.yml')):
+            if format.lower() == 'yaml':
+                with open(config_path, 'w') as f:
                     yaml.dump(self.config, f, default_flow_style=False)
-                else:
-                    self.logger.error(f"Unsupported configuration file format: {config_path}")
-                    return False
+            else:
+                with open(config_path, 'w') as f:
+                    json.dump(self.config, f, indent=2)
             
-            self.logger.info(f"Configuration saved to {config_path}")
+            self.logger.info(f"Saved configuration to {config_path}")
             return True
-        
+            
         except Exception as e:
-            self.logger.error(f"Error saving configuration to {config_path}: {e}")
+            self.logger.error(f"Error saving configuration: {e}")
             return False
     
-    def get(self, section: str, key: Optional[str] = None, default: Any = None) -> Any:
+    def get(self, key: Optional[str] = None, default: Any = None) -> Any:
         """
-        Get a configuration value.
+        Get configuration value.
         
         Args:
-            section: Configuration section
-            key: Configuration key within section (None = return entire section)
-            default: Default value if key is not found
+            key: Configuration key (dot notation for nested keys, e.g., 'core.name')
+            default: Default value if key not found
             
         Returns:
-            Configuration value, section, or default
+            Configuration value or default
         """
-        if section not in self.config:
-            return default
-        
         if key is None:
-            return self.config[section]
+            return self.config
         
-        return self.config[section].get(key, default)
+        # Handle dot notation
+        parts = key.split('.')
+        value = self.config
+        
+        try:
+            for part in parts:
+                value = value[part]
+            return value
+        except (KeyError, TypeError):
+            return default
     
-    def set(self, section: str, key: str, value: Any) -> bool:
+    def set(self, key: str, value: Any) -> bool:
         """
-        Set a configuration value.
+        Set configuration value.
         
         Args:
-            section: Configuration section
-            key: Configuration key within section
-            value: Configuration value
+            key: Configuration key (dot notation for nested keys, e.g., 'core.name')
+            value: Value to set
             
         Returns:
             True if successful, False otherwise
         """
-        if section not in self.config:
-            self.logger.error(f"Configuration section not found: {section}")
-            return False
+        # Handle dot notation
+        parts = key.split('.')
+        config = self.config
         
-        self.config[section][key] = value
-        return True
+        try:
+            # Navigate to the parent of the target key
+            for part in parts[:-1]:
+                if part not in config:
+                    config[part] = {}
+                config = config[part]
+            
+            # Set the value
+            config[parts[-1]] = value
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error setting configuration: {e}")
+            return False
     
     def get_master_prompt(self) -> str:
         """
-        Get the master prompt for all agents.
+        Get the master prompt.
         
         Returns:
             Master prompt string
         """
-        return self.config["core"]["master_prompt"]
+        return self.config.get("master_prompt", "")
     
-    def set_master_prompt(self, prompt: str) -> None:
+    def set_master_prompt(self, prompt: str) -> bool:
         """
-        Set the master prompt for all agents.
+        Set the master prompt.
         
         Args:
             prompt: Master prompt string
+            
+        Returns:
+            True if successful, False otherwise
         """
-        self.config["core"]["master_prompt"] = prompt
+        try:
+            self.config["master_prompt"] = prompt
+            return True
+        except Exception as e:
+            self.logger.error(f"Error setting master prompt: {e}")
+            return False
     
     def get_enabled_agents(self) -> List[Dict[str, Any]]:
         """
-        Get a list of enabled agents.
+        Get list of enabled agents.
         
         Returns:
             List of enabled agent configurations
         """
-        return [
-            agent for agent in self.config["agent_army"]["agents"]
-            if agent.get("enabled", True)
-        ]
+        try:
+            agents = self.config.get("agents", {}).get("enabled", [])
+            return [agent for agent in agents if agent.get("enabled", False)]
+        except Exception as e:
+            self.logger.error(f"Error getting enabled agents: {e}")
+            return []
     
-    def get_agent_config(self, agent_name: str) -> Optional[Dict[str, Any]]:
+    def get_agent_config(self, agent_id: str) -> Optional[Dict[str, Any]]:
         """
         Get configuration for a specific agent.
         
         Args:
-            agent_name: Name of the agent
+            agent_id: Agent ID
             
         Returns:
             Agent configuration or None if not found
         """
-        for agent in self.config["agent_army"]["agents"]:
-            if agent["name"] == agent_name:
-                return agent
-        
-        return None
+        try:
+            agents = self.config.get("agents", {}).get("enabled", [])
+            for agent in agents:
+                if agent.get("id") == agent_id:
+                    return agent
+            return None
+        except Exception as e:
+            self.logger.error(f"Error getting agent configuration: {e}")
+            return None
     
     def get_communication_config(self) -> Dict[str, Any]:
         """
-        Get communication configuration based on selected protocol.
+        Get communication configuration.
         
         Returns:
-            Communication configuration for the selected protocol
+            Communication configuration
         """
-        comm_config = self.config["communication"]
-        protocol = comm_config["protocol"]
-        
-        return {
-            "protocol": protocol,
-            "message_format": comm_config["message_format"],
-            "retry_attempts": comm_config["retry_attempts"],
-            "retry_delay": comm_config["retry_delay"],
-            "timeout": comm_config["timeout"],
-            "heartbeat_interval": comm_config["heartbeat_interval"],
-            "settings": comm_config.get(protocol, {})
-        }
+        return self.config.get("communication", {})
     
     def get_replay_buffer_config(self) -> Dict[str, Any]:
         """
-        Get replay buffer configuration based on selected type.
+        Get replay buffer configuration.
         
         Returns:
-            Replay buffer configuration for the selected type
+            Replay buffer configuration
         """
-        buffer_config = self.config["replay_buffer"]
-        buffer_type = buffer_config["type"]
+        return self.config.get("replay_buffer", {})
+    
+    def get_dashboard_config(self) -> Dict[str, Any]:
+        """
+        Get dashboard configuration.
         
-        return {
-            "type": buffer_type,
-            "capacity": buffer_config["capacity"],
-            "alpha": buffer_config["alpha"],
-            "beta": buffer_config["beta"],
-            "beta_increment": buffer_config["beta_increment"],
-            "save_dir": buffer_config["save_dir"],
-            "settings": buffer_config.get(buffer_type, {})
-        }
+        Returns:
+            Dashboard configuration
+        """
+        return self.config.get("dashboard", {})

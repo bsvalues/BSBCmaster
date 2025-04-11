@@ -95,7 +95,7 @@ def main():
     )
     
     # Send the command
-    print(f"Sending command: {command.command_name}")
+    print(f"Sending command: {command.payload.get('command_name')}")
     hub.send_message(command)
     
     # Simulate response

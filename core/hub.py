@@ -77,6 +77,9 @@ class CoreHub:
         # Running flag
         self.running = False
         
+        # Start time
+        self.start_time = time.time()
+        
         # Processing thread
         self.processing_thread = None
         
