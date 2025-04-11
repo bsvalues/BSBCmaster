@@ -47,7 +47,7 @@ class Task:
     
     def __init__(self, to_agent_id: str, task_type: str,
                 parameters: Dict[str, Any] = None,
-                from_agent_id: Optional[str] = None,
+                source_agent_id: Optional[str] = None,
                 priority: TaskPriority = TaskPriority.NORMAL,
                 task_id: Optional[str] = None,
                 parent_task_id: Optional[str] = None,
@@ -61,7 +61,7 @@ class Task:
             to_agent_id: ID of the agent the task is assigned to
             task_type: Type of task
             parameters: Task parameters as a dictionary
-            from_agent_id: ID of the agent creating the task (optional)
+            source_agent_id: ID of the agent creating the task (optional)
             priority: Task priority
             task_id: Unique identifier for the task (generated if not provided)
             parent_task_id: ID of the parent task (for subtasks)

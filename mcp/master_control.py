@@ -380,7 +380,7 @@ class MasterControlProgram:
     
     def create_task(self, to_agent_id: str, task_type: str,
                   parameters: Dict[str, Any],
-                  from_agent_id: Optional[str] = None,
+                  source_agent_id: Optional[str] = None,
                   priority: Optional[TaskPriority] = None,
                   timeout_seconds: Optional[int] = None) -> Dict[str, Any]:
         """
@@ -390,7 +390,7 @@ class MasterControlProgram:
             to_agent_id: ID of the agent to assign the task to
             task_type: Type of task
             parameters: Task parameters
-            from_agent_id: ID of the agent creating the task (optional)
+            source_agent_id: ID of the agent creating the task (optional)
             priority: Task priority (default: NORMAL)
             timeout_seconds: Optional timeout for the task
             
@@ -406,7 +406,7 @@ class MasterControlProgram:
             to_agent_id=to_agent_id,
             task_type=task_type,
             parameters=parameters,
-            from_agent_id=from_agent_id,
+            source_agent_id=source_agent_id,
             priority=priority,
             timeout_seconds=timeout_seconds
         )
@@ -791,10 +791,10 @@ class MasterControlProgram:
         
         # Create message to notify agent of task assignment
         message = Message(
-            from_agent_id="mcp",
+            source_agent_id="mcp",
             to_agent_id=to_agent_id,
             message_type=MessageType.TASK_ASSIGNMENT,
-            content={
+            payload={
                 "task_id": task.task_id,
                 "task_type": task.task_type,
                 "parameters": task.parameters
