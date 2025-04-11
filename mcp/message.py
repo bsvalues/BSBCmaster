@@ -85,9 +85,9 @@ class Message:
     and delivery confirmation.
     """
     
-    def __init__(self, from_agent_id: str, to_agent_id: str,
+    def __init__(self, source_agent_id: str, to_agent_id: str,
                 message_type: MessageType = MessageType.CUSTOM,
-                content: Dict[str, Any] = None,
+                payload: Dict[str, Any] = None,
                 priority: MessagePriority = MessagePriority.NORMAL,
                 message_id: Optional[str] = None,
                 correlation_id: Optional[str] = None,
@@ -96,10 +96,10 @@ class Message:
         Initialize a new message with the specified parameters.
         
         Args:
-            from_agent_id: ID of the sending agent
+            source_agent_id: ID of the sending agent
             to_agent_id: ID of the receiving agent
             message_type: Type of message
-            content: Message content as a dictionary
+            payload: Message content as a dictionary
             priority: Message priority
             message_id: Unique identifier for the message (generated if not provided)
             correlation_id: ID linking related messages (for request/response tracking)
@@ -107,10 +107,10 @@ class Message:
         """
         self.message_id = message_id or str(uuid.uuid4())
         self.correlation_id = correlation_id
-        self.from_agent_id = from_agent_id
+        self.source_agent_id = source_agent_id
         self.to_agent_id = to_agent_id
         self.message_type = message_type
-        self.content = content or {}
+        self.payload = {} if payload is None else payload
         self.priority = priority
         
         # Message metadata
@@ -123,7 +123,7 @@ class Message:
         self.timeout_seconds = timeout_seconds
         self.expired = False
         
-        logger.debug(f"Created message {self.message_id} from {from_agent_id} to {to_agent_id}")
+        logger.debug(f"Created message {self.message_id} from {source_agent_id} to {to_agent_id}")
     
     def mark_delivered(self):
         """Mark the message as delivered to the recipient."""
@@ -167,14 +167,14 @@ class Message:
         
         return self.expired
     
-    def create_response(self, content: Dict[str, Any],
+    def create_response(self, payload: Dict[str, Any],
                       message_type: Optional[MessageType] = None,
                       priority: Optional[MessagePriority] = None) -> 'Message':
         """
         Create a response message to this message.
         
         Args:
-            content: Content of the response
+            payload: Content of the response
             message_type: Type of response message (default: derives appropriate response type)
             priority: Priority of response message (default: same as original message)
             
@@ -203,10 +203,10 @@ class Message:
             response_type = message_type
         
         response = Message(
-            from_agent_id=self.to_agent_id,
-            to_agent_id=self.from_agent_id,
+            source_agent_id=self.to_agent_id,
+            to_agent_id=self.source_agent_id,
             message_type=response_type,
-            content=content,
+            payload=payload,
             priority=priority or self.priority,
             correlation_id=self.message_id
         )
@@ -224,10 +224,10 @@ class Message:
         return {
             "message_id": self.message_id,
             "correlation_id": self.correlation_id,
-            "from_agent_id": self.from_agent_id,
+            "source_agent_id": self.source_agent_id,
             "to_agent_id": self.to_agent_id,
             "message_type": self.message_type.value,
-            "content": self.content,
+            "payload": self.payload,
             "priority": self.priority.value,
             "created_at": self.created_at.isoformat(),
             "delivered_at": self.delivered_at.isoformat() if self.delivered_at else None,
@@ -257,11 +257,15 @@ class Message:
         Returns:
             Message: The reconstructed message
         """
+        # Handle backward compatibility with from_agent_id and content keys
+        source_agent_id = data.get("source_agent_id", data.get("from_agent_id"))
+        payload = data.get("payload", data.get("content"))
+        
         message = cls(
-            from_agent_id=data["from_agent_id"],
+            source_agent_id=source_agent_id,
             to_agent_id=data["to_agent_id"],
             message_type=MessageType(data["message_type"]),
-            content=data["content"],
+            payload=payload,
             priority=MessagePriority(data["priority"]),
             message_id=data["message_id"],
             correlation_id=data.get("correlation_id"),
