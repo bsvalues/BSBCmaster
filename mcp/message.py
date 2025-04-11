@@ -10,7 +10,7 @@ import uuid
 import json
 from datetime import datetime
 from enum import Enum, auto
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -87,7 +87,7 @@ class Message:
     
     def __init__(self, source_agent_id: str, to_agent_id: str,
                 message_type: MessageType = MessageType.CUSTOM,
-                payload: Dict[str, Any] = None,
+                payload: Union[Dict[str, Any], None] = None,
                 priority: MessagePriority = MessagePriority.NORMAL,
                 message_id: Optional[str] = None,
                 correlation_id: Optional[str] = None,

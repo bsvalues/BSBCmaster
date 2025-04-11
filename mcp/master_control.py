@@ -276,19 +276,19 @@ class MasterControlProgram:
         logger.info(f"Agent {agent.name} ({agent_id}) status changed from {previous_status.value} to {status.value}")
         return True
     
-    def send_message(self, from_agent_id: str, to_agent_id: str,
+    def send_message(self, source_agent_id: str, to_agent_id: str,
                     message_type: Union[str, MessageType],
-                    content: Dict[str, Any],
+                    payload: Dict[str, Any],
                     priority: Optional[MessagePriority] = None,
                     timeout_seconds: Optional[int] = None) -> Dict[str, Any]:
         """
         Send a message from one agent to another.
         
         Args:
-            from_agent_id: ID of the sending agent
+            source_agent_id: ID of the sending agent
             to_agent_id: ID of the receiving agent
             message_type: Type of message
-            content: Message content
+            payload: Message content
             priority: Message priority (default: NORMAL)
             timeout_seconds: Optional timeout for the message
             
@@ -308,10 +308,10 @@ class MasterControlProgram:
         
         # Create message
         message = Message(
-            from_agent_id=from_agent_id,
+            source_agent_id=source_agent_id,
             to_agent_id=to_agent_id,
             message_type=message_type,
-            content=content,
+            payload=payload,
             priority=priority,
             timeout_seconds=timeout_seconds
         )
@@ -325,7 +325,7 @@ class MasterControlProgram:
         priority_value = self._get_priority_value(priority)
         self.message_queue.put((priority_value, message))
         
-        logger.info(f"Message {message.message_id} from {from_agent_id} to {to_agent_id} queued")
+        logger.info(f"Message {message.message_id} from {source_agent_id} to {to_agent_id} queued")
         
         return {
             "message_id": message.message_id,
@@ -333,17 +333,17 @@ class MasterControlProgram:
             "timestamp": message.created_at.isoformat()
         }
     
-    def broadcast_message(self, from_agent_id: str, message_type: Union[str, MessageType],
-                        content: Dict[str, Any],
+    def broadcast_message(self, source_agent_id: str, message_type: Union[str, MessageType],
+                        payload: Dict[str, Any],
                         agent_type: Optional[AgentType] = None,
                         priority: Optional[MessagePriority] = None) -> Dict[str, Any]:
         """
         Broadcast a message to multiple agents.
         
         Args:
-            from_agent_id: ID of the sending agent
+            source_agent_id: ID of the sending agent
             message_type: Type of message
-            content: Message content
+            payload: Message content
             agent_type: Optional filter for agent type
             priority: Message priority (default: NORMAL)
             
@@ -357,17 +357,17 @@ class MasterControlProgram:
             target_agents = list(self.agents.keys())
         
         # Remove sender from recipients
-        if from_agent_id in target_agents:
-            target_agents.remove(from_agent_id)
+        if source_agent_id in target_agents:
+            target_agents.remove(source_agent_id)
         
         # Send message to each target agent
         message_ids = []
         for to_agent_id in target_agents:
             result = self.send_message(
-                from_agent_id=from_agent_id,
+                source_agent_id=source_agent_id,
                 to_agent_id=to_agent_id,
                 message_type=message_type,
-                content=content,
+                payload=payload,
                 priority=priority
             )
             message_ids.append(result["message_id"])
