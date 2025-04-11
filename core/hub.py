@@ -278,11 +278,23 @@ class CoreHub:
         asyncio.set_event_loop(self.loop)
         self.loop.run_forever()
     
+    def force_save_state(self) -> bool:
+        """
+        Force saving the Core Hub state immediately.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        return self._save_state()
+        
     def stop(self) -> None:
         """Stop the Core Hub."""
         if not self.running:
             self.logger.warning("Core Hub is not running")
             return
+        
+        # Save state before shutting down
+        self._save_state()
         
         self.running = False
         
@@ -449,6 +461,15 @@ class CoreHub:
             self.registered_agents[agent_id]["status"] = status
             self.registered_agents[agent_id]["metrics"] = metrics
             self.registered_agents[agent_id]["last_update"] = time.time()
+            
+            # Save state periodically when handling status updates
+            # Only save on significant status changes or every 15 status updates to avoid excessive I/O
+            significant_status = status in ["terminated", "error", "restarting"]
+            status_update_count = self.registered_agents[agent_id].get("status_update_count", 0) + 1
+            self.registered_agents[agent_id]["status_update_count"] = status_update_count
+            
+            if significant_status or status_update_count % 15 == 0:
+                self._save_state()
         
         # Route status update to target agent
         self._route_message(message)
@@ -487,15 +508,58 @@ class CoreHub:
                 metadata={
                     "priority": 1.5,  # Higher priority for assistance requests
                     "message_id": message.message_id,
-                    "correlation_id": message.correlation_id
+                    "correlation_id": message.correlation_id,
+                    "timestamp": time.time()
                 }
             )
             
             # Add to replay buffer
             self.replay_buffer.add(experience)
+            
+            # Save state after recording assistance request
+            # These are important events that should be persisted
+            self._save_state()
         
         except Exception as e:
             self.logger.error(f"Error recording assistance request: {e}")
+            
+    def record_assistance_response(self, request_message_id: str, response: Dict[str, Any], success: bool = True) -> None:
+        """
+        Record a response to an assistance request in the replay buffer.
+        
+        Args:
+            request_message_id: ID of the original assistance request message
+            response: Response data
+            success: Whether the assistance was successful
+        """
+        try:
+            # Find experiences in replay buffer with matching message_id
+            # This would be more efficient with a database-backed replay buffer
+            # For now, we'll add a new experience with a reference to the original
+            
+            experience = Experience(
+                agent_id="core_hub",
+                state={"message_type": "assistance_response"},
+                action={"response_to": request_message_id},
+                result={"success": success, "data": response},
+                next_state={"message_type": "assistance_completed"},
+                metadata={
+                    "priority": 1.0,
+                    "original_message_id": request_message_id,
+                    "timestamp": time.time()
+                }
+            )
+            
+            # Add to replay buffer
+            self.replay_buffer.add(experience)
+            
+            # Save state after recording assistance response
+            self._save_state()
+            
+            self.logger.info(f"Recorded response to assistance request {request_message_id}")
+        
+        except Exception as e:
+            self.logger.error(f"Error recording assistance response: {e}")
     
     def _route_message(self, message: Message) -> None:
         """
@@ -770,6 +834,70 @@ class CoreHub:
         if time.time() - self.last_prompt_refresh > refresh_interval:
             self._broadcast_master_prompt()
     
+    def _save_state(self) -> bool:
+        """
+        Save the Core Hub state to a file.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Create state object
+            state = {
+                "registered_agents": self.registered_agents,
+                "last_prompt_refresh": self.last_prompt_refresh,
+                "start_time": self.start_time,
+                "version": self.config.get("core.version", "3.0.0"),
+                "saved_at": time.time(),
+                "agent_metrics": {
+                    agent_id: agent.get("metrics", {})
+                    for agent_id, agent in self.registered_agents.items()
+                }
+            }
+            
+            # Save to file
+            with open(self.state_file, 'w') as f:
+                json.dump(state, f, indent=2)
+            
+            self.logger.info(f"Core Hub state saved to {self.state_file}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error saving Core Hub state: {e}")
+            return False
+    
+    def _load_state(self) -> bool:
+        """
+        Load the Core Hub state from a file.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        if not os.path.exists(self.state_file):
+            self.logger.info(f"No saved state found at {self.state_file}")
+            return False
+        
+        try:
+            # Load from file
+            with open(self.state_file, 'r') as f:
+                state = json.load(f)
+            
+            # Restore registered agents
+            if "registered_agents" in state:
+                self.registered_agents = state["registered_agents"]
+            
+            # Restore other state variables
+            if "last_prompt_refresh" in state:
+                self.last_prompt_refresh = state["last_prompt_refresh"]
+            
+            self.logger.info(f"Core Hub state loaded from {self.state_file}")
+            self.logger.info(f"Restored {len(self.registered_agents)} registered agents")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error loading Core Hub state: {e}")
+            return False
+    
     def register_agent(self, agent_id: str, agent_info: Dict[str, Any]) -> bool:
         """
         Register an agent with the Core Hub.
@@ -794,6 +922,9 @@ class CoreHub:
         }
         
         self.logger.info(f"Agent {agent_id} registered: {agent_info.get('type', 'unknown')}")
+        
+        # Save state after registering a new agent
+        self._save_state()
         
         # Send master prompt to the new agent
         try:
@@ -834,6 +965,9 @@ class CoreHub:
         agent_info = self.registered_agents.pop(agent_id)
         
         self.logger.info(f"Agent {agent_id} deregistered: {agent_info.get('type', 'unknown')}")
+        
+        # Save state after deregistering an agent
+        self._save_state()
         
         return True
     

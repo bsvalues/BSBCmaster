@@ -174,23 +174,107 @@ def main():
     
     # Get system status
     print("\nGetting system status...")
+    system_status = hub.get_system_status()
+    print("System status:")
+    print(json.dumps(system_status, indent=2))
     
-    try:
-        # Note: This will fail because we haven't added start_time to CoreHub
-        system_status = hub.get_system_status()
-        print("System status:")
-        print(json.dumps(system_status, indent=2))
-    except Exception as e:
-        print(f"Error getting system status: {e}")
+    # Demonstrate state persistence
+    print("\nDemonstrating state persistence...")
+    
+    # Force save state
+    print("Forcing state save...")
+    hub.force_save_state()
+    print(f"State saved to {hub.state_file}")
+    
+    # Simulate status updates
+    print("\nSimulating agent status updates...")
+    for agent_id in list(hub.get_registered_agents().keys()):
+        # Create status update message for each agent
+        status_message = Message(
+            message_id=f"status_{agent_id}_{int(time.time())}",
+            source_agent_id=agent_id,
+            target_agent_id="core_hub",
+            event_type=EventType.STATUS_UPDATE,
+            payload={
+                "status": "active",
+                "metrics": {
+                    "cpu_usage": 0.2 + (hash(agent_id) % 5) / 10,
+                    "memory_usage": 120 + (hash(agent_id) % 10) * 10,
+                    "tasks_completed": hash(agent_id) % 10,
+                    "errors": 0
+                }
+            }
+        )
         
-        # Show what we can get
-        print("Registered agents:")
-        print(json.dumps(hub.get_registered_agents(), indent=2))
+        # Handle status update
+        hub._handle_status_update(status_message)
+        print(f"Updated status for {agent_id}")
+    
+    # Demonstrate assistance request and response tracking
+    print("\nDemonstrating assistance request and response tracking...")
+    
+    # Create an assistance request
+    assistance_request = Message(
+        message_id=f"assist_req_{int(time.time())}",
+        source_agent_id="valuation_agent",
+        target_agent_id="core_hub",
+        event_type=EventType.ASSISTANCE_REQUESTED,
+        payload={
+            "assistance_type": "model_selection",
+            "property_type": "commercial",
+            "location": "downtown",
+            "priority": "high"
+        }
+    )
+    
+    # Record the assistance request
+    print("Recording assistance request...")
+    hub._handle_assistance_request(assistance_request)
+    
+    # Record a response to the assistance request
+    print("Recording assistance response...")
+    hub.record_assistance_response(
+        request_message_id=assistance_request.message_id,
+        response={
+            "model_selected": "commercial_downtown_high_value",
+            "confidence": 0.92,
+            "additional_data_needed": False
+        },
+        success=True
+    )
+    
+    # Demonstrate a second save and show replay buffer stats
+    print("\nForcing another state save and checking replay buffer...")
+    hub.force_save_state()
+    
+    # Get updated buffer statistics
+    buffer_stats = hub.replay_buffer.get_stats()
+    print("\nUpdated replay buffer statistics:")
+    print(f"  Size: {buffer_stats['size']}/{buffer_stats['capacity']}")
+    print(f"  Total added: {buffer_stats['total_added']}")
+    print(f"  Agent distribution: {buffer_stats['agent_distribution']}")
+    print(f"  Average reward: {buffer_stats['avg_reward']:.2f}")
     
     # Clean up
     print("\nStopping Core Hub...")
     hub.stop()
     print("Core Hub stopped successfully.")
+    
+    # Verify that state was saved on shutdown
+    print(f"\nVerifying state file exists at {hub.state_file}...")
+    if os.path.exists(hub.state_file):
+        print(f"State file exists and is {os.path.getsize(hub.state_file)} bytes")
+        
+        # Load and print some state data
+        try:
+            with open(hub.state_file, 'r') as f:
+                state_data = json.load(f)
+            print(f"State contains data for {len(state_data.get('registered_agents', {}))} agents")
+            print(f"State was saved at: {time.ctime(state_data.get('saved_at', 0))}")
+        except Exception as e:
+            print(f"Error reading state file: {e}")
+    else:
+        print("State file doesn't exist!")
     
     print("\nDemo completed successfully.\n")
 

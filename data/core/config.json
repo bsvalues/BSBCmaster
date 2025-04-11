@@ -1,0 +1,129 @@
+{
+  "core": {
+    "name": "BentonCountyAssessorCore",
+    "version": "3.0.0",
+    "log_level": "info",
+    "log_dir": "logs/core",
+    "data_dir": "data/core",
+    "master_prompt_refresh_interval": 3600
+  },
+  "communication": {
+    "protocol": "rest",
+    "host": "localhost",
+    "rest": {
+      "host": "0.0.0.0",
+      "port": 8000,
+      "api_prefix": "/api/v1/core"
+    },
+    "redis": {
+      "host": "localhost",
+      "port": 6379,
+      "db": 0,
+      "channels": {
+        "commands": "core:commands",
+        "events": "core:events",
+        "errors": "core:errors",
+        "status": "core:status"
+      }
+    },
+    "mqtt": {
+      "broker": "localhost",
+      "port": 1883,
+      "topics": {
+        "commands": "core/commands",
+        "events": "core/events",
+        "errors": "core/errors",
+        "status": "core/status"
+      }
+    }
+  },
+  "agents": {
+    "enabled": [
+      {
+        "id": "data_quality_agent",
+        "name": "Data Quality Agent",
+        "type": "data_quality",
+        "description": "Validates property assessment data against Washington State standards",
+        "capabilities": [
+          "validate_data",
+          "detect_anomalies",
+          "enhance_data"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "compliance_agent",
+        "name": "Compliance Agent",
+        "type": "compliance",
+        "description": "Ensures compliance with Washington State assessment regulations",
+        "capabilities": [
+          "check_compliance",
+          "verify_exemption",
+          "create_audit_record"
+        ],
+        "enabled": true
+      },
+      {
+        "id": "valuation_agent",
+        "name": "Valuation Agent",
+        "type": "valuation",
+        "description": "Calculates property values using advanced models",
+        "capabilities": [
+          "estimate_value",
+          "analyze_trends",
+          "compare_properties"
+        ],
+        "enabled": false
+      },
+      {
+        "id": "tax_agent",
+        "name": "Tax Calculation Agent",
+        "type": "tax",
+        "description": "Calculates property taxes based on mill rates and exemptions",
+        "capabilities": [
+          "calculate_tax",
+          "apply_exemptions",
+          "generate_tax_report"
+        ],
+        "enabled": false
+      },
+      {
+        "id": "user_agent",
+        "name": "User Interaction Agent",
+        "type": "user_interaction",
+        "description": "Handles user queries and interactions",
+        "capabilities": [
+          "process_query",
+          "generate_response",
+          "follow_up"
+        ],
+        "enabled": false
+      }
+    ]
+  },
+  "replay_buffer": {
+    "type": "memory",
+    "capacity": 10000,
+    "alpha": 0.6,
+    "beta": 0.4,
+    "beta_increment": 0.001,
+    "file": {
+      "save_dir": "data/core/replay_buffer"
+    },
+    "redis": {
+      "host": "localhost",
+      "port": 6379,
+      "db": 1,
+      "key_prefix": "replay:"
+    }
+  },
+  "dashboard": {
+    "enabled": true,
+    "type": "streamlit",
+    "host": "0.0.0.0",
+    "port": 8501,
+    "update_interval": 10,
+    "metrics_history_size": 100
+  },
+  "master_prompt": "You are an AI assistant working for the Benton County Assessor's Office. Your role is to help with property assessment, valuation, and tax calculations in accordance with Washington State law and Benton County regulations. Always be helpful, accurate, and compliant with all applicable regulations. Focus on providing factual information and follow the specific guidelines for your agent type."
+}

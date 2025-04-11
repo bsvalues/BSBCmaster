@@ -1,0 +1,88 @@
+{
+  "registered_agents": {
+    "data_quality_agent": {
+      "name": "Data Quality Agent",
+      "type": "data_quality",
+      "description": "Validates property assessment data against Washington State standards",
+      "capabilities": [
+        "validate_data",
+        "detect_anomalies",
+        "enhance_data"
+      ],
+      "registered_at": 1744415460.7156968,
+      "last_update": 1744415460.71796,
+      "status": "active",
+      "metrics": {
+        "cpu_usage": 0.4,
+        "memory_usage": 190,
+        "tasks_completed": 7,
+        "errors": 0
+      },
+      "status_update_count": 1
+    },
+    "compliance_agent": {
+      "name": "Compliance Agent",
+      "type": "compliance",
+      "description": "Ensures compliance with Washington State assessment regulations",
+      "capabilities": [
+        "check_compliance",
+        "verify_exemption",
+        "create_audit_record"
+      ],
+      "registered_at": 1744415460.7161732,
+      "last_update": 1744415460.7179894,
+      "status": "active",
+      "metrics": {
+        "cpu_usage": 0.6000000000000001,
+        "memory_usage": 160,
+        "tasks_completed": 4,
+        "errors": 0
+      },
+      "status_update_count": 1
+    },
+    "valuation_agent": {
+      "name": "Valuation Agent",
+      "type": "valuation",
+      "description": "Calculates property values using advanced models",
+      "capabilities": [
+        "estimate_value",
+        "analyze_trends",
+        "compare_properties"
+      ],
+      "registered_at": 1744415460.7166996,
+      "last_update": 1744415460.718009,
+      "status": "active",
+      "metrics": {
+        "cpu_usage": 0.6000000000000001,
+        "memory_usage": 210,
+        "tasks_completed": 9,
+        "errors": 0
+      },
+      "status_update_count": 1
+    }
+  },
+  "last_prompt_refresh": 1744415460.7156084,
+  "start_time": 1744415460.7142935,
+  "version": "3.0.0",
+  "saved_at": 1744415460.7286496,
+  "agent_metrics": {
+    "data_quality_agent": {
+      "cpu_usage": 0.4,
+      "memory_usage": 190,
+      "tasks_completed": 7,
+      "errors": 0
+    },
+    "compliance_agent": {
+      "cpu_usage": 0.6000000000000001,
+      "memory_usage": 160,
+      "tasks_completed": 4,
+      "errors": 0
+    },
+    "valuation_agent": {
+      "cpu_usage": 0.6000000000000001,
+      "memory_usage": 210,
+      "tasks_completed": 9,
+      "errors": 0
+    }
+  }
+}
