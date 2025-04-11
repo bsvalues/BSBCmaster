@@ -88,27 +88,25 @@ class TestValuationAgent(unittest.TestCase):
         mock_result.fetchone.return_value = None
         self.mock_connection.execute.return_value = mock_result
         
-        # Setup expected response message
-        mock_response = MagicMock()
-        message.create_response.return_value = mock_response
-        
         # Call the handler
         self.agent._handle_valuation_request(message)
         
-        # Check that send_message was called with response message
+        # Check that send_message was called with correct parameters
         mock_send_message.assert_called_once()
         
-        # Check that the message was created using message.create_response
-        message.create_response.assert_called_once()
+        # Get the arguments passed to create_response
+        args, kwargs = mock_send_message.call_args
         
-        # Get the content passed to create_response
-        args, kwargs = message.create_response.call_args
-        content = kwargs.get("content", {})
+        # Check that create_response was called with the correct parameters
+        self.assertEqual(kwargs.get("target_agent_id"), message.from_agent_id)
+        
+        # Get the payload for validation
+        payload = kwargs.get("content", {})
         
         # Validate the content
-        self.assertFalse(content.get("success", True))
-        self.assertIn("error", content)
-        self.assertIn("not found", content.get("error", ""))
+        self.assertFalse(payload.get("success", True))
+        self.assertIn("error", payload)
+        self.assertIn("not found", payload.get("error", ""))
     
     @patch('mcp.agents.valuation.agent.ValuationAgent._calculate_cost_approach')
     @patch('mcp.agents.valuation.agent.ValuationAgent.send_message')
@@ -157,10 +155,6 @@ class TestValuationAgent(unittest.TestCase):
         mock_result.fetchone.return_value = property_row
         self.mock_connection.execute.return_value = mock_result
         
-        # Setup expected response message
-        mock_response = MagicMock()
-        message.create_response.return_value = mock_response
-        
         # Call the handler
         self.agent._handle_valuation_request(message)
         
@@ -170,18 +164,20 @@ class TestValuationAgent(unittest.TestCase):
         # Check that send_message was called with response message
         mock_send_message.assert_called_once()
         
-        # Check that the message was created using message.create_response
-        message.create_response.assert_called_once()
+        # Get the arguments passed to send_message
+        args, kwargs = mock_send_message.call_args
         
-        # Get the content passed to create_response
-        args, kwargs = message.create_response.call_args
-        content = kwargs.get("content", {})
+        # Check that send_message was called with the correct parameters
+        self.assertEqual(kwargs.get("target_agent_id"), message.from_agent_id)
+        
+        # Get the content/payload for validation
+        payload = kwargs.get("content", {})
         
         # Validate the content
-        self.assertTrue(content.get("success", False))
-        self.assertEqual(content.get("property_id"), 1)
-        self.assertIn("cost_approach", content.get("results", {}))
-        self.assertEqual(content.get("results", {}).get("cost_approach", {}).get("total_value"), 350000)
+        self.assertTrue(payload.get("success", False))
+        self.assertEqual(payload.get("property_id"), 1)
+        self.assertIn("cost_approach", payload.get("results", {}))
+        self.assertEqual(payload.get("results", {}).get("cost_approach", {}).get("total_value"), 350000)
     
     def test_calculate_cost_approach(self):
         """Test calculation of property value using cost approach."""
@@ -413,35 +409,32 @@ class TestValuationAgent(unittest.TestCase):
         # Configure mock connection to return different results for different queries
         self.mock_connection.execute.side_effect = [subject_result, comp1_result, comp2_result]
         
-        # Setup expected response message
-        mock_response = MagicMock()
-        message.create_response.return_value = mock_response
-        
         # Call the handler
         self.agent._handle_comparative_analysis_request(message)
         
-        # Check that send_message was called
+        # Check that send_message was called with correct parameters
         mock_send_message.assert_called_once()
         
-        # Check that the message was created using message.create_response
-        message.create_response.assert_called_once()
+        # Check message parameters
+        args, kwargs = mock_send_message.call_args
+        self.assertEqual(kwargs.get("message_type"), MessageType.COMPARATIVE_ANALYSIS_RESPONSE)
+        self.assertEqual(kwargs.get("target_agent_id"), message.from_agent_id)
         
-        # Get the content passed to create_response
-        args, kwargs = message.create_response.call_args
-        content = kwargs.get("content", {})
+        # Get the content from the payload
+        payload = kwargs.get("payload", {})
         
         # Validate the content
-        self.assertTrue(content.get("success", False))
-        self.assertEqual(content.get("property_id"), 1)
-        self.assertIn("subject_property", content)
-        self.assertIn("comparison_properties", content)
-        self.assertIn("metrics", content)
+        self.assertTrue(payload.get("success", False))
+        self.assertEqual(payload.get("property_id"), 1)
+        self.assertIn("subject_property", payload)
+        self.assertIn("comparison_properties", payload)
+        self.assertIn("metrics", payload)
         
         # Check comparison properties
-        self.assertEqual(len(content.get("comparison_properties", [])), 2)
+        self.assertEqual(len(payload.get("comparison_properties", [])), 2)
         
         # Check metrics
-        metrics = content.get("metrics", {})
+        metrics = payload.get("metrics", {})
         self.assertIn("comparison_count", metrics)
         self.assertIn("subject_value", metrics)
         self.assertIn("average_comp_value", metrics)
