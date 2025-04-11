@@ -721,7 +721,7 @@ class ValuationAgent(Agent):
                         payload={
                             "success": False,
                             "error": f"Property with ID {property_id} not found",
-                            "original_request": content
+                            "original_request": payload
                         },
                         correlation_id=message.message_id
                     )
@@ -765,7 +765,7 @@ class ValuationAgent(Agent):
                 payload={
                     "success": False,
                     "error": str(e),
-                    "original_request": content
+                    "original_request": payload
                 },
                 correlation_id=message.message_id
             )
@@ -867,10 +867,10 @@ class ValuationAgent(Agent):
             message: Comparative analysis request message
         """
         try:
-            # Extract request data from message content
-            content = message.content
-            property_id = content.get("property_id")
-            comparison_property_ids = content.get("comparison_property_ids", [])
+            # Extract request data from message payload
+            payload = message.payload
+            property_id = payload.get("property_id")
+            comparison_property_ids = payload.get("comparison_property_ids", [])
             
             logger.info(f"Processing comparative analysis request for property {property_id} compared to {len(comparison_property_ids)} properties")
             
@@ -897,7 +897,7 @@ class ValuationAgent(Agent):
                         payload={
                             "success": False,
                             "error": f"Property with ID {property_id} not found",
-                            "original_request": content
+                            "original_request": payload
                         },
                         correlation_id=message.message_id
                     )
