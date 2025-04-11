@@ -149,11 +149,11 @@ class ValuationAgent(Agent):
             message: Valuation request message
         """
         try:
-            # Extract request data
-            payload = message.payload
-            property_id = payload.get("property_id")
-            valuation_date = payload.get("valuation_date", datetime.now().strftime("%Y-%m-%d"))
-            methodology = payload.get("methodology", "all")  # 'cost', 'market', 'income', or 'all'
+            # Extract request data from message content
+            content = message.content
+            property_id = content.get("property_id")
+            valuation_date = content.get("valuation_date", datetime.now().strftime("%Y-%m-%d"))
+            methodology = content.get("methodology", "all")  # 'cost', 'market', 'income', or 'all'
             
             logger.info(f"Processing valuation request for property {property_id} using {methodology} approach")
             
@@ -690,10 +690,10 @@ class ValuationAgent(Agent):
             message: Trend analysis request message
         """
         try:
-            # Extract request data
-            payload = message.payload
-            property_id = payload.get("property_id")
-            years = payload.get("years", 3)  # Number of years to analyze
+            # Extract request data from message content
+            content = message.content
+            property_id = content.get("property_id")
+            years = content.get("years", 3)  # Number of years to analyze
             
             logger.info(f"Processing trend analysis request for property {property_id}")
             
@@ -867,10 +867,10 @@ class ValuationAgent(Agent):
             message: Comparative analysis request message
         """
         try:
-            # Extract request data
-            payload = message.payload
-            property_id = payload.get("property_id")
-            comparison_property_ids = payload.get("comparison_property_ids", [])
+            # Extract request data from message content
+            content = message.content
+            property_id = content.get("property_id")
+            comparison_property_ids = content.get("comparison_property_ids", [])
             
             logger.info(f"Processing comparative analysis request for property {property_id} compared to {len(comparison_property_ids)} properties")
             
