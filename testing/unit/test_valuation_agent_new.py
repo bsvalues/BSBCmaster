@@ -421,7 +421,7 @@ class TestValuationAgent(unittest.TestCase):
         self.assertEqual(kwargs.get("target_agent_id"), message.source_agent_id)
         
         # Get the content from the payload
-        payload = kwargs.get("payload", {})
+        payload = kwargs.get("content", {})
         
         # Validate the content
         self.assertTrue(payload.get("success", False))
