@@ -17,6 +17,7 @@
 <!-- Helper Functions -->
 <script src="{{ url_for('static', filename='js/chart_update_functions.js') }}"></script>
 <script src="/static/js/fix_statistics.js"></script>
+<script src="{{ url_for('static', filename='js/city_comparison_chart.js') }}"></script>
 <script src="{{ url_for('static', filename='js/statistics_dashboard.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard_map.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard_tabs.js') }}"></script>
@@ -1037,6 +1038,20 @@
     <div class="tab-content" id="detailed-stats-tab">
         <div class="stats-container">
             <h3 class="stats-section-title">Detailed Property Statistics</h3>
+            
+            <!-- City Comparison Chart -->
+            <div class="row mb-4">
+                <div class="col-12 animate-scale-up">
+                    <div class="card chart-card h-100">
+                        <div class="card-body">
+                            <h5 class="chart-title">City Comparison</h5>
+                            <div class="chart-container">
+                                <canvas id="city-comparison-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             <div class="row">
                 <div class="col-md-6 mb-4 animate-scale-up">

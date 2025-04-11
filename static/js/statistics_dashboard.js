@@ -203,6 +203,10 @@ function updateDashboard(stats) {
         console.log("Trends data:", trendsData);
         updateValueTrendsChart(trendsData);
         
+        // Update the city comparison chart with city statistics
+        console.log("Updating city comparison chart");
+        updateCityComparisonChart(stats.city_statistics);
+        
         console.log("All charts updated successfully");
     } catch (e) {
         console.error("Error updating charts:", e);
