@@ -97,6 +97,16 @@ class CoreHub:
         
         # Last master prompt refresh time
         self.last_prompt_refresh = time.time()
+        
+        # Data directory for persistence
+        self.data_dir = self.config.get("core.data_dir", "data/core")
+        os.makedirs(self.data_dir, exist_ok=True)
+        
+        # State persistence file
+        self.state_file = os.path.join(self.data_dir, "core_hub_state.json")
+        
+        # Load persisted state if available
+        self._load_state()
     
     def _init_communication(self) -> None:
         """Initialize communication protocol."""
