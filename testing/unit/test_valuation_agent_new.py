@@ -168,7 +168,7 @@ class TestValuationAgent(unittest.TestCase):
         args, kwargs = mock_send_message.call_args
         
         # Check that send_message was called with the correct parameters
-        self.assertEqual(kwargs.get("target_agent_id"), message.from_agent_id)
+        self.assertEqual(kwargs.get("target_agent_id"), message.source_agent_id)
         
         # Get the content/payload for validation
         payload = kwargs.get("content", {})
@@ -280,10 +280,10 @@ class TestValuationAgent(unittest.TestCase):
         # Check message parameters
         args, kwargs = mock_send_message.call_args
         self.assertEqual(kwargs.get("message_type"), MessageType.TREND_ANALYSIS_RESPONSE)
-        self.assertEqual(kwargs.get("target_agent_id"), message.from_agent_id)
+        self.assertEqual(kwargs.get("target_agent_id"), message.source_agent_id)
         
         # Get the content from the payload
-        payload = kwargs.get("payload", {})
+        payload = kwargs.get("content", {})
         
         # Validate the content
         self.assertTrue(payload.get("success", False))
