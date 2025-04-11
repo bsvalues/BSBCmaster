@@ -74,8 +74,8 @@ class TestValuationAgent(unittest.TestCase):
         """Test handling of valuation request when property is not found."""
         # Create a message with a non-existent property
         message = MagicMock()
-        message.from_agent_id = "test_sender"
-        message.to_agent_id = "test_agent_id"
+        message.source_agent_id = "test_sender"
+        message.target_agent_id = "test_agent_id"
         message.message_id = "test_message_id"
         message.message_type = MessageType.VALUATION_REQUEST
         message.content = {
@@ -98,7 +98,7 @@ class TestValuationAgent(unittest.TestCase):
         args, kwargs = mock_send_message.call_args
         
         # Check that create_response was called with the correct parameters
-        self.assertEqual(kwargs.get("target_agent_id"), message.from_agent_id)
+        self.assertEqual(kwargs.get("target_agent_id"), message.source_agent_id)
         
         # Get the payload for validation
         payload = kwargs.get("content", {})
@@ -114,8 +114,8 @@ class TestValuationAgent(unittest.TestCase):
         """Test handling of valuation request using cost approach."""
         # Create a message requesting cost approach valuation
         message = MagicMock()
-        message.from_agent_id = "test_sender"
-        message.to_agent_id = "test_agent_id"
+        message.source_agent_id = "test_sender"
+        message.target_agent_id = "test_agent_id"
         message.message_id = "test_message_id"
         message.message_type = MessageType.VALUATION_REQUEST
         message.content = {
@@ -238,8 +238,8 @@ class TestValuationAgent(unittest.TestCase):
         """Test handling of trend analysis request."""
         # Create a message requesting trend analysis
         message = MagicMock()
-        message.from_agent_id = "test_sender"
-        message.to_agent_id = "test_agent_id"
+        message.source_agent_id = "test_sender"
+        message.target_agent_id = "test_agent_id"
         message.message_id = "test_message_id"
         message.message_type = MessageType.TREND_ANALYSIS_REQUEST
         message.content = {
@@ -339,8 +339,8 @@ class TestValuationAgent(unittest.TestCase):
         """Test handling of comparative analysis request."""
         # Create a message requesting comparative analysis
         message = MagicMock()
-        message.from_agent_id = "test_sender"
-        message.to_agent_id = "test_agent_id"
+        message.source_agent_id = "test_sender"
+        message.target_agent_id = "test_agent_id"
         message.message_id = "test_message_id"
         message.message_type = MessageType.COMPARATIVE_ANALYSIS_REQUEST
         message.content = {
@@ -418,7 +418,7 @@ class TestValuationAgent(unittest.TestCase):
         # Check message parameters
         args, kwargs = mock_send_message.call_args
         self.assertEqual(kwargs.get("message_type"), MessageType.COMPARATIVE_ANALYSIS_RESPONSE)
-        self.assertEqual(kwargs.get("target_agent_id"), message.from_agent_id)
+        self.assertEqual(kwargs.get("target_agent_id"), message.source_agent_id)
         
         # Get the content from the payload
         payload = kwargs.get("payload", {})
