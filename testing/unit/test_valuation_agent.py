@@ -22,11 +22,22 @@ class TestValuationAgent(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures."""
+        # Create mock for app_setup.db
+        self.db_patcher = patch('app_setup.db')
+        self.mock_db = self.db_patcher.start()
+        
+        # Configure the mock database
+        self.mock_engine = MagicMock()
+        self.mock_connection = MagicMock()
+        self.mock_engine.connect.return_value.__enter__.return_value = self.mock_connection
+        self.mock_db.engine = self.mock_engine
+        
+        # Create the agent instance
         self.agent = ValuationAgent(agent_id="test_valuation_agent")
     
     def tearDown(self):
         """Clean up test fixtures."""
-        pass
+        self.db_patcher.stop()
     
     def test_init(self):
         """Test initialization of the Valuation Agent."""
@@ -70,30 +81,23 @@ class TestValuationAgent(unittest.TestCase):
             "methodology": "all"
         }
         
-        # Mock the imported app_setup.db
-        with patch('app_setup.db') as mock_db:
-            # Configure the mock to return None for property query
-            mock_engine = MagicMock()
-            mock_connection = MagicMock()
-            mock_result = MagicMock()
-            mock_result.fetchone.return_value = None
-            
-            mock_connection.execute.return_value = mock_result
-            mock_engine.connect.return_value.__enter__.return_value = mock_connection
-            mock_db.engine = mock_engine
-            
-            # Call the handler
-            self.agent._handle_valuation_request(message)
-            
-            # Check that send_message was called with error response
-            mock_send_message.assert_called_once()
-            args, kwargs = mock_send_message.call_args
-            
-            self.assertEqual(kwargs["message_type"], MessageType.VALUATION_RESPONSE)
-            self.assertEqual(kwargs["target_agent_id"], "test_sender")
-            self.assertEqual(kwargs["correlation_id"], "test_message_id")
-            self.assertFalse(kwargs["payload"]["success"])
-            self.assertIn("not found", kwargs["payload"]["error"])
+        # Configure the mock to return None for property query
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = None
+        self.mock_connection.execute.return_value = mock_result
+        
+        # Call the handler
+        self.agent._handle_valuation_request(message)
+        
+        # Check that send_message was called with error response
+        mock_send_message.assert_called_once()
+        args, kwargs = mock_send_message.call_args
+        
+        self.assertEqual(kwargs["message_type"], MessageType.VALUATION_RESPONSE)
+        self.assertEqual(kwargs["target_agent_id"], "test_sender")
+        self.assertEqual(kwargs["correlation_id"], "test_message_id")
+        self.assertFalse(kwargs["payload"]["success"])
+        self.assertIn("not found", kwargs["payload"]["error"])
     
     @patch('mcp.agents.valuation.agent.ValuationAgent._calculate_cost_approach')
     @patch('mcp.agents.valuation.agent.ValuationAgent.send_message')
@@ -122,48 +126,41 @@ class TestValuationAgent(unittest.TestCase):
             }
         }
         
-        # Mock the database connection to return a property
-        with patch('mcp.agents.valuation.agent.db') as mock_db:
-            # Configure the mock to return a property
-            mock_engine = MagicMock()
-            mock_connection = MagicMock()
-            mock_result = MagicMock()
-            
-            property_row = MagicMock()
-            property_row._mapping = {
-                "id": 1,
-                "account_id": 1,
-                "property_type": "Residential",
-                "living_area": 2000,
-                "bedrooms": 3,
-                "bathrooms": 2,
-                "year_built": 2000,
-                "quality": "Good",
-                "city": "Richland"
-            }
-            
-            mock_result.fetchone.return_value = property_row
-            mock_connection.execute.return_value = mock_result
-            mock_engine.connect.return_value.__enter__.return_value = mock_connection
-            mock_db.engine = mock_engine
-            
-            # Call the handler
-            self.agent._handle_valuation_request(message)
-            
-            # Check that calculation was called with property details
-            mock_calculate_cost.assert_called_once()
-            
-            # Check that send_message was called with success response
-            mock_send_message.assert_called_once()
-            args, kwargs = mock_send_message.call_args
-            
-            self.assertEqual(kwargs["message_type"], MessageType.VALUATION_RESPONSE)
-            self.assertEqual(kwargs["target_agent_id"], "test_sender")
-            self.assertEqual(kwargs["correlation_id"], "test_message_id")
-            self.assertTrue(kwargs["payload"]["success"])
-            self.assertEqual(kwargs["payload"]["property_id"], 1)
-            self.assertIn("cost_approach", kwargs["payload"]["results"])
-            self.assertEqual(kwargs["payload"]["results"]["cost_approach"]["total_value"], 350000)
+        # Configure the mock to return a property
+        mock_result = MagicMock()
+        property_row = MagicMock()
+        property_row._mapping = {
+            "id": 1,
+            "account_id": 1,
+            "property_type": "Residential",
+            "living_area": 2000,
+            "bedrooms": 3,
+            "bathrooms": 2,
+            "year_built": 2000,
+            "quality": "Good",
+            "city": "Richland"
+        }
+        
+        mock_result.fetchone.return_value = property_row
+        self.mock_connection.execute.return_value = mock_result
+        
+        # Call the handler
+        self.agent._handle_valuation_request(message)
+        
+        # Check that calculation was called with property details
+        mock_calculate_cost.assert_called_once()
+        
+        # Check that send_message was called with success response
+        mock_send_message.assert_called_once()
+        args, kwargs = mock_send_message.call_args
+        
+        self.assertEqual(kwargs["message_type"], MessageType.VALUATION_RESPONSE)
+        self.assertEqual(kwargs["target_agent_id"], "test_sender")
+        self.assertEqual(kwargs["correlation_id"], "test_message_id")
+        self.assertTrue(kwargs["payload"]["success"])
+        self.assertEqual(kwargs["payload"]["property_id"], 1)
+        self.assertIn("cost_approach", kwargs["payload"]["results"])
+        self.assertEqual(kwargs["payload"]["results"]["cost_approach"]["total_value"], 350000)
     
     def test_calculate_cost_approach(self):
         """Test calculation of property value using cost approach."""
@@ -237,50 +234,43 @@ class TestValuationAgent(unittest.TestCase):
             "details": {}
         }
         
-        # Mock the database connection to return a property
-        with patch('mcp.agents.valuation.agent.db') as mock_db:
-            # Configure the mock to return a property
-            mock_engine = MagicMock()
-            mock_connection = MagicMock()
-            mock_result = MagicMock()
-            
-            property_row = MagicMock()
-            property_row._mapping = {
-                "id": 1,
-                "account_id": 1,
-                "property_type": "Residential",
-                "living_area": 2000,
-                "bedrooms": 3,
-                "bathrooms": 2,
-                "year_built": 2000,
-                "quality": "Good",
-                "city": "Richland"
-            }
-            
-            mock_result.fetchone.return_value = property_row
-            mock_connection.execute.return_value = mock_result
-            mock_engine.connect.return_value.__enter__.return_value = mock_connection
-            mock_db.engine = mock_engine
-            
-            # Call the handler
-            self.agent._handle_trend_analysis_request(message)
-            
-            # Check that send_message was called with success response
-            mock_send_message.assert_called_once()
-            args, kwargs = mock_send_message.call_args
-            
-            self.assertEqual(kwargs["message_type"], MessageType.TREND_ANALYSIS_RESPONSE)
-            self.assertEqual(kwargs["target_agent_id"], "test_sender")
-            self.assertEqual(kwargs["correlation_id"], "test_message_id")
-            self.assertTrue(kwargs["payload"]["success"])
-            self.assertEqual(kwargs["payload"]["property_id"], 1)
-            self.assertIn("trend_data", kwargs["payload"])
-            self.assertIsInstance(kwargs["payload"]["trend_data"], list)
-            
-            # Check that the trend data covers the requested years
-            trend_data = kwargs["payload"]["trend_data"]
-            years_covered = len(set(item["year"] for item in trend_data))
-            self.assertGreaterEqual(years_covered, 3)
+        # Configure the mock to return a property
+        mock_result = MagicMock()
+        property_row = MagicMock()
+        property_row._mapping = {
+            "id": 1,
+            "account_id": 1,
+            "property_type": "Residential",
+            "living_area": 2000,
+            "bedrooms": 3,
+            "bathrooms": 2,
+            "year_built": 2000,
+            "quality": "Good",
+            "city": "Richland"
+        }
+        
+        mock_result.fetchone.return_value = property_row
+        self.mock_connection.execute.return_value = mock_result
+        
+        # Call the handler
+        self.agent._handle_trend_analysis_request(message)
+        
+        # Check that send_message was called with success response
+        mock_send_message.assert_called_once()
+        args, kwargs = mock_send_message.call_args
+        
+        self.assertEqual(kwargs["message_type"], MessageType.TREND_ANALYSIS_RESPONSE)
+        self.assertEqual(kwargs["target_agent_id"], "test_sender")
+        self.assertEqual(kwargs["correlation_id"], "test_message_id")
+        self.assertTrue(kwargs["payload"]["success"])
+        self.assertEqual(kwargs["payload"]["property_id"], 1)
+        self.assertIn("trend_data", kwargs["payload"])
+        self.assertIsInstance(kwargs["payload"]["trend_data"], list)
+        
+        # Check that the trend data covers the requested years
+        trend_data = kwargs["payload"]["trend_data"]
+        years_covered = len(set(item["year"] for item in trend_data))
+        self.assertGreaterEqual(years_covered, 3)
     
     def test_generate_trend_data(self):
         """Test generation of trend data."""
@@ -344,70 +334,62 @@ class TestValuationAgent(unittest.TestCase):
             {"total_value": 370000, "details": {}}   # Comp 2
         ]
         
-        # Mock the database connection to return properties
-        with patch('mcp.agents.valuation.agent.db') as mock_db:
-            # Configure the mock to return properties
-            mock_engine = MagicMock()
-            mock_connection = MagicMock()
-            
-            # Subject property query result
-            subject_result = MagicMock()
-            subject_row = MagicMock()
-            subject_row._mapping = {
-                "id": 1,
-                "account_id": 1,
-                "property_type": "Residential",
-                "living_area": 2000,
-                "bedrooms": 3,
-                "bathrooms": 2,
-                "year_built": 2000,
-                "quality": "Good",
-                "city": "Richland",
-                "address": "123 Main St"
-            }
-            subject_result.fetchone.return_value = subject_row
-            
-            # Comp 1 property query result
-            comp1_result = MagicMock()
-            comp1_row = MagicMock()
-            comp1_row._mapping = {
-                "id": 2,
-                "account_id": 2,
-                "property_type": "Residential",
-                "living_area": 1900,
-                "bedrooms": 3,
-                "bathrooms": 2,
-                "year_built": 2002,
-                "quality": "Good",
-                "city": "Richland",
-                "address": "456 Oak St"
-            }
-            comp1_result.fetchone.return_value = comp1_row
-            
-            # Comp 2 property query result
-            comp2_result = MagicMock()
-            comp2_row = MagicMock()
-            comp2_row._mapping = {
-                "id": 3,
-                "account_id": 3,
-                "property_type": "Residential",
-                "living_area": 2100,
-                "bedrooms": 4,
-                "bathrooms": 2,
-                "year_built": 1998,
-                "quality": "Good",
-                "city": "Richland",
-                "address": "789 Pine St"
-            }
-            comp2_result.fetchone.return_value = comp2_row
-            
-            # Configure mock connection to return different results for different queries
-            mock_connection.execute.side_effect = [subject_result, comp1_result, comp2_result]
-            mock_engine.connect.return_value.__enter__.return_value = mock_connection
-            mock_db.engine = mock_engine
-            
-            # Call the handler
-            self.agent._handle_comparative_analysis_request(message)
+        # Subject property query result
+        subject_result = MagicMock()
+        subject_row = MagicMock()
+        subject_row._mapping = {
+            "id": 1,
+            "account_id": 1,
+            "property_type": "Residential",
+            "living_area": 2000,
+            "bedrooms": 3,
+            "bathrooms": 2,
+            "year_built": 2000,
+            "quality": "Good",
+            "city": "Richland",
+            "address": "123 Main St"
+        }
+        subject_result.fetchone.return_value = subject_row
+        
+        # Comp 1 property query result
+        comp1_result = MagicMock()
+        comp1_row = MagicMock()
+        comp1_row._mapping = {
+            "id": 2,
+            "account_id": 2,
+            "property_type": "Residential",
+            "living_area": 1900,
+            "bedrooms": 3,
+            "bathrooms": 2,
+            "year_built": 2002,
+            "quality": "Good",
+            "city": "Richland",
+            "address": "456 Oak St"
+        }
+        comp1_result.fetchone.return_value = comp1_row
+        
+        # Comp 2 property query result
+        comp2_result = MagicMock()
+        comp2_row = MagicMock()
+        comp2_row._mapping = {
+            "id": 3,
+            "account_id": 3,
+            "property_type": "Residential",
+            "living_area": 2100,
+            "bedrooms": 4,
+            "bathrooms": 2,
+            "year_built": 1998,
+            "quality": "Good",
+            "city": "Richland",
+            "address": "789 Pine St"
+        }
+        comp2_result.fetchone.return_value = comp2_row
+        
+        # Configure mock connection to return different results for different queries
+        self.mock_connection.execute.side_effect = [subject_result, comp1_result, comp2_result]
+        
+        # Call the handler
+        self.agent._handle_comparative_analysis_request(message)
             
             # Check that send_message was called with success response
             mock_send_message.assert_called_once()
