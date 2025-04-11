@@ -46,7 +46,7 @@ class Task:
     """
     
     def __init__(self, to_agent_id: str, task_type: str,
-                parameters: Dict[str, Any] = None,
+                parameters: Dict[str, Any] = {},
                 source_agent_id: Optional[str] = None,
                 priority: TaskPriority = TaskPriority.NORMAL,
                 task_id: Optional[str] = None,
@@ -71,7 +71,7 @@ class Task:
         """
         self.task_id = task_id or str(uuid.uuid4())
         self.parent_task_id = parent_task_id
-        self.from_agent_id = from_agent_id
+        self.source_agent_id = source_agent_id
         self.to_agent_id = to_agent_id
         self.task_type = task_type
         self.parameters = parameters or {}
@@ -197,7 +197,7 @@ class Task:
             to_agent_id=self.to_agent_id,
             task_type=self.task_type,
             parameters=self.parameters,
-            from_agent_id=self.from_agent_id,
+            source_agent_id=self.source_agent_id,
             priority=self.priority,
             parent_task_id=self.task_id,
             timeout_seconds=self.timeout_seconds,
@@ -227,7 +227,7 @@ class Task:
             to_agent_id=self.to_agent_id,
             task_type=task_type,
             parameters=parameters,
-            from_agent_id=self.from_agent_id,
+            source_agent_id=self.source_agent_id,
             priority=priority or self.priority,
             parent_task_id=self.task_id,
             timeout_seconds=self.timeout_seconds
@@ -248,7 +248,7 @@ class Task:
         return {
             "task_id": self.task_id,
             "parent_task_id": self.parent_task_id,
-            "from_agent_id": self.from_agent_id,
+            "source_agent_id": self.source_agent_id,
             "to_agent_id": self.to_agent_id,
             "task_type": self.task_type,
             "parameters": self.parameters,
@@ -287,11 +287,14 @@ class Task:
         Returns:
             Task: The reconstructed task
         """
+        # Handle both new "source_agent_id" and legacy "from_agent_id" for backward compatibility
+        source_agent = data.get("source_agent_id") or data.get("from_agent_id")
+        
         task = cls(
             to_agent_id=data["to_agent_id"],
             task_type=data["task_type"],
             parameters=data["parameters"],
-            from_agent_id=data.get("from_agent_id"),
+            source_agent_id=source_agent,
             priority=TaskPriority(data["priority"]),
             task_id=data["task_id"],
             parent_task_id=data.get("parent_task_id"),

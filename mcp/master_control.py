@@ -449,7 +449,7 @@ class MasterControlProgram:
             "task_id": task_id,
             "status": task.status.value,
             "to_agent_id": task.to_agent_id,
-            "from_agent_id": task.from_agent_id,
+            "source_agent_id": task.source_agent_id,
             "task_type": task.task_type,
             "created_at": task.created_at.isoformat(),
             "started_at": task.started_at.isoformat() if task.started_at else None,
