@@ -32,7 +32,6 @@ from app.db import execute_parameterized_query, parse_for_parameters, get_connec
 from app.nl_processing import sql_to_natural_language, extract_query_intent
 from sqlalchemy import create_engine, inspect
 from app.validators import validate_query
-import map_module
 
 # Import statistics routes
 try:
@@ -79,6 +78,17 @@ try:
     logger.info("Data Quality API routes registered successfully")
 except Exception as e:
     logger.error(f"Failed to register data quality API routes: {e}")
+
+# Register valuation API routes
+try:
+    # Import valuation API router
+    from app.api.valuation import router as valuation_api
+    # Convert FastAPI router to Flask blueprint
+    valuation_blueprint = fastapi_router_to_blueprint(valuation_api)
+    app.register_blueprint(valuation_blueprint)
+    logger.info("Valuation API routes registered successfully")
+except Exception as e:
+    logger.error(f"Failed to register valuation API routes: {e}")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

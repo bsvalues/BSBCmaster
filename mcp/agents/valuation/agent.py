@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session
 
 from mcp.agent import Agent
 from mcp.message import Message, MessageType
-from models import Parcel, Property, Account, PropertyImage, Base
+from models import Parcel, Property, Account, PropertyImage
+from app_setup import Base
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
