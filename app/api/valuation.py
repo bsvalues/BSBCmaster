@@ -164,7 +164,7 @@ def analyze_trends(property_id: int, years: int = 3):
 
 
 @router.post("/comparative-analysis", response_model=ComparativeAnalysisResponse)
-def analyze_comparatives(request: ComparativeAnalysisRequest):
+def analyze_comparatives(property_id: int, comparison_property_ids: Optional[List[int]] = None):
     """
     Perform comparative property analysis.
     
@@ -175,7 +175,7 @@ def analyze_comparatives(request: ComparativeAnalysisRequest):
         Comparative analysis results
     """
     try:
-        logger.info(f"Received comparative analysis request for property {request.property_id}")
+        logger.info(f"Received comparative analysis request for property {property_id}")
         
         # Create comparative analysis request message
         message = Message(
@@ -183,8 +183,8 @@ def analyze_comparatives(request: ComparativeAnalysisRequest):
             to_agent_id=valuation_agent.agent_id,
             message_type=MessageType.COMPARATIVE_ANALYSIS_REQUEST,
             content={
-                "property_id": request.property_id,
-                "comparison_property_ids": request.comparison_property_ids
+                "property_id": property_id,
+                "comparison_property_ids": comparison_property_ids
             }
         )
         

@@ -178,16 +178,19 @@ class ValuationAgent(Agent):
                 
                 if not row:
                     # Property not found
-                    self.send_message(
-                        message_type=MessageType.VALUATION_RESPONSE,
-                        target_agent_id=message.source_agent_id,
-                        payload={
+                    # Create response using the response builder in Message class
+                    response = message.create_response(
+                        content={
                             "success": False,
                             "error": f"Property with ID {property_id} not found",
-                            "original_request": payload
-                        },
-                        correlation_id=message.message_id
+                            "property_id": property_id,
+                            "valuation_date": valuation_date,
+                            "results": {},
+                            "metadata": {}
+                        }
                     )
+                    # Send the response
+                    self.send_message(response)
                     return
                 
                 # Extract property details from row
@@ -229,30 +232,29 @@ class ValuationAgent(Agent):
                     }
                 }
                 
-                # Send response
-                self.send_message(
-                    message_type=MessageType.VALUATION_RESPONSE,
-                    target_agent_id=message.source_agent_id,
-                    payload=response,
-                    correlation_id=message.message_id
-                )
+                # Create response using the response builder in Message class
+                response_message = message.create_response(content=response)
+                # Send the response
+                self.send_message(response_message)
                 
                 logger.info(f"Valuation completed for property {property_id}")
         
         except Exception as e:
             logger.error(f"Error processing valuation request: {e}")
             
-            # Send error response
-            self.send_message(
-                message_type=MessageType.VALUATION_RESPONSE,
-                target_agent_id=message.source_agent_id,
-                payload={
+            # Create error response using Message's response builder
+            error_response = message.create_response(
+                content={
                     "success": False,
+                    "property_id": property_id,
+                    "valuation_date": valuation_date,
                     "error": str(e),
-                    "original_request": payload
-                },
-                correlation_id=message.message_id
+                    "results": {},
+                    "metadata": {}
+                }
             )
+            # Send the error response
+            self.send_message(error_response)
     
     def _calculate_cost_approach(self, property_details: Dict[str, Any]) -> Dict[str, Any]:
         """
