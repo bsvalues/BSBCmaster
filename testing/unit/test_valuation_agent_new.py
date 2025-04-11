@@ -101,7 +101,7 @@ class TestValuationAgent(unittest.TestCase):
         self.assertEqual(kwargs.get("target_agent_id"), message.source_agent_id)
         
         # Get the payload for validation
-        payload = kwargs.get("content", {})
+        payload = kwargs.get("payload", {})
         
         # Validate the content
         self.assertFalse(payload.get("success", True))
@@ -171,7 +171,7 @@ class TestValuationAgent(unittest.TestCase):
         self.assertEqual(kwargs.get("target_agent_id"), message.source_agent_id)
         
         # Get the content/payload for validation
-        payload = kwargs.get("content", {})
+        payload = kwargs.get("payload", {})
         
         # Validate the content
         self.assertTrue(payload.get("success", False))
@@ -283,7 +283,7 @@ class TestValuationAgent(unittest.TestCase):
         self.assertEqual(kwargs.get("target_agent_id"), message.source_agent_id)
         
         # Get the content from the payload
-        payload = kwargs.get("content", {})
+        payload = kwargs.get("payload", {})
         
         # Validate the content
         self.assertTrue(payload.get("success", False))
@@ -421,7 +421,7 @@ class TestValuationAgent(unittest.TestCase):
         self.assertEqual(kwargs.get("target_agent_id"), message.source_agent_id)
         
         # Get the content from the payload
-        payload = kwargs.get("content", {})
+        payload = kwargs.get("payload", {})
         
         # Validate the content
         self.assertTrue(payload.get("success", False))
