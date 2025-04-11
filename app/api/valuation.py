@@ -75,7 +75,7 @@ class ComparativeAnalysisResponse(BaseModel):
 
 
 @router.post("/valuate", response_model=ValuationResponse)
-async def valuate_property(request: ValuationRequest):
+def valuate_property(request: ValuationRequest):
     """
     Valuate a property using the specified methodology.
     
@@ -121,7 +121,7 @@ async def valuate_property(request: ValuationRequest):
 
 
 @router.post("/trend-analysis", response_model=TrendAnalysisResponse)
-async def analyze_trends(request: TrendAnalysisRequest):
+def analyze_trends(request: TrendAnalysisRequest):
     """
     Analyze property value trends.
     
@@ -164,7 +164,7 @@ async def analyze_trends(request: TrendAnalysisRequest):
 
 
 @router.post("/comparative-analysis", response_model=ComparativeAnalysisResponse)
-async def analyze_comparatives(request: ComparativeAnalysisRequest):
+def analyze_comparatives(request: ComparativeAnalysisRequest):
     """
     Perform comparative property analysis.
     

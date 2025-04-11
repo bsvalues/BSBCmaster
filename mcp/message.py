@@ -44,6 +44,10 @@ class MessageType(Enum):
     # Valuation messages
     VALUATION_REQUEST = "valuation-request" # Request for property valuation
     VALUATION_RESPONSE = "valuation-response" # Valuation results
+    TREND_ANALYSIS_REQUEST = "trend-analysis-request" # Request for property value trend analysis
+    TREND_ANALYSIS_RESPONSE = "trend-analysis-response" # Trend analysis results
+    COMPARATIVE_ANALYSIS_REQUEST = "comparative-analysis-request" # Request for comparative property analysis
+    COMPARATIVE_ANALYSIS_RESPONSE = "comparative-analysis-response" # Comparative analysis results
     
     # Alert messages
     ALERT = "alert"                     # Important system alerts
@@ -187,6 +191,10 @@ class Message:
                 response_type = MessageType.COMPLIANCE_REPORT
             elif self.message_type == MessageType.VALUATION_REQUEST:
                 response_type = MessageType.VALUATION_RESPONSE
+            elif self.message_type == MessageType.TREND_ANALYSIS_REQUEST:
+                response_type = MessageType.TREND_ANALYSIS_RESPONSE
+            elif self.message_type == MessageType.COMPARATIVE_ANALYSIS_REQUEST:
+                response_type = MessageType.COMPARATIVE_ANALYSIS_RESPONSE
             elif self.message_type == MessageType.USER_QUERY:
                 response_type = MessageType.USER_RESPONSE
             else:
