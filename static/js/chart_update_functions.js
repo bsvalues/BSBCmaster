@@ -49,143 +49,146 @@ function updatePropertyTypeChart(propertyTypes) {
         const greenGradient = ctx.createLinearGradient(0, 0, 0, 400);
         greenGradient.addColorStop(0, 'rgba(16, 185, 129, 0.8)');
         greenGradient.addColorStop(1, 'rgba(16, 185, 129, 0.2)');
-    
-    // Create new chart with animations
-    propertyTypeChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [
-                {
-                    label: 'Count',
-                    data: counts,
-                    backgroundColor: blueGradient,
-                    borderColor: 'rgba(59, 130, 246, 1)',
-                    borderWidth: 1,
-                    borderRadius: 6,
-                    yAxisID: 'y',
-                    hoverBackgroundColor: 'rgba(59, 130, 246, 0.9)'
-                },
-                {
-                    label: 'Average Value',
-                    data: values,
-                    backgroundColor: greenGradient,
-                    borderColor: 'rgba(16, 185, 129, 1)',
-                    borderWidth: 1,
-                    borderRadius: 6,
-                    type: 'bar',
-                    yAxisID: 'y1',
-                    hoverBackgroundColor: 'rgba(16, 185, 129, 0.9)'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: {
-                duration: 1000,
-                easing: 'easeOutQuart'
-            },
-            plugins: {
-                legend: {
-                    position: 'top',
-                    labels: {
-                        usePointStyle: true,
-                        padding: 20,
-                        font: {
-                            size: 12
-                        }
-                    }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    titleFont: {
-                        size: 14,
-                        weight: 'bold'
+        
+        // Create new chart with animations
+        propertyTypeChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Count',
+                        data: counts,
+                        backgroundColor: blueGradient,
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        yAxisID: 'y',
+                        hoverBackgroundColor: 'rgba(59, 130, 246, 0.9)'
                     },
-                    bodyFont: {
-                        size: 13
-                    },
-                    padding: 15,
-                    cornerRadius: 8,
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.datasetIndex === 1) {
-                                label += formatCurrency(context.raw);
-                            } else {
-                                label += context.raw;
-                            }
-                            return label;
-                        }
+                    {
+                        label: 'Average Value',
+                        data: values,
+                        backgroundColor: greenGradient,
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        type: 'bar',
+                        yAxisID: 'y1',
+                        hoverBackgroundColor: 'rgba(16, 185, 129, 0.9)'
                     }
-                }
+                ]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Count',
-                        font: {
-                            size: 13,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 1000,
+                    easing: 'easeOutQuart'
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleFont: {
+                            size: 14,
                             weight: 'bold'
                         },
-                        color: 'rgba(59, 130, 246, 0.9)'
-                    },
-                    ticks: {
-                        font: {
-                            size: 11
+                        bodyFont: {
+                            size: 13
                         },
-                        padding: 8
-                    },
-                    grid: {
-                        drawBorder: false,
-                        color: 'rgba(0, 0, 0, 0.05)'
+                        padding: 15,
+                        cornerRadius: 8,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.datasetIndex === 1) {
+                                    label += formatCurrency(context.raw);
+                                } else {
+                                    label += context.raw;
+                                }
+                                return label;
+                            }
+                        }
                     }
                 },
-                y1: {
-                    beginAtZero: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Average Value',
-                        font: {
-                            size: 13,
-                            weight: 'bold'
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Count',
+                            font: {
+                                size: 13,
+                                weight: 'bold'
+                            },
+                            color: 'rgba(59, 130, 246, 0.9)'
                         },
-                        color: 'rgba(16, 185, 129, 0.9)'
-                    },
-                    ticks: {
-                        font: {
-                            size: 11
+                        ticks: {
+                            font: {
+                                size: 11
+                            },
+                            padding: 8
                         },
-                        padding: 8,
-                        callback: function(value) {
-                            return formatCurrency(value);
+                        grid: {
+                            drawBorder: false,
+                            color: 'rgba(0, 0, 0, 0.05)'
                         }
                     },
-                    grid: {
-                        display: false
-                    }
-                },
-                x: {
-                    grid: {
-                        display: false
-                    },
-                    ticks: {
-                        font: {
-                            size: 11
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Average Value',
+                            font: {
+                                size: 13,
+                                weight: 'bold'
+                            },
+                            color: 'rgba(16, 185, 129, 0.9)'
                         },
-                        padding: 8
+                        ticks: {
+                            font: {
+                                size: 11
+                            },
+                            padding: 8,
+                            callback: function(value) {
+                                return formatCurrency(value);
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            font: {
+                                size: 11
+                            },
+                            padding: 8
+                        }
                     }
                 }
             }
-        }
-    });
+        });
+    } catch (e) {
+        console.error("Error in updatePropertyTypeChart:", e);
+    }
 }
 
 // Function to update the value distribution chart
