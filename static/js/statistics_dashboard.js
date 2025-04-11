@@ -57,14 +57,25 @@ function loadStatistics() {
         .join('&');
     
     // Fetch data from API
-    fetch(`/api/statistics${queryString ? '?' + queryString : ''}`)
+    console.log("Fetching statistics data from:", `/api/statistics${queryString ? '?' + queryString : ''}`);
+    
+    fetch(`/api/statistics${queryString ? '?' + queryString : ''}`, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        credentials: 'same-origin'
+    })
         .then(response => {
+            console.log("Response status:", response.status);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
+            console.log("Received data:", data);
             hideLoading();
             if (data.status === 'success') {
                 updateDashboard(data.statistics);
@@ -76,7 +87,7 @@ function loadStatistics() {
         .catch(error => {
             hideLoading();
             console.error('Error fetching statistics:', error);
-            showErrorMessage('Failed to fetch statistics data');
+            showErrorMessage('Failed to fetch statistics data. Error: ' + error.message);
         });
 }
 
