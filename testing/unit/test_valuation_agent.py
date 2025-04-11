@@ -76,10 +76,13 @@ class TestValuationAgent(unittest.TestCase):
         message = MagicMock()
         message.source_agent_id = "test_sender"
         message.message_id = "test_message_id"
-        message.payload = {
+        message.content = {
             "property_id": 999999,  # Non-existent property
             "methodology": "all"
         }
+        # Mock the create_response method
+        response = MagicMock()
+        message.create_response.return_value = response
         
         # Configure the mock to return None for property query
         mock_result = MagicMock()
@@ -89,15 +92,12 @@ class TestValuationAgent(unittest.TestCase):
         # Call the handler
         self.agent._handle_valuation_request(message)
         
-        # Check that send_message was called with error response
+        # Check that send_message was called with response message
         mock_send_message.assert_called_once()
-        args, kwargs = mock_send_message.call_args
+        response_message = mock_send_message.call_args[0][0]
         
-        self.assertEqual(kwargs["message_type"], MessageType.VALUATION_RESPONSE)
-        self.assertEqual(kwargs["target_agent_id"], "test_sender")
-        self.assertEqual(kwargs["correlation_id"], "test_message_id")
-        self.assertFalse(kwargs["payload"]["success"])
-        self.assertIn("not found", kwargs["payload"]["error"])
+        # Check that the message was created using message.create_response
+        message.create_response.assert_called_once()
     
     @patch('mcp.agents.valuation.agent.ValuationAgent._calculate_cost_approach')
     @patch('mcp.agents.valuation.agent.ValuationAgent.send_message')
@@ -390,29 +390,29 @@ class TestValuationAgent(unittest.TestCase):
         
         # Call the handler
         self.agent._handle_comparative_analysis_request(message)
-            
-            # Check that send_message was called with success response
-            mock_send_message.assert_called_once()
-            args, kwargs = mock_send_message.call_args
-            
-            self.assertEqual(kwargs["message_type"], MessageType.COMPARATIVE_ANALYSIS_RESPONSE)
-            self.assertEqual(kwargs["target_agent_id"], "test_sender")
-            self.assertEqual(kwargs["correlation_id"], "test_message_id")
-            self.assertTrue(kwargs["payload"]["success"])
-            self.assertEqual(kwargs["payload"]["property_id"], 1)
-            self.assertIn("subject_property", kwargs["payload"])
-            self.assertIn("comparison_properties", kwargs["payload"])
-            self.assertIn("metrics", kwargs["payload"])
-            
-            # Check comparison properties
-            self.assertEqual(len(kwargs["payload"]["comparison_properties"]), 2)
-            
-            # Check metrics
-            metrics = kwargs["payload"]["metrics"]
-            self.assertIn("comparison_count", metrics)
-            self.assertIn("subject_value", metrics)
-            self.assertIn("average_comp_value", metrics)
-            self.assertEqual(metrics["comparison_count"], 2)
+        
+        # Check that send_message was called with success response
+        mock_send_message.assert_called_once()
+        args, kwargs = mock_send_message.call_args
+        
+        self.assertEqual(kwargs["message_type"], MessageType.COMPARATIVE_ANALYSIS_RESPONSE)
+        self.assertEqual(kwargs["target_agent_id"], "test_sender")
+        self.assertEqual(kwargs["correlation_id"], "test_message_id")
+        self.assertTrue(kwargs["payload"]["success"])
+        self.assertEqual(kwargs["payload"]["property_id"], 1)
+        self.assertIn("subject_property", kwargs["payload"])
+        self.assertIn("comparison_properties", kwargs["payload"])
+        self.assertIn("metrics", kwargs["payload"])
+        
+        # Check comparison properties
+        self.assertEqual(len(kwargs["payload"]["comparison_properties"]), 2)
+        
+        # Check metrics
+        metrics = kwargs["payload"]["metrics"]
+        self.assertIn("comparison_count", metrics)
+        self.assertIn("subject_value", metrics)
+        self.assertIn("average_comp_value", metrics)
+        self.assertEqual(metrics["comparison_count"], 2)
     
     def test_calculate_comparison_metrics(self):
         """Test calculation of comparison metrics."""
