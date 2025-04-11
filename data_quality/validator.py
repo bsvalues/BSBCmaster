@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class ValidationResult:
     """Class to represent validation results."""
     
-    def __init__(self, valid: bool = True, errors: List[Dict[str, str]] = None):
+    def __init__(self, valid: bool = True, errors: Optional[List[Dict[str, str]]] = None):
         """
         Initialize validation result.
         
@@ -28,7 +28,7 @@ class ValidationResult:
             errors: List of validation errors
         """
         self.valid = valid
-        self.errors = errors or []
+        self.errors = errors if errors is not None else []
         self.timestamp = datetime.utcnow().isoformat()
     
     def add_error(self, field: str, message: str):
