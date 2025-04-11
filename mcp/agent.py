@@ -172,16 +172,22 @@ class Agent:
         self.task_handlers[task_type] = handler
         logger.info(f"Registered handler for task type {task_type} on agent {self.name}")
     
-    def register_message_handler(self, message_type: str, handler: Callable):
+    def register_message_handler(self, message_type: Union[str, MessageType], handler: Callable):
         """
         Register a handler for a specific type of message.
         
         Args:
-            message_type: The type of message
+            message_type: The type of message (string or MessageType enum)
             handler: The function to handle the message
         """
-        self.message_handlers[message_type] = handler
-        logger.info(f"Registered handler for message type {message_type} on agent {self.name}")
+        # Convert MessageType enum to string if needed
+        if isinstance(message_type, MessageType):
+            msg_type_key = message_type.value
+        else:
+            msg_type_key = message_type
+            
+        self.message_handlers[msg_type_key] = handler
+        logger.info(f"Registered handler for message type {msg_type_key} on agent {self.name}")
     
     def handle_task(self, task):
         """
@@ -240,14 +246,15 @@ class Agent:
             logger.warning(f"Agent {self.name} has no handler for message type {message.message_type}")
             return {"error": f"No handler for message type {message.message_type}", "status": "rejected"}
     
-    def send_message(self, to_agent_id: str, message_type: str, content: Dict[str, Any]):
+    def send_message(self, target_agent_id: str, message_type: str, payload: Dict[str, Any], correlation_id: Optional[str] = None):
         """
         Send a message to another agent through the MCP.
         
         Args:
-            to_agent_id: The ID of the receiving agent
+            target_agent_id: The ID of the receiving agent
             message_type: The type of message
-            content: The message content
+            payload: The message payload
+            correlation_id: Optional correlation ID for related messages
             
         Returns:
             dict: The message sending result
@@ -256,7 +263,10 @@ class Agent:
             logger.error(f"Agent {self.name} tried to send message but is not registered with MCP")
             return {"error": "Not registered with MCP", "status": "failed"}
         
-        return self.mcp.send_message(self.agent_id, to_agent_id, message_type, content)
+        # Pass the correlation_id as part of the message creation process
+        priority = None  # Let the MCP use the default priority
+        timeout_seconds = None  # Let the MCP handle timeouts
+        return self.mcp.send_message(self.agent_id, target_agent_id, message_type, payload, priority, timeout_seconds)
     
     def assign_task(self, to_agent_id: str, task_type: str, parameters: Dict[str, Any]):
         """
