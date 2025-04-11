@@ -149,11 +149,11 @@ class ValuationAgent(Agent):
             message: Valuation request message
         """
         try:
-            # Extract request data from message content
-            content = message.content
-            property_id = content.get("property_id")
-            valuation_date = content.get("valuation_date", datetime.now().strftime("%Y-%m-%d"))
-            methodology = content.get("methodology", "all")  # 'cost', 'market', 'income', or 'all'
+            # Extract request data from message payload
+            payload = message.payload
+            property_id = payload.get("property_id")
+            valuation_date = payload.get("valuation_date", datetime.now().strftime("%Y-%m-%d"))
+            methodology = payload.get("methodology", "all")  # 'cost', 'market', 'income', or 'all'
             
             logger.info(f"Processing valuation request for property {property_id} using {methodology} approach")
             
@@ -180,7 +180,7 @@ class ValuationAgent(Agent):
                     # Property not found
                     # Create response using the response builder in Message class
                     response = message.create_response(
-                        content={
+                        payload={
                             "success": False,
                             "error": f"Property with ID {property_id} not found",
                             "property_id": property_id,
