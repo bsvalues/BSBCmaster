@@ -107,10 +107,13 @@ class TestValuationAgent(unittest.TestCase):
         message = MagicMock()
         message.source_agent_id = "test_sender"
         message.message_id = "test_message_id"
-        message.payload = {
+        message.content = {
             "property_id": 1,
             "methodology": "cost"
         }
+        # Mock the create_response method
+        response = MagicMock()
+        message.create_response.return_value = response
         
         # Mock the cost approach calculation to return a predefined value
         mock_calculate_cost.return_value = {
@@ -150,17 +153,20 @@ class TestValuationAgent(unittest.TestCase):
         # Check that calculation was called with property details
         mock_calculate_cost.assert_called_once()
         
-        # Check that send_message was called with success response
+        # Check that send_message was called with response message
         mock_send_message.assert_called_once()
-        args, kwargs = mock_send_message.call_args
+        response_message = mock_send_message.call_args[0][0]
         
-        self.assertEqual(kwargs["message_type"], MessageType.VALUATION_RESPONSE)
-        self.assertEqual(kwargs["target_agent_id"], "test_sender")
-        self.assertEqual(kwargs["correlation_id"], "test_message_id")
-        self.assertTrue(kwargs["payload"]["success"])
-        self.assertEqual(kwargs["payload"]["property_id"], 1)
-        self.assertIn("cost_approach", kwargs["payload"]["results"])
-        self.assertEqual(kwargs["payload"]["results"]["cost_approach"]["total_value"], 350000)
+        # Check that the message was created using message.create_response
+        message.create_response.assert_called_once()
+        
+        # Verify proper arguments were passed to create_response
+        args, kwargs = message.create_response.call_args
+        content = kwargs.get("content", {})
+        self.assertTrue(content.get("success", False))
+        self.assertEqual(content.get("property_id"), 1)
+        self.assertIn("cost_approach", content.get("results", {}))
+        self.assertEqual(content.get("results", {}).get("cost_approach", {}).get("total_value"), 350000)
     
     def test_calculate_cost_approach(self):
         """Test calculation of property value using cost approach."""
@@ -223,10 +229,13 @@ class TestValuationAgent(unittest.TestCase):
         message = MagicMock()
         message.source_agent_id = "test_sender"
         message.message_id = "test_message_id"
-        message.payload = {
+        message.content = {
             "property_id": 1,
             "years": 3
         }
+        # Mock the create_response method
+        response = MagicMock()
+        message.create_response.return_value = response
         
         # Mock the cost approach calculation to return a predefined value
         mock_calculate_cost.return_value = {
@@ -255,20 +264,23 @@ class TestValuationAgent(unittest.TestCase):
         # Call the handler
         self.agent._handle_trend_analysis_request(message)
         
-        # Check that send_message was called with success response
+        # Check that send_message was called with response message
         mock_send_message.assert_called_once()
-        args, kwargs = mock_send_message.call_args
+        response_message = mock_send_message.call_args[0][0]
         
-        self.assertEqual(kwargs["message_type"], MessageType.TREND_ANALYSIS_RESPONSE)
-        self.assertEqual(kwargs["target_agent_id"], "test_sender")
-        self.assertEqual(kwargs["correlation_id"], "test_message_id")
-        self.assertTrue(kwargs["payload"]["success"])
-        self.assertEqual(kwargs["payload"]["property_id"], 1)
-        self.assertIn("trend_data", kwargs["payload"])
-        self.assertIsInstance(kwargs["payload"]["trend_data"], list)
+        # Check that the message was created using message.create_response
+        message.create_response.assert_called_once()
+        
+        # Verify proper arguments were passed to create_response
+        args, kwargs = message.create_response.call_args
+        content = kwargs.get("content", {})
+        self.assertTrue(content.get("success", False))
+        self.assertEqual(content.get("property_id"), 1)
+        self.assertIn("trend_data", content)
+        self.assertIsInstance(content.get("trend_data"), list)
         
         # Check that the trend data covers the requested years
-        trend_data = kwargs["payload"]["trend_data"]
+        trend_data = content.get("trend_data", [])
         years_covered = len(set(item["year"] for item in trend_data))
         self.assertGreaterEqual(years_covered, 3)
     
@@ -322,10 +334,13 @@ class TestValuationAgent(unittest.TestCase):
         message = MagicMock()
         message.source_agent_id = "test_sender"
         message.message_id = "test_message_id"
-        message.payload = {
+        message.content = {
             "property_id": 1,
             "comparison_property_ids": [2, 3]
         }
+        # Mock the create_response method
+        response = MagicMock()
+        message.create_response.return_value = response
         
         # Mock the cost approach calculation to return predefined values
         mock_calculate_cost.side_effect = [
@@ -391,28 +406,31 @@ class TestValuationAgent(unittest.TestCase):
         # Call the handler
         self.agent._handle_comparative_analysis_request(message)
         
-        # Check that send_message was called with success response
+        # Check that send_message was called with response message
         mock_send_message.assert_called_once()
-        args, kwargs = mock_send_message.call_args
+        response_message = mock_send_message.call_args[0][0]
         
-        self.assertEqual(kwargs["message_type"], MessageType.COMPARATIVE_ANALYSIS_RESPONSE)
-        self.assertEqual(kwargs["target_agent_id"], "test_sender")
-        self.assertEqual(kwargs["correlation_id"], "test_message_id")
-        self.assertTrue(kwargs["payload"]["success"])
-        self.assertEqual(kwargs["payload"]["property_id"], 1)
-        self.assertIn("subject_property", kwargs["payload"])
-        self.assertIn("comparison_properties", kwargs["payload"])
-        self.assertIn("metrics", kwargs["payload"])
+        # Check that the message was created using message.create_response
+        message.create_response.assert_called_once()
+        
+        # Verify proper arguments were passed to create_response
+        args, kwargs = message.create_response.call_args
+        content = kwargs.get("content", {})
+        self.assertTrue(content.get("success", False))
+        self.assertEqual(content.get("property_id"), 1)
+        self.assertIn("subject_property", content)
+        self.assertIn("comparison_properties", content)
+        self.assertIn("metrics", content)
         
         # Check comparison properties
-        self.assertEqual(len(kwargs["payload"]["comparison_properties"]), 2)
+        self.assertEqual(len(content.get("comparison_properties", [])), 2)
         
         # Check metrics
-        metrics = kwargs["payload"]["metrics"]
+        metrics = content.get("metrics", {})
         self.assertIn("comparison_count", metrics)
         self.assertIn("subject_value", metrics)
         self.assertIn("average_comp_value", metrics)
-        self.assertEqual(metrics["comparison_count"], 2)
+        self.assertEqual(metrics.get("comparison_count"), 2)
     
     def test_calculate_comparison_metrics(self):
         """Test calculation of comparison metrics."""
