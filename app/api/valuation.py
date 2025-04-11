@@ -75,7 +75,7 @@ class ComparativeAnalysisResponse(BaseModel):
 
 
 @router.post("/valuate", response_model=ValuationResponse)
-def valuate_property(request: ValuationRequest):
+def valuate_property(property_id: int, methodology: str = "all", valuation_date: Optional[str] = None):
     """
     Valuate a property using the specified methodology.
     
@@ -86,7 +86,7 @@ def valuate_property(request: ValuationRequest):
         Valuation results
     """
     try:
-        logger.info(f"Received valuation request for property {request.property_id}")
+        logger.info(f"Received valuation request for property {property_id}")
         
         # Create valuation request message
         message = Message(
@@ -94,9 +94,9 @@ def valuate_property(request: ValuationRequest):
             to_agent_id=valuation_agent.agent_id,
             message_type=MessageType.VALUATION_REQUEST,
             content={
-                "property_id": request.property_id,
-                "methodology": request.methodology,
-                "valuation_date": request.valuation_date or datetime.now().strftime("%Y-%m-%d")
+                "property_id": property_id,
+                "methodology": methodology,
+                "valuation_date": valuation_date or datetime.now().strftime("%Y-%m-%d")
             }
         )
         
@@ -121,7 +121,7 @@ def valuate_property(request: ValuationRequest):
 
 
 @router.post("/trend-analysis", response_model=TrendAnalysisResponse)
-def analyze_trends(request: TrendAnalysisRequest):
+def analyze_trends(property_id: int, years: int = 3):
     """
     Analyze property value trends.
     
@@ -132,7 +132,7 @@ def analyze_trends(request: TrendAnalysisRequest):
         Trend analysis results
     """
     try:
-        logger.info(f"Received trend analysis request for property {request.property_id}")
+        logger.info(f"Received trend analysis request for property {property_id}")
         
         # Create trend analysis request message
         message = Message(
@@ -140,8 +140,8 @@ def analyze_trends(request: TrendAnalysisRequest):
             to_agent_id=valuation_agent.agent_id,
             message_type=MessageType.TREND_ANALYSIS_REQUEST,
             content={
-                "property_id": request.property_id,
-                "years": request.years
+                "property_id": property_id,
+                "years": years
             }
         )
         

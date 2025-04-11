@@ -44,7 +44,7 @@ def fastapi_router_to_blueprint(fastapi_router) -> Blueprint:
         
         # Create Flask route function
         def create_flask_route(fastapi_handler, path_template):
-            async def flask_route(*args, **kwargs):
+            def flask_route(*args, **kwargs):
                 try:
                     # Get request data
                     request_data = {}
@@ -64,9 +64,9 @@ def fastapi_router_to_blueprint(fastapi_router) -> Blueprint:
                     
                     # Prepare parameters for FastAPI handler
                     if request_data:
-                        result = await fastapi_handler(**request_data, **kwargs)
+                        result = fastapi_handler(**request_data, **kwargs)
                     else:
-                        result = await fastapi_handler(**kwargs)
+                        result = fastapi_handler(**kwargs)
                     
                     # Convert response to Flask response
                     if isinstance(result, dict) or isinstance(result, list):
