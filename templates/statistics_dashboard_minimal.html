@@ -374,7 +374,7 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch('/api/statistics')
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
+            if (data.status === 'success') {
                 updateDashboard(data.statistics);
             } else {
                 console.error('Error loading statistics:', data.message);
