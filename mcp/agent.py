@@ -9,7 +9,9 @@ import logging
 import uuid
 from datetime import datetime
 from enum import Enum, auto
-from typing import Dict, List, Any, Optional, Set, Callable
+from typing import Dict, List, Any, Optional, Set, Callable, Union
+
+from mcp.message import MessageType
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -232,9 +234,12 @@ class Agent:
         self.last_active_time = datetime.utcnow()
         self.message_count += 1
         
-        if message.message_type in self.message_handlers:
+        # Get the message type as a string for handler lookup
+        msg_type_key = message.message_type.value if isinstance(message.message_type, MessageType) else message.message_type
+        
+        if msg_type_key in self.message_handlers:
             try:
-                handler = self.message_handlers[message.message_type]
+                handler = self.message_handlers[msg_type_key]
                 response = handler(message)
                 logger.info(f"Agent {self.name} handled message {message.message_id}")
                 return response
@@ -243,10 +248,10 @@ class Agent:
                 logger.error(f"Agent {self.name} failed to handle message {message.message_id}: {str(e)}")
                 return {"error": str(e), "status": "failed"}
         else:
-            logger.warning(f"Agent {self.name} has no handler for message type {message.message_type}")
-            return {"error": f"No handler for message type {message.message_type}", "status": "rejected"}
+            logger.warning(f"Agent {self.name} has no handler for message type {msg_type_key}")
+            return {"error": f"No handler for message type {msg_type_key}", "status": "rejected"}
     
-    def send_message(self, target_agent_id: str, message_type: str, payload: Dict[str, Any], correlation_id: Optional[str] = None):
+    def send_message(self, target_agent_id: str, message_type: Union[str, MessageType], payload: Dict[str, Any], correlation_id: Optional[str] = None):
         """
         Send a message to another agent through the MCP.
         
