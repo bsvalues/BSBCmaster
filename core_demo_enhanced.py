@@ -127,8 +127,16 @@ def register_mock_agents(hub: CoreHubEnhanced) -> List[str]:
         }
     ]
     
-    registered_agents = []
+    # First unregister any existing agents to avoid conflicts
+    for agent in agents:
+        agent_id = agent["id"]
+        existing = hub.get_agent_info(agent_id)
+        if existing:
+            print(f"Unregistering existing agent: {agent_id}")
+            hub.unregister_agent(agent_id)
     
+    # Now register agents with clean state
+    registered_agents = []
     for agent in agents:
         agent_id = agent.pop("id")
         print(f"Registering agent: {agent['name']}")
@@ -175,19 +183,19 @@ def simulate_message_exchange(hub: CoreHubEnhanced, agent_ids: List[str]) -> Non
     response = ResponseMessage(
         source_agent_id=target_agent,
         target_agent_id=source_agent,
-        original_message_id=command.message_id,
-        correlation_id=command.correlation_id,
-        payload={
-            "result": "success",
+        status="success",
+        result={
             "compliance_status": "compliant",
             "details": {
                 "requirements_met": 5,
                 "requirements_total": 5
             }
-        }
+        },
+        original_message_id=command.message_id,
+        correlation_id=command.correlation_id
     )
     
-    print(f"Sending response: {response.payload.get('result')}")
+    print(f"Sending response with status: {response.payload.get('status')}")
     hub.send_message(response)
     print("Response sent successfully")
     
@@ -197,15 +205,13 @@ def simulate_message_exchange(hub: CoreHubEnhanced, agent_ids: List[str]) -> Non
         target_agent_id=source_agent,
         error_code=ErrorCode.INVALID_INPUT,
         error_message="Invalid property ID format",
-        correlation_id=str(uuid.uuid4()),
-        payload={
+        details={
             "level": ErrorLevel.WARNING,
             "category": ErrorCategory.VALIDATION,
-            "details": {
-                "property_id": "12345",
-                "expected_format": "COUNTY-PARCEL-XXXX"
-            }
-        }
+            "property_id": "12345",
+            "expected_format": "COUNTY-PARCEL-XXXX"
+        },
+        correlation_id=str(uuid.uuid4())
     )
     
     print(f"Sending error: {error.payload.get('error_code')}")
