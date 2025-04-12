@@ -159,7 +159,7 @@ def simulate_message_exchange(hub: CoreHubEnhanced, agent_ids: List[str]) -> Non
     command = CommandMessage(
         source_agent_id=source_agent,
         target_agent_id=target_agent,
-        command="verify_compliance",
+        command_name="verify_compliance",
         parameters={
             "property_id": "12345",
             "assessment_date": "2025-01-01",
@@ -167,7 +167,7 @@ def simulate_message_exchange(hub: CoreHubEnhanced, agent_ids: List[str]) -> Non
         }
     )
     
-    print(f"Sending command: {command.command}")
+    print(f"Sending command: {command.payload.get('command_name')}")
     hub.send_message(command)
     print("Command sent successfully")
     
@@ -208,7 +208,7 @@ def simulate_message_exchange(hub: CoreHubEnhanced, agent_ids: List[str]) -> Non
         }
     )
     
-    print(f"Sending error: {error.error_code}")
+    print(f"Sending error: {error.payload.get('error_code')}")
     hub.send_message(error)
     print("Error sent successfully")
 

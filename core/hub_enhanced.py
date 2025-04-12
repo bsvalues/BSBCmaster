@@ -454,7 +454,7 @@ class CoreHubEnhanced:
         message = CommandMessage(
             source_agent_id="core_hub",
             target_agent_id="broadcast",
-            command="update_master_prompt",
+            command_name="update_master_prompt",
             parameters={
                 "prompt": master_prompt
             }

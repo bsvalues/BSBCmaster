@@ -1,0 +1,117 @@
+{
+  "registered_agents": {
+    "data_quality_agent": {
+      "name": "Data Quality Agent",
+      "type": "data_quality",
+      "description": "Validates property assessment data against Washington State standards",
+      "capabilities": [
+        "validate_data",
+        "detect_anomalies",
+        "enhance_data"
+      ],
+      "subscriptions": [
+        "data_update",
+        "validation_request"
+      ],
+      "dependencies": [],
+      "registered_at": 1744417182.477313,
+      "last_update": 1744417182.4773135,
+      "status": "inactive"
+    },
+    "compliance_agent": {
+      "name": "Compliance Agent",
+      "type": "compliance",
+      "description": "Ensures compliance with Washington State Department of Revenue requirements",
+      "capabilities": [
+        "verify_compliance",
+        "generate_reports",
+        "analyze_regulations"
+      ],
+      "subscriptions": [
+        "regulation_update",
+        "compliance_request"
+      ],
+      "dependencies": [
+        "validate_data"
+      ],
+      "registered_at": 1744417182.477579,
+      "last_update": 1744417182.4775796,
+      "status": "inactive"
+    },
+    "valuation_agent": {
+      "name": "Valuation Agent",
+      "type": "valuation",
+      "description": "Provides property valuation services using advanced ML models",
+      "capabilities": [
+        "valuate_property",
+        "trend_analysis",
+        "comparative_analysis"
+      ],
+      "subscriptions": [
+        "valuation_request",
+        "market_update"
+      ],
+      "dependencies": [
+        "validate_data",
+        "verify_compliance"
+      ],
+      "registered_at": 1744417182.4778695,
+      "last_update": 1744417182.4778702,
+      "status": "inactive"
+    }
+  },
+  "agent_capabilities": {
+    "validate_data": [
+      "data_quality_agent"
+    ],
+    "detect_anomalies": [
+      "data_quality_agent"
+    ],
+    "enhance_data": [
+      "data_quality_agent"
+    ],
+    "verify_compliance": [
+      "compliance_agent"
+    ],
+    "generate_reports": [
+      "compliance_agent"
+    ],
+    "analyze_regulations": [
+      "compliance_agent"
+    ],
+    "valuate_property": [
+      "valuation_agent"
+    ],
+    "trend_analysis": [
+      "valuation_agent"
+    ],
+    "comparative_analysis": [
+      "valuation_agent"
+    ]
+  },
+  "agent_subscriptions": {
+    "data_quality_agent": [
+      "data_update",
+      "validation_request"
+    ],
+    "compliance_agent": [
+      "regulation_update",
+      "compliance_request"
+    ],
+    "valuation_agent": [
+      "valuation_request",
+      "market_update"
+    ]
+  },
+  "agent_dependencies": {
+    "data_quality_agent": [],
+    "compliance_agent": [
+      "validate_data"
+    ],
+    "valuation_agent": [
+      "validate_data",
+      "verify_compliance"
+    ]
+  },
+  "saved_at": "Sat Apr 12 00:19:42 2025"
+}
