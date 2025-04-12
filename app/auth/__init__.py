@@ -1,3 +1,3 @@
 """
-Authentication package for MCP Assessor Agent API.
+MCP Assessor Agent API Authentication Package.
 """
