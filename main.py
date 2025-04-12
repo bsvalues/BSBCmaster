@@ -1248,11 +1248,245 @@ def map_property_images(account_id):
     return map_module.get_property_images_for_map(account_id)
 
 
+# Global variable to store the agent coordinator instance
+agent_coordinator = None
+agent_list = []
+
+# Initialize agent-assisted development framework
+def initialize_agent_framework():
+    """Initialize the agent-assisted development framework."""
+    global agent_coordinator, agent_list
+    
+    try:
+        # Try to import the agent integration module
+        from agent_coordination.integration import initialize_agent_development_system
+        
+        logger.info("Initializing agent-assisted development framework...")
+        
+        # Initialize the framework (without a real hub for now)
+        coordinator, agents = initialize_agent_development_system()
+        
+        if coordinator:
+            logger.info(f"Agent coordinator initialized successfully")
+            if agents:
+                logger.info(f"Initialized {len(agents)} development agents")
+                for agent in agents:
+                    logger.info(f"  - Agent '{agent.agent_id}' ready")
+            else:
+                logger.info("No development agents were initialized")
+            
+            # Store in global variables
+            agent_coordinator = coordinator
+            agent_list = agents
+            
+            return coordinator, agents
+        else:
+            logger.warning("Failed to initialize agent coordinator")
+            return None, []
+            
+    except ImportError as e:
+        logger.warning(f"Agent-assisted development framework not available: {e}")
+        return None, []
+    except Exception as e:
+        logger.error(f"Error initializing agent framework: {str(e)}")
+        return None, []
+
+# API endpoints for agent-assisted development
+@app.route('/api/dev/tasks', methods=['GET'])
+def get_development_tasks():
+    """Get all development tasks."""
+    global agent_coordinator
+    
+    if agent_coordinator is None:
+        return jsonify({
+            "status": "error",
+            "message": "Agent coordinator not initialized"
+        }), 500
+    
+    try:
+        # Get task data
+        tasks = {}
+        
+        for status in ["pending", "assigned", "in_progress", "completed", "failed"]:
+            status_tasks = agent_coordinator.get_tasks_by_status(status)
+            for task in status_tasks:
+                tasks[task.task_id] = {
+                    "task_id": task.task_id,
+                    "title": task.title,
+                    "description": task.description,
+                    "task_type": task.task_type,
+                    "priority": task.priority,
+                    "status": task.status,
+                    "agent_id": task.agent_id,
+                    "created_at": task.created_at,
+                    "updated_at": task.updated_at
+                }
+        
+        return jsonify({
+            "status": "success",
+            "tasks": tasks
+        })
+    except Exception as e:
+        logger.error(f"Error fetching development tasks: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to fetch development tasks: {str(e)}"
+        }), 500
+
+@app.route('/api/dev/tasks', methods=['POST'])
+def create_development_task():
+    """Create a new development task."""
+    global agent_coordinator
+    
+    if agent_coordinator is None:
+        return jsonify({
+            "status": "error",
+            "message": "Agent coordinator not initialized"
+        }), 500
+    
+    try:
+        # Get task data from request
+        data = request.json
+        if not data:
+            return jsonify({
+                "status": "error",
+                "message": "No task data provided"
+            }), 400
+        
+        # Create task
+        task_id = agent_coordinator.create_task(data)
+        
+        # Auto-assign if requested
+        auto_assign = data.get("auto_assign", False)
+        if auto_assign:
+            agent_coordinator.assign_task(task_id)
+            
+        return jsonify({
+            "status": "success",
+            "task_id": task_id,
+            "message": "Task created successfully"
+        })
+    except Exception as e:
+        logger.error(f"Error creating development task: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to create development task: {str(e)}"
+        }), 500
+
+@app.route('/api/dev/tasks/<task_id>/assign', methods=['POST'])
+def assign_development_task(task_id):
+    """Assign a development task to an agent."""
+    global agent_coordinator
+    
+    if agent_coordinator is None:
+        return jsonify({
+            "status": "error",
+            "message": "Agent coordinator not initialized"
+        }), 500
+    
+    try:
+        # Get agent ID from request
+        data = request.json or {}
+        agent_id = data.get("agent_id")
+        
+        # Assign task
+        success = agent_coordinator.assign_task(task_id, agent_id)
+        
+        if success:
+            return jsonify({
+                "status": "success",
+                "message": f"Task {task_id} assigned successfully"
+            })
+        else:
+            return jsonify({
+                "status": "error",
+                "message": f"Failed to assign task {task_id}"
+            }), 400
+    except Exception as e:
+        logger.error(f"Error assigning development task: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to assign development task: {str(e)}"
+        }), 500
+
+@app.route('/api/dev/agents', methods=['GET'])
+def get_development_agents():
+    """Get all development agents."""
+    global agent_list
+    
+    try:
+        # Get agent data
+        agents = []
+        for agent in agent_list:
+            agents.append({
+                "agent_id": agent.agent_id,
+                "agent_type": getattr(agent, "agent_type", "unknown"),
+                "capabilities": getattr(agent, "capabilities", []),
+                "specialization": getattr(agent, "specialization", "unknown")
+            })
+        
+        return jsonify({
+            "status": "success",
+            "agents": agents
+        })
+    except Exception as e:
+        logger.error(f"Error fetching development agents: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to fetch development agents: {str(e)}"
+        }), 500
+
+@app.route('/api/dev/analyze', methods=['POST'])
+def analyze_codebase():
+    """Analyze the codebase and generate tasks."""
+    global agent_coordinator
+    
+    if agent_coordinator is None:
+        return jsonify({
+            "status": "error",
+            "message": "Agent coordinator not initialized"
+        }), 500
+    
+    try:
+        # Analyze codebase
+        analysis = agent_coordinator.analyze_codebase()
+        
+        # Generate tasks from analysis if requested
+        generate_tasks = request.json.get("generate_tasks", False) if request.json else False
+        task_ids = []
+        
+        if generate_tasks:
+            task_ids = agent_coordinator.generate_tasks_from_analysis(analysis)
+        
+        return jsonify({
+            "status": "success",
+            "analysis": {
+                "modules_count": len(analysis.get("modules", [])),
+                "code_quality": {
+                    "issue_count": len(analysis.get("code_quality", {}).get("issues", []))
+                },
+                "test_coverage": {
+                    "low_coverage_count": len(analysis.get("test_coverage", {}).get("low_coverage", []))
+                }
+            },
+            "tasks_generated": len(task_ids),
+            "task_ids": task_ids
+        })
+    except Exception as e:
+        logger.error(f"Error analyzing codebase: {str(e)}")
+        return jsonify({
+            "status": "error",
+            "message": f"Failed to analyze codebase: {str(e)}"
+        }), 500
+
 # This is called when the Flask app is run
 if __name__ == "__main__":
     # Create tables and seed database if needed
     create_tables()
     seed_database_if_needed()
+    
+    # Initialize agent-assisted development framework
+    coordinator, agents = initialize_agent_framework()
     
     try:
         # Log that we're only running the Flask app now
