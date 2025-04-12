@@ -1342,7 +1342,7 @@ class DeveloperAgent(Agent):
     
     def _generate_function_docstring(self, function_name: str) -> str:
         """Generate a docstring for a function."""
-        return f'"""
+        return f"""
 {function_name} function.
 
 This function performs operations related to {function_name.replace("_", " ")}.
@@ -1356,11 +1356,11 @@ Returns:
     
 Raises:
     ValueError: If parameters are invalid
-"""'
+"""
     
     def _generate_class_docstring(self, class_name: str) -> str:
         """Generate a docstring for a class."""
-        return f'"""
+        return f"""
 {class_name} class.
 
 This class implements functionality for {class_name}.
@@ -1368,11 +1368,11 @@ This class implements functionality for {class_name}.
 Attributes:
     attr1: First attribute
     attr2: Second attribute
-"""'
+"""
     
     def _generate_module_docstring(self, module_name: str) -> str:
         """Generate a docstring for a module."""
-        return f'"""
+        return f"""
 {module_name} module.
 
 This module provides functionality for {module_name.replace("_", " ")}.
@@ -1383,7 +1383,7 @@ Example:
     
     result = {module_name}.process(data)
     ```
-"""'
+"""
     
     def _generate_examples(self, subject: str) -> List[Dict[str, str]]:
         """Generate usage examples."""
