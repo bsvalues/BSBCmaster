@@ -1645,6 +1645,14 @@ with app.app_context():
 
 # This is called when the Flask app is run
 if __name__ == "__main__":
+    # Register authentication demo routes
+    try:
+        from app.auth.demo_routes import register_auth_demo_routes
+        register_auth_demo_routes(app)
+        logger.info("Authentication demo routes registered successfully")
+    except Exception as e:
+        logger.error(f"Failed to register authentication demo routes: {e}")
+    
     # Create tables and seed database if needed
     create_tables()
     seed_database_if_needed()
