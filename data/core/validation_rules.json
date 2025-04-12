@@ -1,0 +1,84 @@
+{
+  "identifiers": [
+    {
+      "id": "valid_parcel_number",
+      "description": "Parcel number must be valid",
+      "severity": "error",
+      "check": "parcel_number_format"
+    },
+    {
+      "id": "valid_property_id",
+      "description": "Property ID must be valid",
+      "severity": "error",
+      "check": "property_id_format"
+    }
+  ],
+  "addresses": [
+    {
+      "id": "address_required",
+      "description": "Property must have an address",
+      "severity": "error",
+      "check": "address_presence"
+    },
+    {
+      "id": "address_format",
+      "description": "Address must be properly formatted",
+      "severity": "warning",
+      "check": "address_format"
+    },
+    {
+      "id": "valid_zip_code",
+      "description": "ZIP code must be valid for Washington State",
+      "severity": "warning",
+      "check": "zip_code_format"
+    }
+  ],
+  "valuation": [
+    {
+      "id": "positive_value",
+      "description": "Assessment value must be positive",
+      "severity": "error",
+      "check": "positive_value"
+    },
+    {
+      "id": "reasonable_value",
+      "description": "Assessment value must be within reasonable range",
+      "severity": "warning",
+      "check": "value_range"
+    },
+    {
+      "id": "value_change_limit",
+      "description": "Value change from previous assessment should be within limits",
+      "severity": "warning",
+      "check": "value_change"
+    }
+  ],
+  "classifications": [
+    {
+      "id": "valid_property_type",
+      "description": "Property type must be valid",
+      "severity": "error",
+      "check": "property_type_enum"
+    },
+    {
+      "id": "valid_zoning",
+      "description": "Zoning must be valid for Washington State",
+      "severity": "warning",
+      "check": "zoning_enum"
+    }
+  ],
+  "dates": [
+    {
+      "id": "valid_assessment_date",
+      "description": "Assessment date must be valid",
+      "severity": "error",
+      "check": "assessment_date_format"
+    },
+    {
+      "id": "assessment_date_not_future",
+      "description": "Assessment date must not be in the future",
+      "severity": "error",
+      "check": "assessment_date_range"
+    }
+  ]
+}

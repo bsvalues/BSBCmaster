@@ -4,45 +4,63 @@
     "version": "3.0.0",
     "data_dir": "data/core",
     "master_prompt": "You are an AI assistant for the Benton County Assessor's Office.",
-    "master_prompt_refresh_interval": 3600
+    "master_prompt_refresh_interval": 3600,
+    "log_level": "info",
+    "log_dir": "logs/core"
   },
-  "logging": {
-    "log_level": "debug",
-    "log_dir": "logs/core",
-    "console": {
-      "enabled": true,
-      "level": "info",
-      "structured": false,
-      "include_context": true,
-      "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  "agent_coordinator": {
+    "data_dir": "data/agent_coordination",
+    "max_agent_tasks": 3
+  },
+  "developer_agents": [
+    {
+      "id": "python_developer",
+      "specialization": "backend",
+      "code_generation_mode": "incremental",
+      "programming_languages": ["python"],
+      "capabilities": ["code_generation", "code_review", "testing", "documentation"]
     },
-    "file": {
-      "enabled": true,
-      "level": "debug",
-      "structured": true,
-      "include_context": true,
-      "filename": "core.log",
-      "max_bytes": 10485760,
-      "backup_count": 5
+    {
+      "id": "web_developer",
+      "specialization": "frontend",
+      "code_generation_mode": "incremental",
+      "programming_languages": ["javascript", "html", "css"],
+      "capabilities": ["code_generation", "ui_design", "documentation"]
     },
-    "propagate": false
+    {
+      "id": "database_developer",
+      "specialization": "database",
+      "code_generation_mode": "incremental",
+      "programming_languages": ["sql", "python"],
+      "capabilities": ["data_modeling", "query_optimization", "testing"]
+    }
+  ],
+  "validator_agents": [
+    {
+      "id": "data_validator",
+      "specialization": "data_quality",
+      "rules_file": "data/core/validation_rules.json",
+      "schema_file": "data/core/property_schema.json",
+      "max_value_change_percent": 30,
+      "log_level": "info"
+    }
+  ],
+  "agent_manager": {
+    "agent_registry_file": "data/core/agent_registry.json",
+    "agent_lifecycle_check_interval": 300,
+    "inactive_agent_timeout": 3600
   },
   "communication": {
-    "protocol": "memory",
-    "settings": {}
+    "retry_attempts": 3,
+    "retry_base_delay": 1.0,
+    "retry_max_delay": 10.0,
+    "circuit_breaker_failure_threshold": 5,
+    "circuit_breaker_reset_timeout": 30.0,
+    "message_timeout": 60.0
   },
-  "agent_manager": {
-    "health_check_interval": 60,
-    "health_check_enabled": true,
-    "agent_timeout": 300
-  },
-  "error_handler": {
-    "max_errors": 1000
-  },
-  "replay_buffer": {
-    "type": "memory",
-    "capacity": 10000,
-    "alpha": 0.6,
-    "beta": 0.4
+  "experience_replay": {
+    "buffer_size": 1000,
+    "save_interval": 300,
+    "experience_file": "data/core/experience_buffer.json"
   }
 }

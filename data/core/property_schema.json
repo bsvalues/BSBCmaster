@@ -1,0 +1,205 @@
+{
+  "type": "object",
+  "required": [
+    "property_id",
+    "parcel_number",
+    "address",
+    "property_type",
+    "assessment_value",
+    "assessment_date"
+  ],
+  "properties": {
+    "property_id": {
+      "type": "string",
+      "pattern": "^[A-Z]{2}-\\d{6,8}$",
+      "description": "Unique property identifier (e.g., WA-123456)"
+    },
+    "parcel_number": {
+      "type": "string",
+      "pattern": "^\\d{2}-\\d{2}-\\d{2}-\\d{4}-\\d{3}$",
+      "description": "County parcel number (e.g., 12-34-56-7890-123)"
+    },
+    "address": {
+      "type": "object",
+      "required": ["street", "city", "state", "zip"],
+      "properties": {
+        "street": {
+          "type": "string",
+          "description": "Street address"
+        },
+        "city": {
+          "type": "string",
+          "description": "City name"
+        },
+        "state": {
+          "type": "string",
+          "enum": ["WA"],
+          "description": "State (must be WA for Washington)"
+        },
+        "zip": {
+          "type": "string",
+          "pattern": "^\\d{5}(-\\d{4})?$",
+          "description": "ZIP code (5 digits or 5+4 format)"
+        }
+      },
+      "description": "Property address"
+    },
+    "property_type": {
+      "type": "string",
+      "enum": ["Residential", "Commercial", "Agricultural", "Industrial", "Public"],
+      "description": "Type of property"
+    },
+    "zoning": {
+      "type": "string",
+      "enum": [
+        "R1", "R2", "R3", "R4",
+        "C1", "C2", "C3",
+        "I1", "I2", "I3",
+        "A1", "A2",
+        "PF", "PS"
+      ],
+      "description": "Zoning classification"
+    },
+    "assessment_value": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Current assessed value in USD"
+    },
+    "previous_assessment_value": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Previously assessed value in USD"
+    },
+    "assessment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of current assessment (ISO format: YYYY-MM-DD)"
+    },
+    "previous_assessment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of previous assessment (ISO format: YYYY-MM-DD)"
+    },
+    "land_area": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Land area in square feet"
+    },
+    "building_area": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Building area in square feet"
+    },
+    "year_built": {
+      "type": "integer",
+      "minimum": 1800,
+      "description": "Year the primary structure was built"
+    },
+    "owners": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "ownership_percentage"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Owner's name"
+          },
+          "ownership_percentage": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Percentage of ownership"
+          }
+        }
+      },
+      "description": "Property owners"
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["image_id", "date_taken", "url"],
+        "properties": {
+          "image_id": {
+            "type": "string",
+            "description": "Unique image identifier"
+          },
+          "date_taken": {
+            "type": "string",
+            "format": "date",
+            "description": "Date the image was taken"
+          },
+          "url": {
+            "type": "string",
+            "description": "URL to the image file"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Image tags"
+          }
+        }
+      },
+      "description": "Property images"
+    },
+    "tax_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tax_year", "tax_amount", "payment_status"],
+        "properties": {
+          "tax_year": {
+            "type": "integer",
+            "description": "Tax year"
+          },
+          "tax_amount": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Tax amount in USD"
+          },
+          "payment_status": {
+            "type": "string",
+            "enum": ["Paid", "Unpaid", "Partial", "Delinquent", "Exempt"],
+            "description": "Payment status"
+          },
+          "payment_date": {
+            "type": "string",
+            "format": "date",
+            "description": "Date of payment"
+          }
+        }
+      },
+      "description": "Tax payment history"
+    },
+    "improvements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["improvement_type", "value", "year_completed"],
+        "properties": {
+          "improvement_type": {
+            "type": "string",
+            "description": "Type of improvement"
+          },
+          "value": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Value of the improvement in USD"
+          },
+          "year_completed": {
+            "type": "integer",
+            "description": "Year the improvement was completed"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the improvement"
+          }
+        }
+      },
+      "description": "Property improvements"
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "buffer_size": 1000,
+  "experience_count": 3,
+  "last_updated": "2025-04-12T16:00:34.704Z",
+  "experiences": [
+    {
+      "id": "exp-1",
+      "request_timestamp": "2025-04-12T15:50:00.000Z",
+      "agent_id": "data_validator",
+      "request_type": "validate_property",
+      "request_data": {
+        "property_id": "WA-123456",
+        "validation_level": "standard"
+      },
+      "response_type": "success",
+      "response_data": {
+        "valid": true,
+        "errors": [],
+        "warnings": []
+      },
+      "processing_time_ms": 120
+    },
+    {
+      "id": "exp-2",
+      "request_timestamp": "2025-04-12T15:52:30.000Z",
+      "agent_id": "python_developer",
+      "request_type": "code_generation",
+      "request_data": {
+        "task_id": "task1",
+        "task_type": "code_generation",
+        "title": "Implement Data Validation Agent"
+      },
+      "response_type": "success",
+      "response_data": {
+        "file_path": "agent_coordination/data_validation_agent.py",
+        "code_size": 38427
+      },
+      "processing_time_ms": 4500
+    },
+    {
+      "id": "exp-3",
+      "request_timestamp": "2025-04-12T15:58:10.000Z",
+      "agent_id": "data_validator",
+      "request_type": "generate_report",
+      "request_data": {
+        "report_type": "data_quality",
+        "data_source": "recent"
+      },
+      "response_type": "success",
+      "response_data": {
+        "report_id": "report-1",
+        "summary": {
+          "validation_stats": {
+            "validated_properties": 20,
+            "validation_errors": 3,
+            "anomalies_detected": 2,
+            "reports_generated": 1
+          }
+        }
+      },
+      "processing_time_ms": 850
+    }
+  ]
+}

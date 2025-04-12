@@ -1,0 +1,63 @@
+{
+  "agents": {
+    "python_developer": {
+      "name": "Backend Developer",
+      "type": "developer",
+      "description": "AI agent specialized in backend development",
+      "capabilities": ["code_generation", "code_review", "testing", "documentation"],
+      "programming_languages": ["python"],
+      "specialization": "backend",
+      "status": "active",
+      "task_count": 3,
+      "success_rate": 100,
+      "registration_time": "2025-04-12T16:00:00.000Z",
+      "last_active": "2025-04-12T16:00:34.704Z"
+    },
+    "web_developer": {
+      "name": "Frontend Developer",
+      "type": "developer",
+      "description": "AI agent specialized in frontend development",
+      "capabilities": ["ui_design", "frontend_development", "css_styling"],
+      "programming_languages": ["javascript", "html", "css"],
+      "specialization": "frontend",
+      "status": "active",
+      "task_count": 0,
+      "success_rate": 0,
+      "registration_time": "2025-04-12T16:00:00.000Z",
+      "last_active": "2025-04-12T16:00:00.000Z"
+    },
+    "data_validator": {
+      "name": "Data Validation Agent",
+      "type": "validator",
+      "description": "AI agent specialized in data validation and quality assessment",
+      "capabilities": ["data_validation", "anomaly_detection", "quality_reporting"],
+      "programming_languages": ["python"],
+      "specialization": "data_quality",
+      "status": "active",
+      "task_count": 1,
+      "success_rate": 100,
+      "registration_time": "2025-04-12T16:00:00.000Z",
+      "last_active": "2025-04-12T16:00:34.704Z"
+    },
+    "database_developer": {
+      "name": "Database Developer",
+      "type": "developer",
+      "description": "AI agent specialized in database development",
+      "capabilities": ["data_modeling", "query_optimization", "testing"],
+      "programming_languages": ["sql", "python"],
+      "specialization": "database",
+      "status": "inactive",
+      "task_count": 0,
+      "success_rate": 0,
+      "registration_time": "2025-04-12T16:00:00.000Z",
+      "last_active": "2025-04-12T16:00:00.000Z"
+    }
+  },
+  "statistics": {
+    "total_agents": 4,
+    "active_agents": 3,
+    "total_tasks_completed": 4,
+    "overall_success_rate": 100,
+    "last_updated": "2025-04-12T16:00:34.704Z"
+  }
+}
