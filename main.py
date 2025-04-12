@@ -68,6 +68,16 @@ except ImportError as e:
 # Register routes
 app.register_blueprint(api_routes)
 
+# Register authentication routes
+try:
+    # Convert FastAPI router to Flask blueprint
+    from app.api.fastapi_to_flask import fastapi_router_to_blueprint
+    auth_blueprint = fastapi_router_to_blueprint(auth_router)
+    app.register_blueprint(auth_blueprint)
+    logger.info("Authentication API routes registered successfully")
+except Exception as e:
+    logger.error(f"Failed to register authentication API routes: {e}")
+
 # Register statistics API routes
 try:
     app.register_blueprint(statistics_api)

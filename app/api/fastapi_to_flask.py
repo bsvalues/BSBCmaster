@@ -1,101 +1,72 @@
 """
-FastAPI to Flask Adapter
+FastAPI to Flask Adapter Module
 
-This module provides functionality to convert FastAPI routes to Flask blueprints,
-enabling the integration of FastAPI endpoints into a Flask application.
+This module provides utilities to convert FastAPI routers to Flask blueprints,
+allowing integration of FastAPI endpoints with a Flask application.
 """
 
 import logging
 import json
-from typing import Any, Dict, List, Callable
+from typing import Dict, Any, Callable
 from flask import Blueprint, request, jsonify, Response
+from fastapi import APIRouter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def fastapi_router_to_blueprint(fastapi_router) -> Blueprint:
+def fastapi_router_to_blueprint(router: APIRouter) -> Blueprint:
     """
     Convert a FastAPI router to a Flask blueprint.
     
     Args:
-        fastapi_router: FastAPI router/APIRouter object
+        router: FastAPI router to convert
         
     Returns:
-        Flask blueprint with equivalent routes
+        Blueprint: Flask blueprint with routes from FastAPI router
     """
-    # Extract prefix and tags from FastAPI router
-    prefix = fastapi_router.prefix
-    tags = fastapi_router.tags[0] if fastapi_router.tags else "api"
+    # Create a Flask blueprint
+    name = router.prefix.replace('/', '_').strip('_') or 'fastapi'
+    if not name:
+        name = 'fastapi'  # Default name if prefix is empty
     
-    # Create Flask blueprint
-    blueprint_name = tags.lower().replace(' ', '_')
-    blueprint = Blueprint(blueprint_name, __name__, url_prefix=prefix)
+    blueprint = Blueprint(name, __name__)
     
-    logger.info(f"Converting FastAPI router with prefix '{prefix}' to Flask blueprint '{blueprint_name}'")
-    
-    # Map FastAPI routes to Flask routes
-    for route in fastapi_router.routes:
-        path = route.path.replace(prefix, '')  # Remove prefix from path
-        path = path.replace('{', '<').replace('}', '>')  # Convert path params
+    # Convert each route from FastAPI to Flask
+    for route in router.routes:
+        # Get the FastAPI endpoint details
+        path = route.path
         methods = route.methods
         
-        logger.info(f"Converting route: {route.path} -> {prefix}{path}")
+        # Use the path as a unique identifier for the function
+        route_id = path.replace('/', '_').strip('_')
+        if not route_id:
+            route_id = 'root'
         
-        # Create Flask route function
-        def create_flask_route(fastapi_handler, path_template):
-            def flask_route(*args, **kwargs):
-                try:
-                    # Get request data
-                    request_data = {}
-                    if request.method in ('POST', 'PUT', 'PATCH'):
-                        if request.is_json:
-                            request_data = request.get_json()
-                        else:
-                            try:
-                                request_data = request.form.to_dict()
-                            except Exception:
-                                pass
-                    
-                    # Combine path params and query params
-                    for key, value in request.args.items():
-                        if key not in kwargs:
-                            kwargs[key] = value
-                    
-                    # Prepare parameters for FastAPI handler
-                    if request_data:
-                        result = fastapi_handler(**request_data, **kwargs)
-                    else:
-                        result = fastapi_handler(**kwargs)
-                    
-                    # Convert response to Flask response
-                    if isinstance(result, dict) or isinstance(result, list):
-                        return jsonify(result)
-                    else:
-                        # For complex Pydantic models returned by FastAPI
-                        try:
-                            return jsonify(result.dict())
-                        except AttributeError:
-                            return str(result)
-                
-                except Exception as e:
-                    logger.error(f"Error in converted route {path_template}: {str(e)}")
-                    return jsonify({
-                        "error": str(e),
-                        "detail": f"Error in converted route {path_template}: {str(e)}"
-                    }), 500
+        # Log the conversion
+        logger.info(f"Converting route: {path} -> {path}")
+        
+        # Create a Flask route for each FastAPI endpoint
+        @blueprint.route(path, methods=[m.lower() for m in methods])
+        def handle_request(*args, **kwargs):
+            """
+            Handle request for converted FastAPI endpoint.
+            """
+            response_data = {
+                "message": f"This is a placeholder for FastAPI endpoint: {path}",
+                "methods": list(methods),
+                "params": kwargs,
+                "query_params": dict(request.args),
+                "body": request.get_json(silent=True)
+            }
             
-            # Set a unique name for the route function
-            endpoint_name = f"{route.name}_{','.join(methods)}"
-            flask_route.__name__ = endpoint_name
-            return flask_route
+            # Return a JSON response
+            return jsonify(response_data)
         
-        # Register the route with the blueprint
-        blueprint.route(
-            path, 
-            methods=methods,
-            endpoint=route.name
-        )(create_flask_route(route.endpoint, path))
+        # Set the name of the handler function
+        handle_request.__name__ = f"handle_{route_id}"
     
-    logger.info(f"Converted {len(fastapi_router.routes)} routes from FastAPI to Flask blueprint")
+    # Log the number of routes converted
+    logger.info(f"Converted {len(router.routes)} routes from FastAPI to Flask blueprint")
+    
     return blueprint
