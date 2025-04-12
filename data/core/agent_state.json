@@ -14,8 +14,8 @@
         "validation_request"
       ],
       "dependencies": [],
-      "registered_at": 1744417182.477313,
-      "last_update": 1744417182.4773135,
+      "registered_at": 1744417761.2876732,
+      "last_update": 1744417761.2876742,
       "status": "inactive"
     },
     "compliance_agent": {
@@ -34,8 +34,8 @@
       "dependencies": [
         "validate_data"
       ],
-      "registered_at": 1744417182.477579,
-      "last_update": 1744417182.4775796,
+      "registered_at": 1744417761.287951,
+      "last_update": 1744417761.2879517,
       "status": "inactive"
     },
     "valuation_agent": {
@@ -55,8 +55,8 @@
         "validate_data",
         "verify_compliance"
       ],
-      "registered_at": 1744417182.4778695,
-      "last_update": 1744417182.4778702,
+      "registered_at": 1744417761.288439,
+      "last_update": 1744417761.2884395,
       "status": "inactive"
     }
   },
@@ -91,12 +91,12 @@
   },
   "agent_subscriptions": {
     "data_quality_agent": [
-      "data_update",
-      "validation_request"
+      "validation_request",
+      "data_update"
     ],
     "compliance_agent": [
-      "regulation_update",
-      "compliance_request"
+      "compliance_request",
+      "regulation_update"
     ],
     "valuation_agent": [
       "valuation_request",
@@ -109,9 +109,9 @@
       "validate_data"
     ],
     "valuation_agent": [
-      "validate_data",
-      "verify_compliance"
+      "verify_compliance",
+      "validate_data"
     ]
   },
-  "saved_at": "Sat Apr 12 00:19:42 2025"
+  "saved_at": "Sat Apr 12 00:29:21 2025"
 }

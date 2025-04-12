@@ -132,8 +132,8 @@ def register_mock_agents(hub: CoreHubEnhanced) -> List[str]:
         agent_id = agent["id"]
         existing = hub.get_agent_info(agent_id)
         if existing:
-            print(f"Unregistering existing agent: {agent_id}")
-            hub.unregister_agent(agent_id)
+            print(f"Deregistering existing agent: {agent_id}")
+            hub.deregister_agent(agent_id)
     
     # Now register agents with clean state
     registered_agents = []

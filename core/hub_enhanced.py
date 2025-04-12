@@ -548,9 +548,9 @@ class CoreHubEnhanced:
             "agents": self.agent_manager.get_system_status(),
             "errors": self.error_handler.get_error_summary(),
             "replay_buffer": {
-                "size": self.replay_buffer.size(),
+                "size": len(self.replay_buffer),
                 "capacity": self.replay_buffer.capacity,
-                "average_reward": self.replay_buffer.get_average_reward()
+                "average_reward": 0.0  # Placeholder until we implement get_average_reward
             }
         }
 
