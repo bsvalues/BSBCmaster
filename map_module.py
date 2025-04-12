@@ -127,30 +127,74 @@ def property_to_geojson(account: Account) -> Dict[str, Any]:
     
     return feature
 
-def get_map_data(limit: int = 100, use_cache: bool = True) -> Dict[str, Any]:
+def get_map_data(limit: int = 500, use_cache: bool = True) -> Dict[str, Any]:
     """
-    Get property data for the map view in GeoJSON format.
+    Get property data for the map view in GeoJSON format with enhanced filtering and visualization options.
     
     Args:
         limit: Maximum number of properties to return
         use_cache: Whether to use cached data if available
         
     Returns:
-        Dictionary with GeoJSON data and bounds
+        Dictionary with GeoJSON data, statistics, and bounds
     """
     global MAP_DATA_CACHE, CACHE_TIMESTAMP
     
+    # Get filter parameters from request if available
+    from flask import request
+    property_type = request.args.get('property_type', 'all')
+    city = request.args.get('city', 'all')
+    visualization_mode = request.args.get('visualization', 'markers')
+    
+    # Get value range filter if provided
+    min_value = request.args.get('min_value', None)
+    max_value = request.args.get('max_value', None)
+    
+    if min_value:
+        try:
+            min_value = float(min_value)
+        except ValueError:
+            min_value = None
+    
+    if max_value:
+        try:
+            max_value = float(max_value)
+        except ValueError:
+            max_value = None
+    
+    # Build cache key based on filter parameters
+    cache_key = f"{property_type}_{city}_{min_value}_{max_value}_{visualization_mode}"
+    
     # Check cache if enabled
     if use_cache and CACHE_TIMESTAMP and datetime.now() - CACHE_TIMESTAMP < CACHE_LIFETIME:
-        logger.info("Using cached map data")
-        return MAP_DATA_CACHE
+        if cache_key in MAP_DATA_CACHE:
+            logger.info(f"Using cached map data for key: {cache_key}")
+            return MAP_DATA_CACHE[cache_key]
     
     try:
-        # Query database for accounts with coordinates
-        accounts = Account.query.filter(
+        # Build query for accounts with coordinates
+        query = Account.query.filter(
             Account.latitude.isnot(None),
             Account.longitude.isnot(None)
-        ).limit(limit).all()
+        )
+        
+        # Apply property type filter
+        if property_type != 'all':
+            query = query.filter(Account.property_type == property_type)
+        
+        # Apply city filter
+        if city != 'all':
+            query = query.filter(Account.property_city == city)
+        
+        # Apply value range filter
+        if min_value is not None:
+            query = query.filter(Account.assessed_value >= min_value)
+        
+        if max_value is not None:
+            query = query.filter(Account.assessed_value <= max_value)
+        
+        # Get filtered accounts
+        accounts = query.limit(limit).all()
         
         # Create GeoJSON features
         features = []
@@ -168,18 +212,39 @@ def get_map_data(limit: int = 100, use_cache: bool = True) -> Dict[str, Any]:
         # Calculate bounds
         bounds = get_property_bounds(features)
         
+        # Generate statistics for the filtered data
+        stats = generate_map_statistics(features)
+        
+        # Create visualization-specific data
+        visualization_data = {}
+        
+        if visualization_mode == 'heatmap':
+            # Generate heatmap data
+            heatmap_data = generate_heatmap_data(features)
+            visualization_data['heatmap'] = heatmap_data
+        elif visualization_mode == 'clusters':
+            # Generate cluster data
+            clusters = generate_clusters(features)
+            visualization_data['clusters'] = clusters
+        
         # Create response
         result = {
             "geojson": geojson,
             "bounds": bounds,
-            "count": len(features)
+            "count": len(features),
+            "statistics": stats,
+            "visualization": visualization_mode,
+            "visualization_data": visualization_data
         }
         
         # Update cache
-        MAP_DATA_CACHE = result
+        if not MAP_DATA_CACHE:
+            MAP_DATA_CACHE = {}
+        
+        MAP_DATA_CACHE[cache_key] = result
         CACHE_TIMESTAMP = datetime.now()
         
-        logger.info(f"Loaded {len(features)} properties from database and updated cache")
+        logger.info(f"Loaded {len(features)} properties from database and updated cache for key: {cache_key}")
         
         return result
     except Exception as e:
@@ -189,6 +254,7 @@ def get_map_data(limit: int = 100, use_cache: bool = True) -> Dict[str, Any]:
             "geojson": {"type": "FeatureCollection", "features": []},
             "bounds": get_property_bounds([]),
             "count": 0,
+            "statistics": {},
             "error": str(e)
         }
 
@@ -252,6 +318,222 @@ def get_property_images_for_map(account_id):
     return jsonify({
         "images": []
     })
+
+def generate_map_statistics(features: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Generate statistics for the filtered map data.
+    
+    Args:
+        features: List of GeoJSON features with property data
+        
+    Returns:
+        Dictionary with statistical summary
+    """
+    if not features:
+        return {
+            "count": 0,
+            "property_types": {},
+            "value_ranges": {},
+            "cities": {}
+        }
+    
+    # Initialize counters
+    property_types = {}
+    cities = {}
+    value_ranges = {
+        "Under $100K": 0,
+        "$100K - $250K": 0,
+        "$250K - $500K": 0,
+        "$500K - $1M": 0,
+        "Over $1M": 0
+    }
+    
+    # Total and average values
+    total_value = 0
+    values = []
+    
+    # Process each feature
+    for feature in features:
+        props = feature.get("properties", {})
+        
+        # Property type statistics
+        prop_type = props.get("property_type", "Unknown")
+        if prop_type in property_types:
+            property_types[prop_type] += 1
+        else:
+            property_types[prop_type] = 1
+        
+        # City statistics
+        city = props.get("property_city", "Unknown")
+        if city in cities:
+            cities[city] += 1
+        else:
+            cities[city] = 1
+        
+        # Value statistics
+        value = props.get("assessed_value", 0)
+        if value:
+            total_value += value
+            values.append(value)
+            
+            # Value range categorization
+            if value < 100000:
+                value_ranges["Under $100K"] += 1
+            elif value < 250000:
+                value_ranges["$100K - $250K"] += 1
+            elif value < 500000:
+                value_ranges["$250K - $500K"] += 1
+            elif value < 1000000:
+                value_ranges["$500K - $1M"] += 1
+            else:
+                value_ranges["Over $1M"] += 1
+    
+    # Calculate median value
+    median_value = 0
+    if values:
+        values.sort()
+        mid = len(values) // 2
+        if len(values) % 2 == 0:
+            median_value = (values[mid-1] + values[mid]) / 2
+        else:
+            median_value = values[mid]
+    
+    # Compile statistics
+    return {
+        "count": len(features),
+        "average_value": total_value / len(features) if features else 0,
+        "median_value": median_value,
+        "property_types": property_types,
+        "value_ranges": value_ranges,
+        "cities": cities
+    }
+
+def generate_heatmap_data(features: List[Dict[str, Any]]) -> List[List[float]]:
+    """
+    Generate heatmap data from property features.
+    
+    Args:
+        features: List of GeoJSON features with property data
+        
+    Returns:
+        List of [lat, lng, intensity] points for heatmap
+    """
+    if not features:
+        return []
+    
+    heatmap_data = []
+    
+    # Process each feature
+    for feature in features:
+        props = feature.get("properties", {})
+        geom = feature.get("geometry", {})
+        coords = geom.get("coordinates", [0, 0])
+        
+        if len(coords) >= 2:
+            # Extract coordinates
+            lng, lat = coords
+            
+            # Calculate intensity based on property value
+            value = props.get("assessed_value", 0)
+            
+            # Normalize intensity (0-1 range)
+            max_value = 1000000  # $1M reference point
+            intensity = min(value / max_value, 1.0)
+            
+            # Add to heatmap data [lat, lng, intensity]
+            heatmap_data.append([lat, lng, intensity])
+    
+    return heatmap_data
+
+def generate_clusters(features: List[Dict[str, Any]], grid_size: float = 0.01) -> List[Dict[str, Any]]:
+    """
+    Generate clusters for property data based on geographical proximity.
+    
+    Args:
+        features: List of GeoJSON features with property data
+        grid_size: Size of the grid cells for clustering (in degrees)
+        
+    Returns:
+        List of cluster objects
+    """
+    if not features:
+        return []
+    
+    # Initialize clusters dictionary
+    # Key is "lat_lng" grid cell, value is list of properties
+    grid_clusters = {}
+    
+    # Process each feature
+    for feature in features:
+        props = feature.get("properties", {})
+        geom = feature.get("geometry", {})
+        coords = geom.get("coordinates", [0, 0])
+        
+        if len(coords) >= 2:
+            # Extract coordinates
+            lng, lat = coords
+            
+            # Calculate grid cell
+            lat_grid = int(lat / grid_size) * grid_size
+            lng_grid = int(lng / grid_size) * grid_size
+            
+            # Create grid key
+            grid_key = f"{lat_grid:.6f}_{lng_grid:.6f}"
+            
+            # Add to grid cell
+            if grid_key not in grid_clusters:
+                grid_clusters[grid_key] = []
+            
+            grid_clusters[grid_key].append({
+                "id": props.get("account_id", ""),
+                "lat": lat,
+                "lng": lng,
+                "value": props.get("assessed_value", 0),
+                "property_type": props.get("property_type", "Unknown")
+            })
+    
+    # Convert grid clusters to list
+    clusters = []
+    
+    for grid_key, properties in grid_clusters.items():
+        if len(properties) == 1:
+            # Single property, no clustering needed
+            continue
+        
+        # Calculate average position
+        avg_lat = sum(prop["lat"] for prop in properties) / len(properties)
+        avg_lng = sum(prop["lng"] for prop in properties) / len(properties)
+        
+        # Calculate total and average value
+        total_value = sum(prop["value"] for prop in properties)
+        avg_value = total_value / len(properties)
+        
+        # Count property types
+        property_types = {}
+        for prop in properties:
+            prop_type = prop["property_type"]
+            if prop_type in property_types:
+                property_types[prop_type] += 1
+            else:
+                property_types[prop_type] = 1
+        
+        # Determine dominant property type
+        dominant_type = max(property_types.items(), key=lambda x: x[1])[0]
+        
+        # Create cluster object
+        cluster = {
+            "position": [avg_lat, avg_lng],
+            "count": len(properties),
+            "average_value": avg_value,
+            "total_value": total_value,
+            "dominant_type": dominant_type,
+            "property_types": property_types,
+            "properties": properties
+        }
+        
+        clusters.append(cluster)
+    
+    return clusters
 
 def get_value_ranges():
     """Get property value ranges for filtering."""

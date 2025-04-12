@@ -1227,25 +1227,42 @@ def visualize():
 
 @app.route('/map-view')
 def map_view():
-    """Render the property map view interface."""
-    return render_template('map_view.html', title="Property Map")
+    """Render the property map view interface with enhanced visualization."""
+    return render_template('map_view_minimal.html', title="Enhanced Property Map")
     
 # Map API endpoints
 @app.route('/api/map/data', methods=['GET'])
 def map_data():
-    """Get map data with filtering options."""
-    return map_module.get_map_data()
+    """Get map data with advanced filtering and visualization options."""
+    # Enhanced implementation uses query parameters directly from the request
+    return map_module.get_map_data(limit=1000, use_cache=True)
 
 @app.route('/api/map/cities', methods=['GET'])
 def map_cities():
     """Get list of cities for map filtering."""
     return map_module.get_cities()
 
+@app.route('/api/map/property-types', methods=['GET'])
+def map_property_types():
+    """Get list of property types for map filtering."""
+    return map_module.get_property_types()
+
+@app.route('/api/map/value-ranges', methods=['GET'])
+def map_value_ranges():
+    """Get property value ranges for filtering."""
+    return map_module.get_value_ranges()
+
 @app.route('/api/map/property-images/<account_id>', methods=['GET'])
 def map_property_images(account_id):
     """Get property images for a specific account."""
     # Pass the account_id to the map module function
     return map_module.get_property_images_for_map(account_id)
+
+@app.route('/api/map/clear-cache', methods=['POST'])
+def map_clear_cache():
+    """Clear the map data cache."""
+    map_module.clear_cache()
+    return jsonify({"status": "success", "message": "Map cache cleared successfully"})
 
 
 # Global variable to store the agent coordinator instance
