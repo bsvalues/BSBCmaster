@@ -51,15 +51,25 @@ class StructuredLogFormatter(logging.Formatter):
         
         # Add exception info if present
         if record.exc_info:
+            exc_type = record.exc_info[0]
+            exc_type_name = exc_type.__name__ if exc_type else "Exception"
             log_data["exception"] = {
-                "type": record.exc_info[0].__name__,
-                "message": str(record.exc_info[1]),
+                "type": exc_type_name,
+                "message": str(record.exc_info[1]) if record.exc_info[1] else "",
                 "traceback": self.formatException(record.exc_info)
             }
         
         # Add context attributes if present and enabled
-        if self.include_context and hasattr(record, "context") and record.context:
-            log_data["context"] = record.context
+        if self.include_context:
+            # Safely get context from extra dict if it exists
+            context = {}
+            if hasattr(record, "extra") and isinstance(record.extra, dict):
+                context = record.extra.get("context", {})
+            elif hasattr(record, "context") and record.context:
+                context = record.context
+                
+            if context:
+                log_data["context"] = context
         
         # Return JSON-formatted string
         return json.dumps(log_data)
@@ -229,7 +239,7 @@ class ContextAdapter(logging.LoggerAdapter):
         """
         super().__init__(logger, extra or {})
     
-    def process(self, msg: str, kwargs: Dict[str, Any]) -> tuple:
+    def process(self, msg: str, kwargs: Any) -> tuple:
         """
         Process the log message and add context information.
         
@@ -240,15 +250,24 @@ class ContextAdapter(logging.LoggerAdapter):
         Returns:
             Tuple with processed message and kwargs
         """
+        # Initialize kwargs if needed
+        if kwargs is None:
+            kwargs = {}
+        
+        # Ensure kwargs is a dictionary (might be MutableMapping in base class)
+        if not isinstance(kwargs, dict):
+            kwargs = dict(kwargs)
+            
         if "extra" not in kwargs:
             kwargs["extra"] = {}
         
         if "context" not in kwargs["extra"]:
             kwargs["extra"]["context"] = {}
         
-        # Add adapter context to record context
-        for key, value in self.extra.items():
-            kwargs["extra"]["context"][key] = value
+        # Add adapter context to record context (safely)
+        if self.extra:
+            for key, value in self.extra.items():
+                kwargs["extra"]["context"][key] = value
         
         return msg, kwargs
     
@@ -262,8 +281,18 @@ class ContextAdapter(logging.LoggerAdapter):
         Returns:
             New context adapter with merged context
         """
-        new_extra = self.extra.copy()
-        new_extra.update(context)
+        # Create a new extra dictionary, safely handling None
+        new_extra = {}
+        if hasattr(self, 'extra') and self.extra is not None:
+            if hasattr(self.extra, 'copy'):
+                new_extra = self.extra.copy()
+            else:
+                new_extra = dict(self.extra)
+                
+        # Update with new context
+        if context:
+            new_extra.update(context)
+            
         return ContextAdapter(self.logger, new_extra)
 
 

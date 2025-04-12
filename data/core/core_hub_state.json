@@ -10,15 +10,15 @@
         "enhance_data"
       ],
       "registered_at": 1744415460.7156968,
-      "last_update": 1744415460.71796,
+      "last_update": 1744416096.5721302,
       "status": "active",
       "metrics": {
-        "cpu_usage": 0.4,
-        "memory_usage": 190,
-        "tasks_completed": 7,
+        "cpu_usage": 0.30000000000000004,
+        "memory_usage": 130,
+        "tasks_completed": 1,
         "errors": 0
       },
-      "status_update_count": 1
+      "status_update_count": 3
     },
     "compliance_agent": {
       "name": "Compliance Agent",
@@ -30,15 +30,15 @@
         "create_audit_record"
       ],
       "registered_at": 1744415460.7161732,
-      "last_update": 1744415460.7179894,
+      "last_update": 1744416096.5721533,
       "status": "active",
       "metrics": {
-        "cpu_usage": 0.6000000000000001,
-        "memory_usage": 160,
-        "tasks_completed": 4,
+        "cpu_usage": 0.30000000000000004,
+        "memory_usage": 180,
+        "tasks_completed": 6,
         "errors": 0
       },
-      "status_update_count": 1
+      "status_update_count": 3
     },
     "valuation_agent": {
       "name": "Valuation Agent",
@@ -50,7 +50,7 @@
         "compare_properties"
       ],
       "registered_at": 1744415460.7166996,
-      "last_update": 1744415460.718009,
+      "last_update": 1744416096.5721662,
       "status": "active",
       "metrics": {
         "cpu_usage": 0.6000000000000001,
@@ -58,24 +58,24 @@
         "tasks_completed": 9,
         "errors": 0
       },
-      "status_update_count": 1
+      "status_update_count": 3
     }
   },
-  "last_prompt_refresh": 1744415460.7156084,
-  "start_time": 1744415460.7142935,
+  "last_prompt_refresh": 1744416096.568696,
+  "start_time": 1744416096.5663369,
   "version": "3.0.0",
-  "saved_at": 1744415460.7286496,
+  "saved_at": 1744416096.576138,
   "agent_metrics": {
     "data_quality_agent": {
-      "cpu_usage": 0.4,
-      "memory_usage": 190,
-      "tasks_completed": 7,
+      "cpu_usage": 0.30000000000000004,
+      "memory_usage": 130,
+      "tasks_completed": 1,
       "errors": 0
     },
     "compliance_agent": {
-      "cpu_usage": 0.6000000000000001,
-      "memory_usage": 160,
-      "tasks_completed": 4,
+      "cpu_usage": 0.30000000000000004,
+      "memory_usage": 180,
+      "tasks_completed": 6,
       "errors": 0
     },
     "valuation_agent": {
