@@ -33,6 +33,13 @@ from app.nl_processing import sql_to_natural_language, extract_query_intent
 from sqlalchemy import create_engine, inspect
 from app.validators import validate_query
 
+# Import authentication modules
+try:
+    from app.auth.routes import router as auth_router
+except ImportError as e:
+    logger = logging.getLogger(__name__)
+    logger.error(f"Failed to import authentication routes: {e}")
+
 # Import statistics routes
 try:
     from app.api.statistics_routes import statistics_api
