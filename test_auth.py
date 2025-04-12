@@ -7,6 +7,7 @@ This script tests the JWT authentication endpoints and token validation.
 import json
 import requests
 import logging
+import sys
 from datetime import datetime, timedelta
 
 # Configure logging
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 API_URL = "http://localhost:5000"  # Flask app running on default port
-AUTH_URL = f"{API_URL}/auth"
+AUTH_URL = f"{API_URL}/api/v1/auth"
 USERNAME = "admin"
 PASSWORD = "admin"
 
