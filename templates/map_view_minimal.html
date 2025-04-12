@@ -423,17 +423,15 @@
         
         // Enhanced marker initialization
         let enhancedMarkers = null;
-        if (document.getElementById("enhanced-markers-toggle") && document.getElementById("enhanced-markers-toggle").checked && typeof EnhancedPropertyMarkers !== "undefined") {
-            enhancedMarkers = new EnhancedPropertyMarkers(map);
+        if (typeof EnhancedPropertyMarkers !== "undefined") {
+            enhancedMarkers = new EnhancedPropertyMarkers(map, {
+                baseSize: 30,
+                minSize: 20,
+                maxSize: 50,
+                pulseEnabled: true,
+                defaultVisualizationMode: 'markers'
+            });
         }
-        let enhancedMarkers = null;
-        
-        // Enhanced marker initialization
-        let enhancedMarkers = null;
-        if (document.getElementById("enhanced-markers-toggle") && document.getElementById("enhanced-markers-toggle").checked && typeof EnhancedPropertyMarkers !== "undefined") {
-            enhancedMarkers = new EnhancedPropertyMarkers(map);
-        }
-        let enhancedMarkers = null;
         
         // Add tile layer
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

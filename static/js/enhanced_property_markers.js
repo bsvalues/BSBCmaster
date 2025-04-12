@@ -3,44 +3,127 @@
  * 
  * This module creates advanced 3D property markers with enhanced 
  * visual representation and interactive elements.
+ * 
+ * Features:
+ * - Property type-specific 3D marker styles
+ * - Value-based sizing and coloring
+ * - Interactive animations and effects
+ * - Detailed popup information
+ * - Support for clustering and heatmap integration
  */
 class EnhancedPropertyMarkers {
     /**
      * Initialize enhanced property markers
      * @param {Object} map - Leaflet map instance
+     * @param {Object} options - Configuration options
      */
-    constructor(map) {
+    constructor(map, options = {}) {
         this.map = map;
         this.markers = [];
         this.markerLayer = L.layerGroup().addTo(map);
+        this.clusterGroup = null;
+        this.heatLayer = null;
+        this.propertyData = [];
         
-        // Marker appearance configuration
+        // Marker appearance configuration - merge defaults with provided options
         this.config = {
             // Size settings
-            baseSize: 30,
-            minSize: 20,
-            maxSize: 50,
+            baseSize: options.baseSize || 30,
+            minSize: options.minSize || 20,
+            maxSize: options.maxSize || 50,
             
             // Animation settings
-            pulseEnabled: true,
-            pulseColor: '#4a89dc',
-            pulseOpacity: 0.4,
-            pulseDuration: 2000,
+            pulseEnabled: options.pulseEnabled !== undefined ? options.pulseEnabled : true,
+            pulseColor: options.pulseColor || '#4a89dc',
+            pulseOpacity: options.pulseOpacity || 0.4,
+            pulseDuration: options.pulseDuration || 2000,
             
-            // Value ranges for color scale
-            valueMin: 100000,  // $100K
-            valueMax: 1000000, // $1M
+            // Value ranges for color scale - can be updated with actual data ranges
+            valueMin: options.valueMin || 100000,  // $100K
+            valueMax: options.valueMax || 1000000, // $1M
             
             // Color settings
-            colorScheme: [
+            colorScheme: options.colorScheme || [
                 { value: 0, color: '#43a047' },       // Low value (green)
                 { value: 0.5, color: '#fdd835' },     // Mid value (yellow) 
                 { value: 1, color: '#e53935' }        // High value (red)
-            ]
+            ],
+            
+            // Additional options for enhanced visualization
+            showLabels: options.showLabels !== undefined ? options.showLabels : false,
+            animateMarkers: options.animateMarkers !== undefined ? options.animateMarkers : true,
+            useTimeBasedVisualization: options.useTimeBasedVisualization || false,
+            
+            // Visualization modes
+            defaultVisualizationMode: options.defaultVisualizationMode || 'markers' // markers, heatmap, clusters
         };
         
-        // Initialize
+        // Initialize components
         this.initMarkerPrototype();
+        this.initClusterGroup();
+        this.setupEventListeners();
+    }
+    
+    /**
+     * Initialize the marker cluster group
+     */
+    initClusterGroup() {
+        // Create marker cluster group if available
+        if (typeof L.MarkerClusterGroup !== 'undefined') {
+            this.clusterGroup = L.markerClusterGroup({
+                showCoverageOnHover: false,
+                maxClusterRadius: 50,
+                iconCreateFunction: (cluster) => {
+                    // Calculate average property value for all markers in the cluster
+                    let totalValue = 0;
+                    let count = 0;
+                    
+                    cluster.getAllChildMarkers().forEach(marker => {
+                        if (marker.propertyValue) {
+                            totalValue += marker.propertyValue;
+                            count++;
+                        }
+                    });
+                    
+                    const avgValue = count > 0 ? totalValue / count : 0;
+                    const normalizedValue = this.normalizeValue(avgValue);
+                    const color = this.getColorForValue(normalizedValue);
+                    
+                    // Create a custom HTML-based icon for the cluster
+                    return new L.DivIcon({
+                        html: `<div class="cluster-icon" style="background-color: ${color};">
+                                <div class="cluster-center"></div>
+                                <span>${cluster.getChildCount()}</span>
+                               </div>`,
+                        className: 'custom-cluster-icon',
+                        iconSize: new L.Point(40, 40)
+                    });
+                }
+            });
+        }
+    }
+    
+    /**
+     * Setup event listeners for map and markers
+     */
+    setupEventListeners() {
+        // Event handler for property comparison mode
+        document.addEventListener('enhanced-markers:comparison-mode', (e) => {
+            const enabled = e.detail.enabled;
+            this.setComparisonMode(enabled);
+        });
+        
+        // Event handler for visualization mode change
+        document.addEventListener('enhanced-markers:visualization-mode', (e) => {
+            const mode = e.detail.mode;
+            this.setVisualizationMode(mode);
+        });
+        
+        // Event handler for filter changes
+        document.addEventListener('enhanced-markers:filter-changed', (e) => {
+            const filters = e.detail.filters;
+            this.applyFilters(filters);
+        });
     }
     
     /**
@@ -443,6 +526,166 @@ class EnhancedPropertyMarkers {
         }
         
         ctx.fillText(displayValue, x + size * 0.8, y - size * 0.8);
+    }
+    
+    /**
+     * Set visualization mode (markers, heatmap, clusters)
+     * @param {String} mode - Visualization mode
+     */
+    setVisualizationMode(mode) {
+        // Clear existing visualizations
+        this.map.removeLayer(this.markerLayer);
+        
+        if (this.clusterGroup && this.map.hasLayer(this.clusterGroup)) {
+            this.map.removeLayer(this.clusterGroup);
+        }
+        
+        if (this.heatLayer && this.map.hasLayer(this.heatLayer)) {
+            this.map.removeLayer(this.heatLayer);
+        }
+        
+        // Apply the selected visualization mode
+        if (mode === 'clusters' && this.clusterGroup) {
+            // Add markers to the cluster group
+            this.clusterGroup.clearLayers();
+            
+            for (const item of this.markers) {
+                this.clusterGroup.addLayer(item.marker);
+                
+                // Store property value on marker for clustering
+                item.marker.propertyValue = item.property.total_value;
+            }
+            
+            // Add cluster group to map
+            this.map.addLayer(this.clusterGroup);
+        } 
+        else if (mode === 'heatmap') {
+            // Create heatmap data if needed
+            if (!this.heatLayer) {
+                // Check if L.heatLayer is available (requires Leaflet.heat plugin)
+                if (typeof L.heatLayer !== 'undefined') {
+                    // Create heatmap data
+                    const heatData = [];
+                    
+                    for (const item of this.markers) {
+                        const prop = item.property;
+                        const intensity = this.normalizeValue(prop.total_value);
+                        
+                        // Add heat point [lat, lng, intensity]
+                        heatData.push([
+                            prop.latitude, 
+                            prop.longitude, 
+                            intensity * 1.0 // Scale intensity
+                        ]);
+                    }
+                    
+                    // Create heat layer
+                    this.heatLayer = L.heatLayer(heatData, {
+                        radius: 25,
+                        blur: 15,
+                        maxZoom: 17,
+                        max: 1.0,
+                        gradient: {
+                            0.0: '#43a047',
+                            0.5: '#fdd835',
+                            1.0: '#e53935'
+                        }
+                    });
+                } else {
+                    console.warn('Leaflet.heat plugin is not available. Fallback to markers mode.');
+                    mode = 'markers';
+                }
+            }
+            
+            if (mode === 'heatmap') {
+                // Add heat layer to map
+                this.map.addLayer(this.heatLayer);
+            }
+        }
+        
+        // Default to markers mode
+        if (mode === 'markers') {
+            // Add marker layer back to map
+            this.map.addLayer(this.markerLayer);
+        }
+    }
+    
+    /**
+     * Enable or disable property comparison mode
+     * @param {Boolean} enabled - Whether to enable comparison mode
+     */
+    setComparisonMode(enabled) {
+        this.comparisonMode = enabled;
+        
+        if (enabled) {
+            // Create comparison panel if it doesn't exist
+            if (!this.comparisonPanel) {
+                this.createComparisonPanel();
+            }
+            
+            // Show comparison panel
+            this.comparisonPanel.style.display = 'block';
+        } else if (this.comparisonPanel) {
+            // Hide comparison panel
+            this.comparisonPanel.style.display = 'none';
+            
+            // Clear compared properties
+            this.comparedProperties = [];
+            this.updateComparisonPanel();
+        }
+    }
+    
+    /**
+     * Apply filters to property markers
+     * @param {Object} filters - Filter criteria
+     */
+    applyFilters(filters) {
+        // Clear existing layers
+        this.markerLayer.clearLayers();
+        
+        if (this.clusterGroup) {
+            this.clusterGroup.clearLayers();
+        }
+        
+        if (this.heatLayer) {
+            // Recreate heatmap with filtered data
+            this.heatLayer = null;
+        }
+        
+        // Apply filters to markers
+        const filteredMarkers = [];
+        
+        for (const item of this.markers) {
+            const prop = item.property;
+            
+            // Apply property type filter
+            if (filters.propertyType && filters.propertyType !== 'all' && 
+                prop.property_type !== filters.propertyType) {
+                continue;
+            }
+            
+            // Apply city filter
+            if (filters.city && filters.city !== 'all' && 
+                prop.property_city !== filters.city) {
+                continue;
+            }
+            
+            // Apply value range filter
+            if (filters.minValue && prop.total_value < filters.minValue) {
+                continue;
+            }
+            
+            if (filters.maxValue && prop.total_value > filters.maxValue) {
+                continue;
+            }
+            
+            // Add marker to filtered markers
+            filteredMarkers.push(item);
+            this.markerLayer.addLayer(item.marker);
+        }
+        
+        // Update visualization mode with filtered markers
+        this.setVisualizationMode(filters.visualizationMode || this.config.defaultVisualizationMode);
     }
     
     /**
