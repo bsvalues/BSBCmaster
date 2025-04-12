@@ -1,734 +1,729 @@
 """
-Agent Coordinator Module
+Agent Coordination System for Benton County Assessor's Office AI Platform
 
-This module provides the central coordination system for the AI agents,
-enabling task delegation, performance monitoring, and collaborative learning.
+This module implements a coordination system that enables AI agents to
+actively contribute to building and improving the application codebase.
 """
 
-import time
-import threading
-import logging
-import json
 import os
-from typing import Dict, Any, List, Optional, Callable, Tuple
+import sys
+import json
+import uuid
+import inspect
+import importlib
+import pkgutil
+from typing import Dict, Any, List, Optional, Callable, Tuple, Set, Union
+from dataclasses import dataclass, field
 from datetime import datetime
+import logging
 
-from .message import CoordinationMessage, MessageType
-from .replay_buffer import ReplayBuffer, Experience
-from .performance import PerformanceTracker
+from core.message import Message, CommandMessage, ResponseMessage, ErrorMessage
+from core.hub_enhanced import CoreHubEnhanced
+
+
+@dataclass
+class DevelopmentTask:
+    """
+    Represents a development task that can be assigned to an agent.
+    
+    Attributes:
+        task_id: Unique identifier for this task
+        title: Short description of the task
+        description: Detailed description of the task
+        task_type: Type of development task (code_generation, code_review, testing, documentation)
+        priority: Task priority (high, medium, low)
+        status: Current status of the task
+        agent_id: ID of the agent assigned to this task
+        related_files: List of files related to this task
+        dependencies: List of tasks that must be completed before this task
+        created_at: When the task was created
+        updated_at: When the task was last updated
+        completion_criteria: Criteria to determine if the task is complete
+        result: Result produced by the agent (code, review, test results, etc.)
+    """
+    task_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    title: str = ""
+    description: str = ""
+    task_type: str = ""  # code_generation, code_review, testing, documentation
+    priority: str = "medium"  # high, medium, low
+    status: str = "pending"  # pending, assigned, in_progress, completed, failed
+    agent_id: Optional[str] = None
+    related_files: List[str] = field(default_factory=list)
+    dependencies: List[str] = field(default_factory=list)
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    completion_criteria: Dict[str, Any] = field(default_factory=dict)
+    result: Optional[Dict[str, Any]] = None
 
 
 class AgentCoordinator:
     """
-    Central coordination system for AI agents.
+    Coordinates AI agents to contribute to building and improving the application.
     
-    This class manages inter-agent communication, task delegation,
-    performance monitoring, and collaborative learning for the AI agent system.
-    It integrates with the Master Control Program (MCP) to provide a complete
-    agent orchestration solution.
+    This class manages the workflow for assigning development tasks to agents,
+    reviewing their contributions, and integrating their work into the codebase.
     """
     
-    def __init__(self, mcp, config_path: Optional[str] = None, 
-                 log_dir: Optional[str] = 'logs/coordination'):
+    def __init__(self, core_hub: CoreHubEnhanced, config: Optional[Dict[str, Any]] = None):
         """
-        Initialize the agent coordinator.
+        Initialize the Agent Coordinator.
         
         Args:
-            mcp: Reference to the Master Control Program
-            config_path: Path to configuration file (None = use defaults)
-            log_dir: Directory for logs (None = no logging)
+            core_hub: Enhanced Core Hub instance
+            config: Configuration options
         """
-        self.mcp = mcp
-        self.log_dir = log_dir
+        self.core_hub = core_hub
+        self.config = config or {}
+        self.logger = logging.getLogger("agent_coordinator")
+        self.tasks: Dict[str, DevelopmentTask] = {}
+        self.agent_capabilities: Dict[str, List[str]] = {}
         
-        # Set up logging
-        self._setup_logging()
+        # Register message handlers
+        self.core_hub.register_topic_handler("development_task", self._handle_development_task)
+        self.core_hub.register_topic_handler("task_update", self._handle_task_update)
+        self.core_hub.register_topic_handler("code_contribution", self._handle_code_contribution)
         
-        # Load configuration
-        self.config = self._load_config(config_path)
-        
-        # Initialize replay buffer for experience sharing
-        self.replay_buffer = ReplayBuffer(
-            capacity=self.config.get('replay_buffer_capacity', 10000),
-            alpha=self.config.get('replay_buffer_alpha', 0.6),
-            beta=self.config.get('replay_buffer_beta', 0.4),
-            beta_increment=self.config.get('replay_buffer_beta_increment', 0.001),
-            save_dir=self.config.get('replay_buffer_save_dir', 'data/experiences')
-        )
-        
-        # Initialize performance tracker
-        self.performance_tracker = PerformanceTracker(
-            performance_threshold=self.config.get('performance_threshold', 0.7),
-            window_size=self.config.get('performance_window_size', 100),
-            save_dir=self.config.get('performance_save_dir', 'data/performance')
-        )
-        
-        # Message queue and thread for background processing
-        self.message_queue = []
-        self.running = False
-        self.processing_thread = None
-        
-        # Registered agents and their capabilities
-        self.agent_capabilities = {}
-        
-        # Training callbacks
-        self.training_callbacks = {}
-        
-        self.logger.info("Agent Coordinator initialized")
+        # Initialize task database
+        self._load_tasks()
     
-    def _setup_logging(self) -> None:
-        """Set up logging for the agent coordinator."""
-        if self.log_dir:
-            os.makedirs(self.log_dir, exist_ok=True)
-            
-            # Create logger
-            self.logger = logging.getLogger('agent_coordinator')
-            self.logger.setLevel(logging.INFO)
-            
-            # Create file handler
-            log_file = os.path.join(self.log_dir, f'coordinator_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log')
-            file_handler = logging.FileHandler(log_file)
-            
-            # Create formatter
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            file_handler.setFormatter(formatter)
-            
-            # Add handler to logger
-            self.logger.addHandler(file_handler)
-        else:
-            # Create a null logger if no log directory is specified
-            self.logger = logging.getLogger('agent_coordinator')
-            self.logger.addHandler(logging.NullHandler())
-    
-    def _load_config(self, config_path: Optional[str]) -> Dict[str, Any]:
+    def create_task(self, task_data: Dict[str, Any]) -> str:
         """
-        Load configuration from a JSON file or use defaults.
+        Create a new development task.
         
         Args:
-            config_path: Path to the configuration file
+            task_data: Task details
             
         Returns:
-            Configuration dictionary
+            Task ID
         """
-        default_config = {
-            'poll_interval': 1.0,  # seconds
-            'replay_buffer_capacity': 10000,
-            'replay_buffer_alpha': 0.6,
-            'replay_buffer_beta': 0.4,
-            'replay_buffer_beta_increment': 0.001,
-            'replay_buffer_save_dir': 'data/experiences',
-            'performance_threshold': 0.7,
-            'performance_window_size': 100,
-            'performance_save_dir': 'data/performance',
-            'training_threshold': 1000,  # min experiences to start training
-            'training_batch_size': 32,
-            'training_frequency': 50,  # train every N new experiences
+        task = DevelopmentTask(
+            title=task_data.get("title", ""),
+            description=task_data.get("description", ""),
+            task_type=task_data.get("task_type", ""),
+            priority=task_data.get("priority", "medium"),
+            related_files=task_data.get("related_files", []),
+            dependencies=task_data.get("dependencies", []),
+            completion_criteria=task_data.get("completion_criteria", {})
+        )
+        
+        self.tasks[task.task_id] = task
+        self._save_tasks()
+        
+        self.logger.info(f"Created task {task.task_id}: {task.title}")
+        return task.task_id
+    
+    def assign_task(self, task_id: str, agent_id: Optional[str] = None) -> bool:
+        """
+        Assign a task to an agent.
+        
+        Args:
+            task_id: Task to assign
+            agent_id: Agent to assign the task to, or None to auto-assign
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if task_id not in self.tasks:
+            self.logger.error(f"Task {task_id} not found")
+            return False
+        
+        task = self.tasks[task_id]
+        
+        # Check dependencies
+        for dep_id in task.dependencies:
+            if dep_id in self.tasks and self.tasks[dep_id].status != "completed":
+                self.logger.warning(f"Task {task_id} has incomplete dependency {dep_id}")
+                return False
+        
+        # Auto-assign if no agent specified
+        if agent_id is None:
+            agent_id = self._find_best_agent_for_task(task)
+            if agent_id is None:
+                self.logger.error(f"No suitable agent found for task {task_id}")
+                return False
+        
+        # Update task
+        task.agent_id = agent_id
+        task.status = "assigned"
+        task.updated_at = datetime.now().isoformat()
+        self._save_tasks()
+        
+        # Send task assignment message
+        self._send_task_assignment(task)
+        
+        self.logger.info(f"Assigned task {task_id} to agent {agent_id}")
+        return True
+    
+    def update_task_status(self, task_id: str, status: str, result: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Update the status of a task.
+        
+        Args:
+            task_id: Task to update
+            status: New status
+            result: Task result
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if task_id not in self.tasks:
+            self.logger.error(f"Task {task_id} not found")
+            return False
+        
+        task = self.tasks[task_id]
+        task.status = status
+        task.updated_at = datetime.now().isoformat()
+        
+        if result is not None:
+            task.result = result
+        
+        self._save_tasks()
+        
+        self.logger.info(f"Updated task {task_id} status to {status}")
+        return True
+    
+    def get_task(self, task_id: str) -> Optional[DevelopmentTask]:
+        """
+        Get a task by ID.
+        
+        Args:
+            task_id: Task ID
+            
+        Returns:
+            Task, or None if not found
+        """
+        return self.tasks.get(task_id)
+    
+    def get_tasks_by_status(self, status: str) -> List[DevelopmentTask]:
+        """
+        Get all tasks with a specific status.
+        
+        Args:
+            status: Status to filter by
+            
+        Returns:
+            List of tasks
+        """
+        return [task for task in self.tasks.values() if task.status == status]
+    
+    def get_tasks_by_agent(self, agent_id: str) -> List[DevelopmentTask]:
+        """
+        Get all tasks assigned to a specific agent.
+        
+        Args:
+            agent_id: Agent ID
+            
+        Returns:
+            List of tasks
+        """
+        return [task for task in self.tasks.values() if task.agent_id == agent_id]
+    
+    def analyze_codebase(self) -> Dict[str, Any]:
+        """
+        Analyze the codebase to identify areas for improvement.
+        
+        Returns:
+            Analysis results
+        """
+        # Implement codebase analysis logic here
+        analysis_results = {
+            "modules": self._discover_modules(),
+            "code_quality": self._analyze_code_quality(),
+            "test_coverage": self._analyze_test_coverage()
         }
         
-        # If no config path, use defaults
-        if config_path is None:
-            return default_config
-        
-        # Load from file if it exists
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, 'r') as f:
-                    loaded_config = json.load(f)
-                
-                # Merge with defaults (loaded config takes precedence)
-                config = {**default_config, **loaded_config}
-                self.logger.info(f"Configuration loaded from {config_path}")
-                return config
-            except Exception as e:
-                self.logger.error(f"Error loading configuration from {config_path}: {e}")
-                return default_config
-        else:
-            self.logger.warning(f"Configuration file not found: {config_path}")
-            return default_config
+        return analysis_results
     
-    def start(self) -> None:
-        """Start the agent coordinator."""
-        if self.running:
-            self.logger.warning("Agent Coordinator is already running")
+    def generate_tasks_from_analysis(self, analysis: Dict[str, Any]) -> List[str]:
+        """
+        Generate development tasks based on codebase analysis.
+        
+        Args:
+            analysis: Analysis results
+            
+        Returns:
+            List of created task IDs
+        """
+        task_ids = []
+        
+        # Generate code improvement tasks
+        if "code_quality" in analysis and "issues" in analysis["code_quality"]:
+            for issue in analysis["code_quality"]["issues"]:
+                task_data = {
+                    "title": f"Fix code quality issue: {issue['type']}",
+                    "description": f"Address {issue['type']} issue in {issue['file']}:{issue['line']}:\n{issue['description']}",
+                    "task_type": "code_improvement",
+                    "priority": issue.get("severity", "medium"),
+                    "related_files": [issue["file"]]
+                }
+                task_id = self.create_task(task_data)
+                task_ids.append(task_id)
+        
+        # Generate test coverage tasks
+        if "test_coverage" in analysis and "low_coverage" in analysis["test_coverage"]:
+            for module in analysis["test_coverage"]["low_coverage"]:
+                task_data = {
+                    "title": f"Improve test coverage for {module['name']}",
+                    "description": f"Create tests to improve coverage for {module['name']} (current: {module['coverage']}%)",
+                    "task_type": "testing",
+                    "priority": "medium",
+                    "related_files": module.get("files", [])
+                }
+                task_id = self.create_task(task_data)
+                task_ids.append(task_id)
+        
+        return task_ids
+    
+    def _find_best_agent_for_task(self, task: DevelopmentTask) -> Optional[str]:
+        """
+        Find the best agent to handle a specific task.
+        
+        Args:
+            task: Task to assign
+            
+        Returns:
+            Agent ID, or None if no suitable agent found
+        """
+        # Get all registered agents
+        agent_infos = self._get_all_agent_infos()
+        
+        # Match task type to agent capabilities
+        best_match = None
+        best_score = 0
+        
+        for agent_id, agent_info in agent_infos.items():
+            # Skip agents that are busy with too many tasks
+            assigned_tasks = self.get_tasks_by_agent(agent_id)
+            active_tasks = [t for t in assigned_tasks if t.status in ["assigned", "in_progress"]]
+            if len(active_tasks) >= self.config.get("max_agent_tasks", 3):
+                continue
+                
+            # Calculate capability match score
+            score = 0
+            capabilities = agent_info.get("capabilities", [])
+            
+            if task.task_type == "code_generation" and "code_generation" in capabilities:
+                score += 5
+            elif task.task_type == "code_review" and "code_review" in capabilities:
+                score += 5
+            elif task.task_type == "testing" and "testing" in capabilities:
+                score += 5
+            elif task.task_type == "documentation" and "documentation" in capabilities:
+                score += 5
+                
+            # Check for file type expertise
+            for file in task.related_files:
+                ext = os.path.splitext(file)[1].lower()
+                if ext == ".py" and "python" in capabilities:
+                    score += 2
+                elif ext == ".js" and "javascript" in capabilities:
+                    score += 2
+                elif ext == ".html" and "web" in capabilities:
+                    score += 2
+                elif ext == ".css" and "web" in capabilities:
+                    score += 2
+            
+            if score > best_score:
+                best_score = score
+                best_match = agent_id
+        
+        return best_match
+    
+    def _save_tasks(self) -> None:
+        """Save tasks to the database."""
+        tasks_dir = os.path.join(self.config.get("data_dir", "data"), "tasks")
+        os.makedirs(tasks_dir, exist_ok=True)
+        
+        tasks_file = os.path.join(tasks_dir, "tasks.json")
+        with open(tasks_file, "w") as f:
+            task_dict = {task_id: self._task_to_dict(task) for task_id, task in self.tasks.items()}
+            json.dump(task_dict, f, indent=2)
+    
+    def _load_tasks(self) -> None:
+        """Load tasks from the database."""
+        tasks_dir = os.path.join(self.config.get("data_dir", "data"), "tasks")
+        os.makedirs(tasks_dir, exist_ok=True)
+        
+        tasks_file = os.path.join(tasks_dir, "tasks.json")
+        if os.path.exists(tasks_file):
+            try:
+                with open(tasks_file, "r") as f:
+                    task_dict = json.load(f)
+                    self.tasks = {task_id: self._dict_to_task(task_data) for task_id, task_data in task_dict.items()}
+                self.logger.info(f"Loaded {len(self.tasks)} tasks from database")
+            except Exception as e:
+                self.logger.error(f"Error loading tasks: {str(e)}")
+    
+    def _task_to_dict(self, task: DevelopmentTask) -> Dict[str, Any]:
+        """Convert a task to a dictionary for serialization."""
+        return {
+            "task_id": task.task_id,
+            "title": task.title,
+            "description": task.description,
+            "task_type": task.task_type,
+            "priority": task.priority,
+            "status": task.status,
+            "agent_id": task.agent_id,
+            "related_files": task.related_files,
+            "dependencies": task.dependencies,
+            "created_at": task.created_at,
+            "updated_at": task.updated_at,
+            "completion_criteria": task.completion_criteria,
+            "result": task.result
+        }
+    
+    def _dict_to_task(self, data: Dict[str, Any]) -> DevelopmentTask:
+        """Convert a dictionary to a task."""
+        return DevelopmentTask(
+            task_id=data.get("task_id", str(uuid.uuid4())),
+            title=data.get("title", ""),
+            description=data.get("description", ""),
+            task_type=data.get("task_type", ""),
+            priority=data.get("priority", "medium"),
+            status=data.get("status", "pending"),
+            agent_id=data.get("agent_id"),
+            related_files=data.get("related_files", []),
+            dependencies=data.get("dependencies", []),
+            created_at=data.get("created_at", datetime.now().isoformat()),
+            updated_at=data.get("updated_at", datetime.now().isoformat()),
+            completion_criteria=data.get("completion_criteria", {}),
+            result=data.get("result")
+        )
+    
+    def _get_all_agent_infos(self) -> Dict[str, Dict[str, Any]]:
+        """Get information about all registered agents."""
+        agents = {}
+        agent_manager = self.core_hub.agent_manager
+        agent_ids = agent_manager.get_all_agent_ids()
+        
+        for agent_id in agent_ids:
+            agent_info = agent_manager.get_agent_info(agent_id)
+            if agent_info:
+                agents[agent_id] = agent_info
+        
+        return agents
+    
+    def _send_task_assignment(self, task: DevelopmentTask) -> None:
+        """
+        Send a task assignment message to an agent.
+        
+        Args:
+            task: Task to assign
+        """
+        if not task.agent_id:
+            self.logger.error(f"Cannot send task assignment for task {task.task_id}: no agent assigned")
             return
         
-        self.running = True
-        self.processing_thread = threading.Thread(target=self._processing_loop)
-        self.processing_thread.daemon = True
-        self.processing_thread.start()
+        command = CommandMessage(
+            source_agent_id="agent_coordinator",
+            target_agent_id=task.agent_id,
+            command_name="execute_development_task",
+            parameters={
+                "task_id": task.task_id,
+                "task_type": task.task_type,
+                "title": task.title,
+                "description": task.description,
+                "related_files": task.related_files,
+                "completion_criteria": task.completion_criteria
+            }
+        )
         
-        self.logger.info("Agent Coordinator started")
+        self.core_hub.send_message(command)
+        self.logger.info(f"Sent task assignment command for task {task.task_id} to agent {task.agent_id}")
     
-    def stop(self) -> None:
-        """Stop the agent coordinator."""
-        if not self.running:
-            self.logger.warning("Agent Coordinator is not running")
+    def _handle_development_task(self, message: Message) -> None:
+        """
+        Handle incoming development task messages.
+        
+        Args:
+            message: Incoming message
+        """
+        if not isinstance(message, CommandMessage):
             return
         
-        self.running = False
-        if self.processing_thread:
-            self.processing_thread.join(timeout=5.0)
+        command_name = message.payload.get("command_name")
         
-        self.logger.info("Agent Coordinator stopped")
-    
-    def _processing_loop(self) -> None:
-        """Background thread for processing messages and training."""
-        last_training_time = time.time()
-        experiences_since_training = 0
-        
-        while self.running:
-            # Process waiting messages
-            self._process_messages()
+        if command_name == "create_task":
+            # Handle create task command
+            task_data = message.payload.get("parameters", {})
+            task_id = self.create_task(task_data)
             
-            # Check if agents need assistance
-            self._check_agent_performance()
-            
-            # Check if we should trigger training
-            if (experiences_since_training >= self.config.get('training_frequency', 50) and
-                len(self.replay_buffer) >= self.config.get('training_threshold', 1000)):
-                self._trigger_training()
-                experiences_since_training = 0
-                last_training_time = time.time()
-            
-            # Sleep for a bit
-            time.sleep(self.config.get('poll_interval', 1.0))
-    
-    def _process_messages(self) -> None:
-        """Process waiting messages in the queue."""
-        # Make a copy of the queue to avoid modification during iteration
-        current_queue = list(self.message_queue)
-        self.message_queue = []
-        
-        for message in current_queue:
-            try:
-                self._handle_message(message)
-            except Exception as e:
-                self.logger.error(f"Error handling message {message.message_id}: {e}")
-    
-    def _handle_message(self, message: CoordinationMessage) -> None:
-        """
-        Handle a coordination message.
-        
-        Args:
-            message: The message to handle
-        """
-        self.logger.debug(f"Handling message: {message}")
-        
-        # Handle different message types
-        if message.message_type == MessageType.HELP_REQUEST:
-            self._handle_help_request(message)
-        elif message.message_type == MessageType.TASK_DELEGATION:
-            self._handle_task_delegation(message)
-        elif message.message_type == MessageType.TRAINING_UPDATE:
-            self._handle_training_update(message)
-        elif message.message_type == MessageType.ACTION:
-            # Record action for the replay buffer
-            self._record_action(message)
-        elif message.message_type == MessageType.RESULT:
-            # Record result for the replay buffer
-            self._record_result(message)
-        elif message.message_type == MessageType.STATUS_UPDATE:
-            # Update agent performance metrics
-            self._update_performance_metrics(message)
-        elif message.message_type == MessageType.ERROR:
-            # Log error and potentially take remedial action
-            self._handle_error(message)
-    
-    def _handle_help_request(self, message: CoordinationMessage) -> None:
-        """
-        Handle a help request from an agent.
-        
-        Args:
-            message: The help request message
-        """
-        self.logger.info(f"Help request from {message.agent_id}: {message.payload.get('assistance_type')}")
-        
-        # Get the type of assistance needed
-        assistance_type = message.payload.get('assistance_type')
-        context = message.payload.get('context', {})
-        
-        if assistance_type == 'debug':
-            # Delegate to MCP for debugging assistance
-            self.mcp.delegate_task(
-                to_agent_id="MCP",
-                task_type="provide_debugging_assistance",
-                parameters={
-                    "target_agent_id": message.agent_id,
-                    "error_context": context
-                },
-                from_agent_id="coordinator"
+            # Send response
+            response = ResponseMessage(
+                source_agent_id="agent_coordinator",
+                target_agent_id=message.source_agent_id,
+                status="success",
+                result={"task_id": task_id},
+                original_message_id=message.message_id,
+                correlation_id=message.correlation_id
             )
-        elif assistance_type == 'optimization':
-            # Find a suitable agent for optimization assistance
-            suitable_agent = self._find_suitable_agent_for_task("optimization")
+            self.core_hub.send_message(response)
             
-            if suitable_agent:
-                self.mcp.delegate_task(
-                    to_agent_id=suitable_agent,
-                    task_type="provide_optimization_assistance",
-                    parameters={
-                        "target_agent_id": message.agent_id,
-                        "performance_metrics": self.performance_tracker.get_agent_stats(message.agent_id),
-                        "context": context
-                    },
-                    from_agent_id="coordinator"
+        elif command_name == "assign_task":
+            # Handle assign task command
+            params = message.payload.get("parameters", {})
+            task_id = params.get("task_id")
+            agent_id = params.get("agent_id")
+            
+            if not task_id:
+                error = ErrorMessage(
+                    source_agent_id="agent_coordinator",
+                    target_agent_id=message.source_agent_id,
+                    error_code="MISSING_TASK_ID",
+                    error_message="Task ID is required",
+                    correlation_id=message.correlation_id
                 )
-            else:
-                # Fall back to MCP if no suitable agent is found
-                self.mcp.delegate_task(
-                    to_agent_id="MCP",
-                    task_type="provide_optimization_assistance",
-                    parameters={
-                        "target_agent_id": message.agent_id,
-                        "performance_metrics": self.performance_tracker.get_agent_stats(message.agent_id),
-                        "context": context
-                    },
-                    from_agent_id="coordinator"
-                )
-    
-    def _handle_task_delegation(self, message: CoordinationMessage) -> None:
-        """
-        Handle a task delegation message.
-        
-        Args:
-            message: The task delegation message
-        """
-        self.logger.info(f"Task delegation from {message.agent_id}: {message.payload.get('task_type')}")
-        
-        # Extract task details
-        task_type = message.payload.get('task_type')
-        parameters = message.payload.get('parameters', {})
-        priority = message.payload.get('priority', 'normal')
-        
-        # Find a suitable agent for the task
-        suitable_agent = self._find_suitable_agent_for_task(task_type)
-        
-        if suitable_agent:
-            # Delegate the task to the suitable agent
-            task_result = self.mcp.create_task(
-                to_agent_id=suitable_agent,
-                task_type=task_type,
-                parameters=parameters,
-                from_agent_id="coordinator"
-            )
+                self.core_hub.send_message(error)
+                return
             
-            # Notify the original agent of the delegation
-            self.send_message(
-                from_agent_id="coordinator",
-                to_agent_id=message.agent_id,
-                message_type=MessageType.RESULT,
-                payload={
-                    "original_message_id": message.message_id,
-                    "delegated_to": suitable_agent,
-                    "task_id": task_result.get('task_id')
-                }
+            success = self.assign_task(task_id, agent_id)
+            
+            # Send response
+            response = ResponseMessage(
+                source_agent_id="agent_coordinator",
+                target_agent_id=message.source_agent_id,
+                status="success" if success else "failure",
+                result={"task_id": task_id, "agent_id": agent_id if success else None},
+                original_message_id=message.message_id,
+                correlation_id=message.correlation_id
             )
-        else:
-            # Notify the agent that no suitable agent was found
-            self.send_message(
-                from_agent_id="coordinator",
-                to_agent_id=message.agent_id,
-                message_type=MessageType.ERROR,
-                payload={
-                    "original_message_id": message.message_id,
-                    "error": "No suitable agent found for task",
-                    "task_type": task_type
-                }
-            )
+            self.core_hub.send_message(response)
     
-    def _handle_training_update(self, message: CoordinationMessage) -> None:
+    def _handle_task_update(self, message: Message) -> None:
         """
-        Handle a training update message.
+        Handle task update messages from agents.
         
         Args:
-            message: The training update message
+            message: Incoming message
         """
-        self.logger.info(f"Training update from {message.agent_id}")
+        if not isinstance(message, CommandMessage):
+            return
         
-        # Extract model updates
-        model_updates = message.payload.get('model_updates', {})
-        metrics = message.payload.get('metrics', {})
+        command_name = message.payload.get("command_name")
         
-        # Apply updates to registered training callbacks
-        for agent_id, callback in self.training_callbacks.items():
-            try:
-                callback(model_updates, metrics)
-                
-                # Notify the agent of the update
-                self.send_message(
-                    from_agent_id="coordinator",
-                    to_agent_id=agent_id,
-                    message_type=MessageType.POLICY_UPDATE,
-                    payload={
-                        "model_updates": model_updates,
-                        "metrics": metrics,
-                        "source_agent": message.agent_id
+        if command_name == "update_task_status":
+            # Handle task status update
+            params = message.payload.get("parameters", {})
+            task_id = params.get("task_id")
+            status = params.get("status")
+            result = params.get("result")
+            
+            if not task_id or not status:
+                error = ErrorMessage(
+                    source_agent_id="agent_coordinator",
+                    target_agent_id=message.source_agent_id,
+                    error_code="INVALID_PARAMETERS",
+                    error_message="Task ID and status are required",
+                    correlation_id=message.correlation_id
+                )
+                self.core_hub.send_message(error)
+                return
+            
+            success = self.update_task_status(task_id, status, result)
+            
+            # Send response
+            response = ResponseMessage(
+                source_agent_id="agent_coordinator",
+                target_agent_id=message.source_agent_id,
+                status="success" if success else "failure",
+                result={"task_id": task_id, "status": status},
+                original_message_id=message.message_id,
+                correlation_id=message.correlation_id
+            )
+            self.core_hub.send_message(response)
+    
+    def _handle_code_contribution(self, message: Message) -> None:
+        """
+        Handle code contribution messages from agents.
+        
+        Args:
+            message: Incoming message
+        """
+        if not isinstance(message, CommandMessage):
+            return
+        
+        command_name = message.payload.get("command_name")
+        
+        if command_name == "submit_code_contribution":
+            # Handle code contribution
+            params = message.payload.get("parameters", {})
+            task_id = params.get("task_id")
+            file_path = params.get("file_path")
+            code = params.get("code")
+            
+            if not task_id or not file_path or not code:
+                error = ErrorMessage(
+                    source_agent_id="agent_coordinator",
+                    target_agent_id=message.source_agent_id,
+                    error_code="INVALID_PARAMETERS",
+                    error_message="Task ID, file path, and code are required",
+                    correlation_id=message.correlation_id
+                )
+                self.core_hub.send_message(error)
+                return
+            
+            # Create directory structure if needed
+            directory = os.path.dirname(file_path)
+            if directory:
+                os.makedirs(directory, exist_ok=True)
+            
+            # Write code to file
+            with open(file_path, "w") as f:
+                f.write(code)
+            
+            # Update task status
+            task = self.get_task(task_id)
+            if task:
+                self.update_task_status(
+                    task_id, 
+                    "completed", 
+                    {
+                        "file_path": file_path,
+                        "code_size": len(code),
+                        "timestamp": datetime.now().isoformat()
                     }
                 )
-            except Exception as e:
-                self.logger.error(f"Error applying model updates to {agent_id}: {e}")
-    
-    def _record_action(self, message: CoordinationMessage) -> None:
-        """
-        Record an action for the replay buffer.
-        
-        Args:
-            message: The action message
-        """
-        # Extract action details
-        agent_id = message.agent_id
-        state = message.payload.get('state', {})
-        action = message.payload.get('action', {})
-        action_id = message.payload.get('action_id')
-        
-        # Store the action in a temporary buffer until we receive the result
-        # For now, we'll just log it
-        self.logger.debug(f"Recorded action from {agent_id}: {action_id}")
-    
-    def _record_result(self, message: CoordinationMessage) -> None:
-        """
-        Record a result for the replay buffer.
-        
-        Args:
-            message: The result message
-        """
-        # Extract result details
-        agent_id = message.agent_id
-        action_id = message.payload.get('action_id')
-        reward = message.payload.get('reward', 0.0)
-        next_state = message.payload.get('next_state', {})
-        done = message.payload.get('done', False)
-        
-        # In a real system, we would match this with the previous action
-        # For demonstration, we'll create a simple experience
-        experience = Experience(
-            agent_id=agent_id,
-            state={"demo": "state"},  # Would be the actual state from the matched action
-            action={"action_id": action_id},  # Would be the actual action from the matched action
-            reward=reward,
-            next_state=next_state,
-            done=done
-        )
-        
-        # Add the experience to the replay buffer
-        self.replay_buffer.add(experience)
-        
-        self.logger.debug(f"Recorded result from {agent_id}: {action_id} with reward {reward}")
-    
-    def _update_performance_metrics(self, message: CoordinationMessage) -> None:
-        """
-        Update performance metrics for an agent.
-        
-        Args:
-            message: The status update message
-        """
-        # Extract metrics
-        agent_id = message.agent_id
-        metrics = message.payload.get('metrics', {})
-        
-        # Record each metric
-        for metric_name, value in metrics.items():
-            self.performance_tracker.record_metric(agent_id, metric_name, value)
-        
-        self.logger.debug(f"Updated performance metrics for {agent_id}")
-    
-    def _handle_error(self, message: CoordinationMessage) -> None:
-        """
-        Handle an error message from an agent.
-        
-        Args:
-            message: The error message
-        """
-        agent_id = message.agent_id
-        error = message.payload.get('error')
-        context = message.payload.get('context', {})
-        
-        self.logger.warning(f"Error from {agent_id}: {error}")
-        
-        # Check if the agent needs assistance based on errors
-        if self.performance_tracker.needs_assistance(agent_id):
-            self.logger.info(f"Agent {agent_id} needs assistance due to errors")
             
-            # Delegate to MCP for assistance
-            self.mcp.delegate_task(
-                to_agent_id="MCP",
-                task_type="provide_error_assistance",
-                parameters={
-                    "target_agent_id": agent_id,
-                    "error": error,
-                    "context": context,
-                    "performance_metrics": self.performance_tracker.get_agent_stats(agent_id)
-                },
-                from_agent_id="coordinator"
+            # Send response
+            response = ResponseMessage(
+                source_agent_id="agent_coordinator",
+                target_agent_id=message.source_agent_id,
+                status="success",
+                result={"task_id": task_id, "file_path": file_path},
+                original_message_id=message.message_id,
+                correlation_id=message.correlation_id
             )
+            self.core_hub.send_message(response)
     
-    def _check_agent_performance(self) -> None:
-        """Check if any agents need assistance based on performance."""
-        # Get all registered agents from MCP
-        agents = self.mcp.list_agents()
+    def _discover_modules(self) -> List[Dict[str, Any]]:
+        """
+        Discover all Python modules in the project.
         
-        for agent in agents:
-            agent_id = agent.get('agent_id')
+        Returns:
+            List of module information
+        """
+        modules = []
+        base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        
+        for root, dirs, files in os.walk(base_path):
+            # Skip hidden directories and __pycache__
+            dirs[:] = [d for d in dirs if not d.startswith(".") and d != "__pycache__"]
             
-            # Skip the MCP itself and the coordinator
-            if agent_id in ['MCP', 'coordinator']:
-                continue
-            
-            # Check if the agent needs assistance
-            if self.performance_tracker.needs_assistance(agent_id):
-                self.logger.info(f"Agent {agent_id} needs assistance due to poor performance")
-                
-                # Get agent stats
-                stats = self.performance_tracker.get_agent_stats(agent_id)
-                
-                # Find the most problematic metric
-                problematic_metric = None
-                lowest_value = float('inf')
-                
-                for metric_name, metric_stats in stats.items():
-                    if metric_name == 'overall_score':
-                        continue
+            for file in files:
+                if file.endswith(".py"):
+                    rel_path = os.path.relpath(os.path.join(root, file), base_path)
+                    module_path = rel_path.replace(os.path.sep, ".").replace(".py", "")
                     
-                    if 'mean' in metric_stats:
-                        # For metrics where higher is better
-                        if metric_name in ['success_rate', 'accuracy']:
-                            if metric_stats['mean'] < lowest_value:
-                                lowest_value = metric_stats['mean']
-                                problematic_metric = metric_name
-                        # For metrics where lower is better
-                        elif metric_name in ['error_rate', 'response_time']:
-                            if 1.0 - metric_stats['mean'] < lowest_value:
-                                lowest_value = 1.0 - metric_stats['mean']
-                                problematic_metric = metric_name
-                
-                # Delegate to MCP for optimization assistance
-                self.mcp.delegate_task(
-                    to_agent_id="MCP",
-                    task_type="provide_optimization_assistance",
-                    parameters={
-                        "target_agent_id": agent_id,
-                        "performance_metrics": stats,
-                        "problematic_metric": problematic_metric
-                    },
-                    from_agent_id="coordinator"
-                )
+                    modules.append({
+                        "name": module_path,
+                        "path": rel_path,
+                        "full_path": os.path.join(root, file)
+                    })
+        
+        return modules
     
-    def _trigger_training(self) -> None:
-        """Trigger a training cycle using the replay buffer."""
-        self.logger.info("Triggering training cycle")
-        
-        # Sample from the replay buffer
-        batch_size = self.config.get('training_batch_size', 32)
-        experiences, indices, weights = self.replay_buffer.sample(batch_size)
-        
-        if not experiences:
-            self.logger.warning("No experiences to train on")
-            return
-        
-        # In a real system, we would train a model here
-        # For demonstration, we'll just log the training
-        self.logger.info(f"Training on {len(experiences)} experiences")
-        
-        # Update priorities based on some hypothetical loss
-        # In a real system, this would be based on the actual training loss
-        priorities = [1.0] * len(indices)  # Example: all equal priorities
-        self.replay_buffer.update_priorities(indices, priorities)
-        
-        # Notify agents of the training update
-        self.send_message(
-            from_agent_id="coordinator",
-            to_agent_id=None,  # Broadcast to all agents
-            message_type=MessageType.POLICY_UPDATE,
-            payload={
-                "model_updates": {"version": time.time()},  # Example update
-                "metrics": {"loss": 0.1, "accuracy": 0.9}  # Example metrics
-            }
-        )
-    
-    def _find_suitable_agent_for_task(self, task_type: str) -> Optional[str]:
+    def _analyze_code_quality(self) -> Dict[str, Any]:
         """
-        Find a suitable agent for a specific task.
-        
-        Args:
-            task_type: Type of task to find an agent for
-            
-        Returns:
-            Agent ID of a suitable agent, or None if no suitable agent is found
-        """
-        # Check registered agent capabilities
-        for agent_id, capabilities in self.agent_capabilities.items():
-            if task_type in capabilities:
-                return agent_id
-        
-        # If not found in registered capabilities, check MCP's agent list
-        agents = self.mcp.list_agents()
-        
-        for agent in agents:
-            agent_id = agent.get('agent_id')
-            agent_type = agent.get('type')
-            
-            # Heuristic: check if the agent type matches the task type
-            if task_type.lower() in agent_type.lower():
-                return agent_id
-        
-        return None
-    
-    def register_agent_capabilities(self, agent_id: str, capabilities: List[str]) -> None:
-        """
-        Register an agent's capabilities.
-        
-        Args:
-            agent_id: Identifier of the agent
-            capabilities: List of capabilities the agent has
-        """
-        self.agent_capabilities[agent_id] = capabilities
-        self.logger.info(f"Registered capabilities for {agent_id}: {capabilities}")
-    
-    def register_training_callback(self, agent_id: str, callback: Callable[[Dict[str, Any], Dict[str, Any]], None]) -> None:
-        """
-        Register a callback for policy updates.
-        
-        Args:
-            agent_id: Identifier of the agent
-            callback: Function to call with model updates
-        """
-        self.training_callbacks[agent_id] = callback
-        self.logger.info(f"Registered training callback for {agent_id}")
-    
-    def send_message(self, from_agent_id: str, to_agent_id: Optional[str],
-                     message_type: MessageType, payload: Dict[str, Any]) -> str:
-        """
-        Send a message to another agent.
-        
-        Args:
-            from_agent_id: Identifier of the sender agent
-            to_agent_id: Identifier of the recipient agent (None = broadcast)
-            message_type: Type of message
-            payload: Content of the message
-            
-        Returns:
-            ID of the sent message
-        """
-        message = CoordinationMessage(
-            agent_id=from_agent_id,
-            recipient_id=to_agent_id,
-            message_type=message_type,
-            payload=payload
-        )
-        
-        # If recipient is None, broadcast to all agents via MCP
-        if to_agent_id is None:
-            # Use MCP to broadcast
-            self.mcp.broadcast_message(
-                from_agent_id=from_agent_id,
-                message_type=message_type.name,
-                content=payload
-            )
-        else:
-            # Send direct message via MCP
-            self.mcp.send_message(
-                from_agent_id=from_agent_id,
-                to_agent_id=to_agent_id,
-                message_type=message_type.name,
-                content=payload
-            )
-        
-        # Queue the message for our own processing
-        self.message_queue.append(message)
-        
-        return message.message_id
-    
-    def record_experience(self, agent_id: str, state: Dict[str, Any],
-                         action: Dict[str, Any], reward: float,
-                         next_state: Dict[str, Any], done: bool) -> None:
-        """
-        Record an experience directly.
-        
-        Args:
-            agent_id: Identifier of the agent
-            state: State before action
-            action: Action taken
-            reward: Reward received
-            next_state: State after action
-            done: Whether the episode is done
-        """
-        experience = Experience(
-            agent_id=agent_id,
-            state=state,
-            action=action,
-            reward=reward,
-            next_state=next_state,
-            done=done
-        )
-        
-        self.replay_buffer.add(experience)
-    
-    def request_help(self, agent_id: str, assistance_type: str,
-                    context: Optional[Dict[str, Any]] = None) -> str:
-        """
-        Request help for an agent.
-        
-        Args:
-            agent_id: Identifier of the agent requesting help
-            assistance_type: Type of assistance needed
-            context: Additional context for the help request
-            
-        Returns:
-            ID of the sent message
-        """
-        return self.send_message(
-            from_agent_id=agent_id,
-            to_agent_id="coordinator",  # To self, will be processed in the message loop
-            message_type=MessageType.HELP_REQUEST,
-            payload={
-                "assistance_type": assistance_type,
-                "context": context or {}
-            }
-        )
-    
-    def get_system_status(self) -> Dict[str, Any]:
-        """
-        Get the status of the coordination system.
+        Analyze code quality of the codebase.
         
         Returns:
-            Dictionary with system status
+            Code quality analysis results
         """
+        # Simple placeholder implementation
+        # In a real implementation, this would use tools like pylint or flake8
+        issues = []
+        modules = self._discover_modules()
+        
+        for module_info in modules:
+            file_path = module_info["full_path"]
+            try:
+                with open(file_path, "r") as f:
+                    lines = f.readlines()
+                    
+                for i, line in enumerate(lines):
+                    # Check line length
+                    if len(line) > 100:
+                        issues.append({
+                            "file": module_info["path"],
+                            "line": i + 1,
+                            "type": "line-too-long",
+                            "severity": "low",
+                            "description": f"Line longer than 100 characters ({len(line)} chars)"
+                        })
+                    
+                    # Check for TODOs
+                    if "TODO" in line:
+                        issues.append({
+                            "file": module_info["path"],
+                            "line": i + 1,
+                            "type": "todo-found",
+                            "severity": "low",
+                            "description": f"TODO comment found: {line.strip()}"
+                        })
+            except Exception as e:
+                self.logger.warning(f"Error analyzing {file_path}: {str(e)}")
+        
         return {
-            "running": self.running,
-            "replay_buffer": {
-                "size": len(self.replay_buffer),
-                "capacity": self.replay_buffer.capacity,
-                "stats": self.replay_buffer.get_stats()
-            },
-            "performance_tracker": {
-                "agent_count": len(self.performance_tracker.metrics),
-                "agents_needing_assistance": [
-                    agent_id for agent_id in self.performance_tracker.metrics
-                    if self.performance_tracker.needs_assistance(agent_id)
-                ]
-            },
-            "message_queue_size": len(self.message_queue),
-            "registered_agents": list(self.agent_capabilities.keys()),
-            "registered_callbacks": list(self.training_callbacks.keys())
+            "issues": issues,
+            "issue_count": len(issues)
         }
     
-    def get_agent_performance(self, agent_id: str) -> Dict[str, Any]:
+    def _analyze_test_coverage(self) -> Dict[str, Any]:
         """
-        Get performance metrics for an agent.
+        Analyze test coverage of the codebase.
         
-        Args:
-            agent_id: Identifier of the agent
-            
         Returns:
-            Dictionary with performance metrics
+            Test coverage analysis results
         """
-        return self.performance_tracker.get_agent_stats(agent_id)
+        # Simple placeholder implementation
+        # In a real implementation, this would use tools like coverage.py
+        modules = self._discover_modules()
+        test_files = [m for m in modules if "test_" in m["name"] or "tests" in m["name"]]
+        
+        # Find modules without corresponding test files
+        low_coverage = []
+        for module in modules:
+            if "test_" not in module["name"] and "tests" not in module["name"]:
+                has_test = False
+                for test in test_files:
+                    if module["name"] in test["name"]:
+                        has_test = True
+                        break
+                
+                if not has_test:
+                    low_coverage.append({
+                        "name": module["name"],
+                        "path": module["path"],
+                        "coverage": 0,
+                        "files": [module["path"]]
+                    })
+        
+        return {
+            "test_files": len(test_files),
+            "total_modules": len(modules),
+            "low_coverage": low_coverage,
+            "coverage_percentage": 100 * (1 - len(low_coverage) / max(1, len(modules) - len(test_files)))
+        }
+
+
+def create_agent_coordinator(core_hub: CoreHubEnhanced, config_path: Optional[str] = None) -> AgentCoordinator:
+    """
+    Create an Agent Coordinator with the specified configuration.
     
-    def generate_performance_report(self) -> Dict[str, Any]:
-        """
-        Generate a comprehensive performance report.
+    Args:
+        core_hub: Enhanced Core Hub instance
+        config_path: Path to configuration file
         
-        Returns:
-            Dictionary with performance data for all agents
-        """
-        return self.performance_tracker.generate_performance_report()
+    Returns:
+        Configured Agent Coordinator
+    """
+    if config_path and os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            config = json.load(f)
+    else:
+        config = {
+            "data_dir": "data/agent_coordination",
+            "max_agent_tasks": 3
+        }
+    
+    return AgentCoordinator(core_hub, config)

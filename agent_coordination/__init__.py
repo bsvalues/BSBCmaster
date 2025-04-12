@@ -1,21 +1,10 @@
 """
-Agent Coordination System for Benton County Assessor's Office
+Agent Coordination Package for Benton County Assessor's Office AI Platform
 
-This package provides coordination and experience sharing functionality
-for the AI agent framework, allowing agents to delegate tasks, share
-experiences, and continuously improve through collaborative learning.
+This package provides the framework for an agent-assisted development system
+where AI agents actively contribute to building and improving the application codebase.
 """
 
-from .coordinator import AgentCoordinator
-from .replay_buffer import ReplayBuffer, Experience
-from .message import CoordinationMessage, MessageType
-from .performance import PerformanceTracker
-
-__all__ = [
-    'AgentCoordinator',
-    'ReplayBuffer',
-    'Experience',
-    'CoordinationMessage',
-    'MessageType',
-    'PerformanceTracker'
-]
+from agent_coordination.coordinator import AgentCoordinator, create_agent_coordinator
+from agent_coordination.developer_agent import DeveloperAgent, create_developer_agent
+from agent_coordination.data_validation_agent import DataValidationAgent, create_data_validation_agent
