@@ -10,6 +10,7 @@ import logging
 import json
 import sys
 from typing import Dict, List, Any, Optional
+from app.db.json_utils import sanitize_for_json, json_serialize
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
@@ -48,7 +49,7 @@ def test_all():
         logger.error("Failed to fetch accounts")
         return False
     logger.info(f"Fetched {len(accounts)} accounts")
-    logger.info(f"First account: {json.dumps(accounts[0], indent=2)}")
+    logger.info(f"First account: {json_serialize(sanitize_for_json(accounts[0]))}")
     
     # Test get account by ID
     if accounts:
@@ -83,7 +84,7 @@ def test_all():
         logger.error("Failed to get property types")
     else:
         logger.info(f"Successfully retrieved {len(property_types)} property types")
-        logger.info(f"Property types: {json.dumps(property_types, indent=2)}")
+        logger.info(f"Property types: {json_serialize(sanitize_for_json(property_types))}")
     
     # Test get city statistics
     logger.info("Testing get_city_statistics")
@@ -92,7 +93,7 @@ def test_all():
         logger.error("Failed to get city statistics")
     else:
         logger.info(f"Successfully retrieved statistics for {len(city_stats)} cities")
-        logger.info(f"City statistics: {json.dumps(city_stats, indent=2)}")
+        logger.info(f"City statistics: {json_serialize(sanitize_for_json(city_stats))}")
     
     # Test get value distribution
     logger.info("Testing get_value_distribution")
