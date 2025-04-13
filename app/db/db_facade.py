@@ -282,10 +282,21 @@ class DatabaseFacade:
         
         # Fall back to direct SQL query
         try:
-            query = f"SELECT * FROM assessments WHERE property_id = {property_id}"
-            results = execute_query(query)
-            logger.info(f"Successfully fetched {len(results)} assessments for property {property_id} via direct SQL")
-            return encode_decimal_datetime(results)
+            query = "SELECT * FROM assessments WHERE property_id = %(property_id)s"
+            params = {"property_id": property_id}
+            results = execute_query(query, params)
+            
+            # Handle different result types
+            if isinstance(results, list):
+                logger.info(f"Successfully fetched {len(results)} assessments for property {property_id} via direct SQL")
+                return encode_decimal_datetime(results)
+            elif isinstance(results, dict):
+                # If we got a single dict, wrap it in a list
+                logger.info(f"Successfully fetched 1 assessment for property {property_id} via direct SQL")
+                return encode_decimal_datetime([results])
+            else:
+                # Empty or unexpected result
+                return []
         except Exception as e:
             logger.error(f"Direct SQL fetch failed: {str(e)}")
             return []
@@ -305,8 +316,20 @@ class DatabaseFacade:
         # For raw queries, direct SQL is always more reliable
         try:
             results = execute_query(query, params)
-            logger.info(f"Successfully executed query via direct SQL with {len(results)} results")
-            return encode_decimal_datetime(results)
+            
+            # Handle different result types correctly
+            if isinstance(results, list):
+                logger.info(f"Successfully executed query via direct SQL with {len(results)} results")
+                return encode_decimal_datetime(results)
+            elif isinstance(results, dict):
+                # If we got a single dict, wrap it in a list
+                logger.info("Successfully executed query via direct SQL with 1 result")
+                return encode_decimal_datetime([results])
+            else:
+                # Empty or unexpected result
+                logger.info("Successfully executed query via direct SQL with 0 results")
+                return []
+                
         except Exception as e:
             logger.error(f"Direct SQL query failed: {str(e)}")
             return []
@@ -328,7 +351,7 @@ class DatabaseFacade:
         
         # Get schema via direct SQL
         try:
-            query = f"""
+            query = """
             SELECT 
                 column_name, 
                 data_type,
@@ -338,11 +361,12 @@ class DatabaseFacade:
                 information_schema.columns
             WHERE 
                 table_schema = 'public'
-                AND table_name = '{table_name}'
+                AND table_name = %(table_name)s
             ORDER BY 
                 ordinal_position;
             """
-            results = execute_query(query)
+            params = {"table_name": table_name}
+            results = execute_query(query, params)
             if results:
                 logger.info(f"Successfully fetched schema for table {table_name}")
                 _schema_cache[table_name] = results
@@ -385,9 +409,10 @@ class DatabaseFacade:
             placeholders = ', '.join([f"%({k})s" for k in data.keys()])
             query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders}) RETURNING *"
             results = execute_query(query, data)
-            if results:
+            if results and len(results) > 0:
                 logger.info(f"Successfully created record in {table_name} via direct SQL")
-                return encode_decimal_datetime(results[0])
+                # Safely access the first element
+                return encode_decimal_datetime(results[0]) if isinstance(results[0], dict) else None
             return None
         except Exception as e:
             logger.error(f"Direct SQL create failed: {str(e)}")
@@ -427,9 +452,10 @@ class DatabaseFacade:
             params = data.copy()
             params['record_id'] = record_id
             results = execute_query(query, params)
-            if results:
+            if results and len(results) > 0:
                 logger.info(f"Successfully updated record {record_id} in {table_name} via direct SQL")
-                return encode_decimal_datetime(results[0])
+                # Safely access the first element
+                return encode_decimal_datetime(results[0]) if isinstance(results[0], dict) else None
             return None
         except Exception as e:
             logger.error(f"Direct SQL update failed: {str(e)}")
@@ -461,9 +487,10 @@ class DatabaseFacade:
         
         # Fall back to direct SQL query
         try:
-            query = f"DELETE FROM {table_name} WHERE id = %(record_id)s RETURNING id"
-            results = execute_query(query, {'record_id': record_id})
-            if results:
+            query = "DELETE FROM %(table)s WHERE id = %(record_id)s RETURNING id"
+            params = {'record_id': record_id, 'table': table_name}
+            results = execute_query(query, params)
+            if results and len(results) > 0:
                 logger.info(f"Successfully deleted record {record_id} from {table_name} via direct SQL")
                 return True
             return False

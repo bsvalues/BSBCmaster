@@ -51,7 +51,7 @@ def get_connection():
         logger.error(f"Error connecting to database: {str(e)}")
         return None
 
-def execute_query(query: str, params: Optional[Union[Dict[str, Any], List, Tuple]] = None) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
+def execute_query(query: str, params: Optional[Union[Dict[str, Any], List, Tuple]] = None) -> List[Dict[str, Any]]:
     """
     Execute a SQL query and return the results.
     
@@ -60,7 +60,7 @@ def execute_query(query: str, params: Optional[Union[Dict[str, Any], List, Tuple
         params: Query parameters (dict, list, or tuple)
         
     Returns:
-        Either a list of dictionaries with the query results, or a single dictionary for single-row results
+        A list of dictionaries with the query results
     """
     conn = get_connection()
     if not conn:
@@ -84,9 +84,11 @@ def execute_query(query: str, params: Optional[Union[Dict[str, Any], List, Tuple
             # Fetch results
             results = cursor.fetchall()
             
-            # Convert to list of dictionaries
+            # Convert to list of dictionaries (always return a list for consistency)
+            if not results:
+                return []
+                
             records = [dict(row) for row in results]
-            
             return records
     except Exception as e:
         logger.error(f"Error executing query: {str(e)}")
@@ -133,7 +135,10 @@ def get_account_by_id(account_id: str) -> Optional[Dict[str, Any]]:
     """
     
     results = execute_query(query, [account_id])
-    return results[0] if results else None
+    # Safely access first element if it exists
+    if results and len(results) > 0:
+        return results[0]
+    return None
 
 def get_accounts_by_city(city: str, limit: int = 100) -> List[Dict[str, Any]]:
     """
