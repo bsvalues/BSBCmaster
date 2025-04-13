@@ -77,13 +77,19 @@ class DatabaseFacade:
             # Handle different result types
             if isinstance(results, list):
                 logger.info(f"Successfully fetched {len(results)} properties via direct SQL")
-                return encode_decimal_datetime(results)
+                # Make sure each item is a dict before encoding
+                records = []
+                for item in results:
+                    if isinstance(item, dict):
+                        records.append(item)
+                return encode_decimal_datetime(records)
             elif isinstance(results, dict):
                 # If we got a single dict, wrap it in a list
                 logger.info("Successfully fetched 1 property via direct SQL")
                 return encode_decimal_datetime([results])
             else:
                 # Empty or unexpected result
+                logger.warning(f"Unexpected result type for properties: {type(results)}")
                 return []
                 
         except Exception as e:
@@ -164,13 +170,19 @@ class DatabaseFacade:
             # Handle different result types
             if isinstance(results, list):
                 logger.info(f"Successfully fetched {len(results)} accounts via direct SQL")
-                return encode_decimal_datetime(results)
+                # Make sure each item is a dict before encoding
+                records = []
+                for item in results:
+                    if isinstance(item, dict):
+                        records.append(item)
+                return encode_decimal_datetime(records)
             elif isinstance(results, dict):
                 # If we got a single dict, wrap it in a list
                 logger.info("Successfully fetched 1 account via direct SQL")
                 return encode_decimal_datetime([results])
             else:
                 # Empty or unexpected result
+                logger.warning(f"Unexpected result type for accounts: {type(results)}")
                 return []
         except Exception as e:
             logger.error(f"Direct SQL fetch failed: {str(e)}")
@@ -207,10 +219,12 @@ class DatabaseFacade:
             # Handle different result types
             if isinstance(results, list) and results:
                 logger.info(f"Successfully fetched account {account_id} via direct SQL")
-                return encode_decimal_datetime(results[0])
+                if isinstance(results[0], dict):
+                    return encode_decimal_datetime(results[0])
             elif isinstance(results, dict):
                 logger.info(f"Successfully fetched account {account_id} via direct SQL")
                 return encode_decimal_datetime(results)
+            logger.warning(f"No account found with ID {account_id}")
             return None
         except Exception as e:
             logger.error(f"Direct SQL fetch failed: {str(e)}")
@@ -248,13 +262,19 @@ class DatabaseFacade:
             # Handle different result types
             if isinstance(results, list):
                 logger.info(f"Successfully fetched {len(results)} assessments via direct SQL")
-                return encode_decimal_datetime(results)
+                # Make sure each item is a dict before encoding
+                records = []
+                for item in results:
+                    if isinstance(item, dict):
+                        records.append(item)
+                return encode_decimal_datetime(records)
             elif isinstance(results, dict):
                 # If we got a single dict, wrap it in a list
                 logger.info("Successfully fetched 1 assessment via direct SQL")
                 return encode_decimal_datetime([results])
             else:
                 # Empty or unexpected result
+                logger.warning(f"Unexpected result type for assessments: {type(results)}")
                 return []
         except Exception as e:
             logger.error(f"Direct SQL fetch failed: {str(e)}")
@@ -291,13 +311,19 @@ class DatabaseFacade:
             # Handle different result types
             if isinstance(results, list):
                 logger.info(f"Successfully fetched {len(results)} assessments for property {property_id} via direct SQL")
-                return encode_decimal_datetime(results)
+                # Make sure each item is a dict before encoding
+                records = []
+                for item in results:
+                    if isinstance(item, dict):
+                        records.append(item)
+                return encode_decimal_datetime(records)
             elif isinstance(results, dict):
                 # If we got a single dict, wrap it in a list
                 logger.info(f"Successfully fetched 1 assessment for property {property_id} via direct SQL")
                 return encode_decimal_datetime([results])
             else:
                 # Empty or unexpected result
+                logger.warning(f"Unexpected result type for assessments by property: {type(results)}")
                 return []
         except Exception as e:
             logger.error(f"Direct SQL fetch failed: {str(e)}")
@@ -322,7 +348,12 @@ class DatabaseFacade:
             # Handle different result types correctly
             if isinstance(results, list):
                 logger.info(f"Successfully executed query via direct SQL with {len(results)} results")
-                return encode_decimal_datetime(results)
+                # Make sure each item is a dict before encoding
+                records = []
+                for item in results:
+                    if isinstance(item, dict):
+                        records.append(item)
+                return encode_decimal_datetime(records)
             elif isinstance(results, dict):
                 # If we got a single dict, wrap it in a list
                 logger.info("Successfully executed query via direct SQL with 1 result")
@@ -330,6 +361,7 @@ class DatabaseFacade:
             else:
                 # Empty or unexpected result
                 logger.info("Successfully executed query via direct SQL with 0 results")
+                logger.warning(f"Unexpected result type from execute_query: {type(results)}")
                 return []
                 
         except Exception as e:
