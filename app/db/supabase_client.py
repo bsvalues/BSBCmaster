@@ -68,7 +68,8 @@ def fetch_properties(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         return []
     
     try:
-        response = supabase.table("properties").select("*").limit(limit).offset(offset).execute()
+        # Try using from_ syntax with explicit schema
+        response = supabase.from_("properties").select("*").limit(limit).offset(offset).execute()
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error fetching properties: {response.error}")
             return []
@@ -92,7 +93,7 @@ def get_property_by_id(property_id: str) -> Optional[Dict[str, Any]]:
         return None
     
     try:
-        response = supabase.table("properties").select("*").eq("id", property_id).limit(1).single().execute()
+        response = supabase.from_("properties").select("*").eq("id", property_id).limit(1).single().execute()
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error getting property {property_id}: {response.error}")
             return None
@@ -116,7 +117,7 @@ def create_property(property_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
     
     try:
-        response = supabase.table("properties").insert(property_data).execute()
+        response = supabase.from_("properties").insert(property_data).execute()
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error creating property: {response.error}")
             return None
