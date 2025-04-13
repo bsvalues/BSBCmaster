@@ -203,20 +203,23 @@ def get_value_distribution() -> Dict[str, int]:
         Dictionary with value ranges and counts
     """
     query = """
-    SELECT
-        CASE
-            WHEN assessed_value < 100000 THEN 'Under $100K'
-            WHEN assessed_value < 250000 THEN '$100K - $250K'
-            WHEN assessed_value < 500000 THEN '$250K - $500K'
-            WHEN assessed_value < 1000000 THEN '$500K - $1M'
-            ELSE 'Over $1M'
-        END as range,
-        COUNT(*) as count
-    FROM accounts
-    WHERE assessed_value IS NOT NULL
-    GROUP BY range
+    WITH value_ranges AS (
+        SELECT
+            CASE
+                WHEN assessed_value < 100000 THEN 'Under $100K'
+                WHEN assessed_value < 250000 THEN '$100K - $250K'
+                WHEN assessed_value < 500000 THEN '$250K - $500K'
+                WHEN assessed_value < 1000000 THEN '$500K - $1M'
+                ELSE 'Over $1M'
+            END as value_range,
+            COUNT(*) as count
+        FROM accounts
+        WHERE assessed_value IS NOT NULL
+        GROUP BY value_range
+    )
+    SELECT value_range, count FROM value_ranges
     ORDER BY 
-        CASE range
+        CASE value_range
             WHEN 'Under $100K' THEN 1
             WHEN '$100K - $250K' THEN 2
             WHEN '$250K - $500K' THEN 3
@@ -237,7 +240,7 @@ def get_value_distribution() -> Dict[str, int]:
     }
     
     for row in results:
-        distribution[row["range"]] = row["count"]
+        distribution[row["value_range"]] = row["count"]
     
     return distribution
 

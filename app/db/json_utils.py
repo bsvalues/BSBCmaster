@@ -11,11 +11,13 @@ from typing import Any, Dict, List, Optional, Union
 
 class CustomJSONEncoder(json.JSONEncoder):
     """
-    Custom JSON encoder that handles Decimal and other non-JSON serializable types.
+    Custom JSON encoder that handles Decimal, datetime, and other non-JSON serializable types.
     """
     def default(self, o):
         if isinstance(o, decimal.Decimal):
             return float(o)
+        elif isinstance(o, (datetime.datetime, datetime.date)):
+            return o.isoformat()
         return super().default(o)
 
 def json_serialize(data: Any) -> str:
@@ -42,6 +44,8 @@ def sanitize_for_json(data: Any) -> Any:
     """
     if isinstance(data, decimal.Decimal):
         return float(data)
+    elif isinstance(data, (datetime.datetime, datetime.date)):
+        return data.isoformat()
     elif isinstance(data, list):
         return [sanitize_for_json(item) for item in data]
     elif isinstance(data, dict):
