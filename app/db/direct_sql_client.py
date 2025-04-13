@@ -236,7 +236,7 @@ def get_value_distribution() -> Dict[str, int]:
     results = execute_query(query, {})
     
     # Convert to dictionary
-    distribution = {
+    distribution: Dict[str, int] = {
         "Under $100K": 0,
         "$100K - $250K": 0,
         "$250K - $500K": 0,
@@ -245,7 +245,15 @@ def get_value_distribution() -> Dict[str, int]:
     }
     
     for row in results:
-        distribution[row["value_range"]] = row["count"]
+        if "value_range" in row and "count" in row:
+            value_range = str(row["value_range"])
+            if value_range in distribution:
+                # Ensure count is an integer
+                try:
+                    count_value = int(row["count"])
+                    distribution[value_range] = count_value
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid count value for {value_range}: {row['count']}")
     
     return distribution
 

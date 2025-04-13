@@ -121,10 +121,12 @@ class DatabaseFacade:
             # Handle different result types
             if isinstance(results, list) and results:
                 logger.info(f"Successfully fetched property {property_id} via direct SQL")
-                return encode_decimal_datetime(results[0])
+                if isinstance(results[0], dict):
+                    return encode_decimal_datetime(results[0])
             elif isinstance(results, dict):
                 logger.info(f"Successfully fetched property {property_id} via direct SQL")
                 return encode_decimal_datetime(results)
+            logger.warning(f"No property found with ID {property_id}")
             return None
         except Exception as e:
             logger.error(f"Direct SQL fetch failed: {str(e)}")
@@ -412,7 +414,10 @@ class DatabaseFacade:
             if results and len(results) > 0:
                 logger.info(f"Successfully created record in {table_name} via direct SQL")
                 # Safely access the first element
-                return encode_decimal_datetime(results[0]) if isinstance(results[0], dict) else None
+                if isinstance(results, list) and isinstance(results[0], dict):
+                    return encode_decimal_datetime(results[0])
+                # Fallback for unexpected result types
+                logger.warning(f"Unexpected result type from create_record: {type(results)}")
             return None
         except Exception as e:
             logger.error(f"Direct SQL create failed: {str(e)}")
@@ -455,7 +460,10 @@ class DatabaseFacade:
             if results and len(results) > 0:
                 logger.info(f"Successfully updated record {record_id} in {table_name} via direct SQL")
                 # Safely access the first element
-                return encode_decimal_datetime(results[0]) if isinstance(results[0], dict) else None
+                if isinstance(results, list) and isinstance(results[0], dict):
+                    return encode_decimal_datetime(results[0])
+                # Fallback for unexpected result types
+                logger.warning(f"Unexpected result type from update_record: {type(results)}")
             return None
         except Exception as e:
             logger.error(f"Direct SQL update failed: {str(e)}")
