@@ -51,16 +51,16 @@ def get_connection():
         logger.error(f"Error connecting to database: {str(e)}")
         return None
 
-def execute_query(query: str, params: Optional[Union[Dict[str, Any], List, Tuple]] = None) -> List[Dict[str, Any]]:
+def execute_query(query: str, params: Optional[Union[Dict[str, Any], List, Tuple]] = None) -> Union[List[Dict[str, Any]], Dict[str, Any]]:
     """
-    Execute a SQL query and return the results as a list of dictionaries.
+    Execute a SQL query and return the results.
     
     Args:
         query: SQL query to execute
         params: Query parameters (dict, list, or tuple)
         
     Returns:
-        List of dictionaries with the query results
+        Either a list of dictionaries with the query results, or a single dictionary for single-row results
     """
     conn = get_connection()
     if not conn:

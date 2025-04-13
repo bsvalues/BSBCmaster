@@ -70,10 +70,22 @@ class DatabaseFacade:
         
         # Fall back to direct SQL query
         try:
-            query = f"SELECT * FROM properties LIMIT {limit} OFFSET {offset}"
-            results = execute_query(query)
-            logger.info(f"Successfully fetched {len(results)} properties via direct SQL")
-            return encode_decimal_datetime(results)
+            query = "SELECT * FROM properties LIMIT %(limit)s OFFSET %(offset)s"
+            params = {"limit": limit, "offset": offset}
+            results = execute_query(query, params)
+            
+            # Handle different result types
+            if isinstance(results, list):
+                logger.info(f"Successfully fetched {len(results)} properties via direct SQL")
+                return encode_decimal_datetime(results)
+            elif isinstance(results, dict):
+                # If we got a single dict, wrap it in a list
+                logger.info("Successfully fetched 1 property via direct SQL")
+                return encode_decimal_datetime([results])
+            else:
+                # Empty or unexpected result
+                return []
+                
         except Exception as e:
             logger.error(f"Direct SQL fetch failed: {str(e)}")
             return []
@@ -102,11 +114,17 @@ class DatabaseFacade:
         
         # Fall back to direct SQL query
         try:
-            query = f"SELECT * FROM properties WHERE id = {property_id}"
-            results = execute_query(query)
-            if results:
+            query = "SELECT * FROM properties WHERE id = %(property_id)s"
+            params = {"property_id": property_id}
+            results = execute_query(query, params)
+            
+            # Handle different result types
+            if isinstance(results, list) and results:
                 logger.info(f"Successfully fetched property {property_id} via direct SQL")
                 return encode_decimal_datetime(results[0])
+            elif isinstance(results, dict):
+                logger.info(f"Successfully fetched property {property_id} via direct SQL")
+                return encode_decimal_datetime(results)
             return None
         except Exception as e:
             logger.error(f"Direct SQL fetch failed: {str(e)}")
@@ -137,10 +155,21 @@ class DatabaseFacade:
         
         # Fall back to direct SQL query
         try:
-            query = f"SELECT * FROM accounts LIMIT {limit} OFFSET {offset}"
-            results = execute_query(query)
-            logger.info(f"Successfully fetched {len(results)} accounts via direct SQL")
-            return encode_decimal_datetime(results)
+            query = "SELECT * FROM accounts LIMIT %(limit)s OFFSET %(offset)s"
+            params = {"limit": limit, "offset": offset}
+            results = execute_query(query, params)
+            
+            # Handle different result types
+            if isinstance(results, list):
+                logger.info(f"Successfully fetched {len(results)} accounts via direct SQL")
+                return encode_decimal_datetime(results)
+            elif isinstance(results, dict):
+                # If we got a single dict, wrap it in a list
+                logger.info("Successfully fetched 1 account via direct SQL")
+                return encode_decimal_datetime([results])
+            else:
+                # Empty or unexpected result
+                return []
         except Exception as e:
             logger.error(f"Direct SQL fetch failed: {str(e)}")
             return []
@@ -169,11 +198,17 @@ class DatabaseFacade:
         
         # Fall back to direct SQL query
         try:
-            query = f"SELECT * FROM accounts WHERE id = {account_id}"
-            results = execute_query(query)
-            if results:
+            query = "SELECT * FROM accounts WHERE id = %(account_id)s"
+            params = {"account_id": account_id}
+            results = execute_query(query, params)
+            
+            # Handle different result types
+            if isinstance(results, list) and results:
                 logger.info(f"Successfully fetched account {account_id} via direct SQL")
                 return encode_decimal_datetime(results[0])
+            elif isinstance(results, dict):
+                logger.info(f"Successfully fetched account {account_id} via direct SQL")
+                return encode_decimal_datetime(results)
             return None
         except Exception as e:
             logger.error(f"Direct SQL fetch failed: {str(e)}")
@@ -204,10 +239,21 @@ class DatabaseFacade:
         
         # Fall back to direct SQL query
         try:
-            query = f"SELECT * FROM assessments LIMIT {limit} OFFSET {offset}"
-            results = execute_query(query)
-            logger.info(f"Successfully fetched {len(results)} assessments via direct SQL")
-            return encode_decimal_datetime(results)
+            query = "SELECT * FROM assessments LIMIT %(limit)s OFFSET %(offset)s"
+            params = {"limit": limit, "offset": offset}
+            results = execute_query(query, params)
+            
+            # Handle different result types
+            if isinstance(results, list):
+                logger.info(f"Successfully fetched {len(results)} assessments via direct SQL")
+                return encode_decimal_datetime(results)
+            elif isinstance(results, dict):
+                # If we got a single dict, wrap it in a list
+                logger.info("Successfully fetched 1 assessment via direct SQL")
+                return encode_decimal_datetime([results])
+            else:
+                # Empty or unexpected result
+                return []
         except Exception as e:
             logger.error(f"Direct SQL fetch failed: {str(e)}")
             return []
