@@ -142,7 +142,7 @@ def update_property(property_id: str, property_data: Dict[str, Any]) -> Optional
         return None
     
     try:
-        response = supabase.table("properties").update(property_data).eq("id", property_id).execute()
+        response = supabase.from_("properties").update(property_data).eq("id", property_id).execute()
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error updating property {property_id}: {response.error}")
             return None
@@ -166,7 +166,7 @@ def delete_property(property_id: str) -> bool:
         return False
     
     try:
-        response = supabase.table("properties").delete().eq("id", property_id).execute()
+        response = supabase.from_("properties").delete().eq("id", property_id).execute()
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error deleting property {property_id}: {response.error}")
             return False
@@ -192,7 +192,7 @@ def fetch_accounts(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         return []
     
     try:
-        response = supabase.table("accounts").select("*").limit(limit).offset(offset).execute()
+        response = supabase.from_("accounts").select("*").limit(limit).offset(offset).execute()
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error fetching accounts: {response.error}")
             return []
@@ -216,7 +216,7 @@ def get_account_by_id(account_id: str) -> Optional[Dict[str, Any]]:
         return None
     
     try:
-        response = supabase.table("accounts").select("*").eq("id", account_id).limit(1).single().execute()
+        response = supabase.from_("accounts").select("*").eq("id", account_id).limit(1).single().execute()
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error getting account {account_id}: {response.error}")
             return None
@@ -242,7 +242,7 @@ def fetch_assessments(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]
         return []
     
     try:
-        response = supabase.table("assessments").select("*").limit(limit).offset(offset).execute()
+        response = supabase.from_("assessments").select("*").limit(limit).offset(offset).execute()
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error fetching assessments: {response.error}")
             return []
@@ -266,7 +266,7 @@ def get_assessments_by_property(property_id: str) -> List[Dict[str, Any]]:
         return []
     
     try:
-        response = supabase.table("assessments").select("*").eq("property_id", property_id).execute()
+        response = supabase.from_("assessments").select("*").eq("property_id", property_id).execute()
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error getting assessments for property {property_id}: {response.error}")
             return []
@@ -318,7 +318,7 @@ def test_connection() -> bool:
     
     try:
         # Try to fetch a single row from properties table
-        response = supabase.table("properties").select("id").limit(1).execute()
+        response = supabase.from_("properties").select("id").limit(1).execute()
         if hasattr(response, 'error') and response.error:
             logger.error(f"Error testing connection: {response.error}")
             return False
