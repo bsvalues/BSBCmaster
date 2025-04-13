@@ -244,6 +244,20 @@ def get_value_distribution() -> Dict[str, int]:
     
     return distribution
 
+def is_connected() -> bool:
+    """
+    Check if database connection is available.
+    
+    Returns:
+        True if connection is available, False otherwise
+    """
+    conn = get_connection()
+    if not conn:
+        return False
+    
+    conn.close()
+    return True
+
 def test_connection() -> bool:
     """
     Test the database connection.
