@@ -5,6 +5,7 @@ This module provides JWT-based authentication for secure access to the API.
 """
 
 import os
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, Optional, List, Any, Union
 
@@ -15,10 +16,21 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 
 # Security configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "development-secret-key-change-in-production")
+# Check if production environment
+IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
+
+# Set JWT secret key - raise an error in production if not set
+if IS_PRODUCTION and not os.getenv("JWT_SECRET_KEY"):
+    raise ValueError("JWT_SECRET_KEY must be set in production environment")
+
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "development-secret-key-do-not-use-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+
+# Log warning if using default key in development
+if not IS_PRODUCTION and SECRET_KEY == "development-secret-key-do-not-use-in-production":
+    logging.warning("Using default JWT secret key. This is insecure and should only be used for development.")
 
 # OAuth2 token URL
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/token")
@@ -51,7 +63,7 @@ class User(BaseModel):
 
 class TokenData(BaseModel):
     """Token data model."""
-    username: Optional[str] = None
+    username: str = "unknown-user"  # Default to avoid None
     roles: List[str] = []
     permissions: List[str] = []
     exp: Optional[datetime] = None
@@ -216,9 +228,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         
         # Extract data from token
-        username: str = payload.get("sub")
+        username = payload.get("sub")
         if username is None:
             raise credentials_exception
+        
+        # Ensure username is a string
+        username = str(username)
         
         roles = payload.get("roles", ["user"])
         permissions = payload.get("permissions", [])
@@ -242,10 +257,29 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         )
     
     # Here you would typically look up the user in the database
-    # For now, we'll create a dummy user with the data from the token
+    # If we can't find the user, we'll create a user object with the data from the token
+    # TODO: Replace with actual database lookup in production
+
+    # Extract username from sub - remove "agent:" prefix if present
+    username = token_data.username
+    if username and username.startswith("agent:"):
+        username = username[6:]  # Strip "agent:" prefix
+    
+    # Make sure username is not None
+    if username is None:
+        username = "unknown-user"
+    
+    # Try to find user in database if possible
+    try:
+        # For now, we'll simulate a lookup by extracting email from the token if available
+        email = payload.get("email", f"{username}@unknown.com")
+    except Exception:
+        # Fallback email based on username
+        email = f"{username}@unknown.com"
+    
     user = User(
-        username=token_data.username,
-        email=f"{token_data.username}@example.com",  # Placeholder
+        username=username,
+        email=email,
         roles=token_data.roles
     )
     

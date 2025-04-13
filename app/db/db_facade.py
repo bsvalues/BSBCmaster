@@ -334,11 +334,11 @@ class DatabaseFacade:
         
         # Fall back to direct SQL query
         try:
-            # Build INSERT query dynamically
+            # Build INSERT query with proper parameterization
             columns = ', '.join(data.keys())
-            placeholders = ', '.join([f"'{v}'" if isinstance(v, str) else str(v) if v is not None else 'NULL' for v in data.values()])
+            placeholders = ', '.join([f"%({k})s" for k in data.keys()])
             query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders}) RETURNING *"
-            results = execute_query(query)
+            results = execute_query(query, data)
             if results:
                 logger.info(f"Successfully created record in {table_name} via direct SQL")
                 return encode_decimal_datetime(results[0])
@@ -374,10 +374,13 @@ class DatabaseFacade:
         
         # Fall back to direct SQL query
         try:
-            # Build UPDATE query dynamically
-            set_clause = ', '.join([f"{k} = '{v}'" if isinstance(v, str) else f"{k} = {v}" if v is not None else f"{k} = NULL" for k, v in data.items()])
-            query = f"UPDATE {table_name} SET {set_clause} WHERE id = {record_id} RETURNING *"
-            results = execute_query(query)
+            # Build UPDATE query with proper parameterization
+            set_clause = ', '.join([f"{k} = %({k})s" for k in data.keys()])
+            query = f"UPDATE {table_name} SET {set_clause} WHERE id = %(record_id)s RETURNING *"
+            # Add record_id to the parameters
+            params = data.copy()
+            params['record_id'] = record_id
+            results = execute_query(query, params)
             if results:
                 logger.info(f"Successfully updated record {record_id} in {table_name} via direct SQL")
                 return encode_decimal_datetime(results[0])
@@ -412,8 +415,8 @@ class DatabaseFacade:
         
         # Fall back to direct SQL query
         try:
-            query = f"DELETE FROM {table_name} WHERE id = {record_id} RETURNING id"
-            results = execute_query(query)
+            query = f"DELETE FROM {table_name} WHERE id = %(record_id)s RETURNING id"
+            results = execute_query(query, {'record_id': record_id})
             if results:
                 logger.info(f"Successfully deleted record {record_id} from {table_name} via direct SQL")
                 return True
