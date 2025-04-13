@@ -102,7 +102,7 @@ def test_all():
         logger.error("Failed to get value distribution")
     else:
         logger.info(f"Successfully retrieved value distribution")
-        logger.info(f"Value distribution: {json.dumps(value_dist, indent=2)}")
+        logger.info(f"Value distribution: {json_serialize(sanitize_for_json(value_dist))}")
     
     logger.info("All tests completed")
     return True

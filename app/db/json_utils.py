@@ -6,6 +6,7 @@ This module provides utilities for working with JSON data.
 
 import json
 import decimal
+import datetime
 from typing import Any, Dict, List, Optional, Union
 
 class CustomJSONEncoder(json.JSONEncoder):
