@@ -1,111 +1,74 @@
 """
 Test Database Facade
 
-This script tests the database facade module to ensure it correctly
-accesses the database via either Supabase REST API or direct SQL.
+This script tests the Database Facade to ensure it correctly handles data access
+and automatically falls back to direct SQL when REST API access fails.
 """
 
-import os
 import logging
-import json
-import sys
-from typing import Dict, List, Any, Optional
-from app.db.json_utils import sanitize_for_json, json_serialize
+from app.db.db_facade import db
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, 
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Add app to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-# Import the database facade
-from app.db.db_facade import (
-    test_connection,
-    fetch_accounts,
-    get_account_by_id,
-    get_accounts_by_city,
-    get_property_types,
-    get_city_statistics,
-    get_value_distribution
-)
-
-def test_all():
-    """Run all tests."""
-    logger.info("Testing database facade")
+def main():
+    """Main function to test database facade."""
+    logger.info("Testing Database Facade")
     
-    # Test connection
-    logger.info("Testing database connection")
-    if not test_connection():
-        logger.error("Database connection failed")
-        return False
-    logger.info("Database connection test passed")
+    # Check if connected
+    if not db.is_connected():
+        logger.error("Database facade is not connected to any database")
+        return
     
-    # Test fetch accounts
-    logger.info("Testing fetch_accounts (limit=3)")
-    accounts = fetch_accounts(limit=3)
-    if not accounts:
-        logger.error("Failed to fetch accounts")
-        return False
+    # Test getting properties
+    logger.info("Fetching properties (limit=5)...")
+    properties = db.get_properties(limit=5)
+    logger.info(f"Fetched {len(properties)} properties")
+    if properties:
+        logger.info(f"First property: {properties[0]}")
+    
+    # Test getting property by ID
+    if properties:
+        property_id = properties[0]['id']
+        logger.info(f"Fetching property with ID {property_id}...")
+        property_data = db.get_property_by_id(property_id)
+        if property_data:
+            logger.info(f"Found property: {property_data}")
+        else:
+            logger.warning(f"Property with ID {property_id} not found")
+    
+    # Test getting accounts
+    logger.info("Fetching accounts (limit=5)...")
+    accounts = db.get_accounts(limit=5)
     logger.info(f"Fetched {len(accounts)} accounts")
-    logger.info(f"First account: {json_serialize(sanitize_for_json(accounts[0]))}")
-    
-    # Test get account by ID
     if accounts:
-        account_id = accounts[0].get('account_id')
-        logger.info(f"Testing get_account_by_id with ID: {account_id}")
-        account = get_account_by_id(account_id)
-        if not account:
-            logger.error(f"Failed to get account by ID: {account_id}")
+        logger.info(f"First account: {accounts[0]}")
+        
+        # Test getting account by ID
+        account_id = accounts[0]['id']
+        logger.info(f"Fetching account with ID {account_id}...")
+        account_data = db.get_account_by_id(account_id)
+        if account_data:
+            logger.info(f"Found account: {account_data}")
         else:
-            logger.info(f"Successfully retrieved account by ID: {account_id}")
+            logger.warning(f"Account with ID {account_id} not found")
     
-    # Test get accounts by city
-    # First find a city that exists in the data
-    cities = set()
-    for account in accounts:
-        if account.get('property_city'):
-            cities.add(account.get('property_city'))
+    # Test getting table schema
+    logger.info("Fetching schema for 'properties' table...")
+    schema = db.get_table_schema('properties')
+    logger.info(f"Fetched {len(schema)} columns in 'properties' schema")
+    for column in schema:
+        logger.info(f"Column: {column['column_name']}, Type: {column['data_type']}, Nullable: {column['is_nullable']}")
     
-    if cities:
-        test_city = list(cities)[0]
-        logger.info(f"Testing get_accounts_by_city with city: {test_city}")
-        city_accounts = get_accounts_by_city(test_city, limit=2)
-        if not city_accounts:
-            logger.error(f"Failed to get accounts for city: {test_city}")
-        else:
-            logger.info(f"Successfully retrieved {len(city_accounts)} accounts for city: {test_city}")
-    
-    # Test get property types
-    logger.info("Testing get_property_types")
-    property_types = get_property_types()
-    if not property_types:
-        logger.error("Failed to get property types")
+    # Test raw SQL query
+    logger.info("Executing raw SQL query...")
+    query = "SELECT COUNT(*) as count FROM properties"
+    results = db.execute_query(query)
+    if results:
+        logger.info(f"Query result: {results[0]}")
     else:
-        logger.info(f"Successfully retrieved {len(property_types)} property types")
-        logger.info(f"Property types: {json_serialize(sanitize_for_json(property_types))}")
-    
-    # Test get city statistics
-    logger.info("Testing get_city_statistics")
-    city_stats = get_city_statistics()
-    if not city_stats:
-        logger.error("Failed to get city statistics")
-    else:
-        logger.info(f"Successfully retrieved statistics for {len(city_stats)} cities")
-        logger.info(f"City statistics: {json_serialize(sanitize_for_json(city_stats))}")
-    
-    # Test get value distribution
-    logger.info("Testing get_value_distribution")
-    value_dist = get_value_distribution()
-    if not value_dist:
-        logger.error("Failed to get value distribution")
-    else:
-        logger.info(f"Successfully retrieved value distribution")
-        logger.info(f"Value distribution: {json_serialize(sanitize_for_json(value_dist))}")
-    
-    logger.info("All tests completed")
-    return True
+        logger.warning("Query returned no results")
 
 if __name__ == "__main__":
-    test_all()
+    main()

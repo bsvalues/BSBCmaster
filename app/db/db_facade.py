@@ -1,216 +1,426 @@
 """
 Database Facade Module
 
-This module provides a unified interface for accessing the database,
-attempting to use the Supabase REST API first, and falling back to direct SQL
-queries if necessary.
+This module provides a unified facade over Supabase client and direct SQL access,
+allowing the application to use the most reliable method depending on circumstances.
+It automatically falls back to direct SQL connections when REST API fails.
 """
 
-import os
 import logging
-import json
-from typing import Dict, List, Any, Optional, Union, Callable
+from typing import Any, Dict, List, Optional, Union, Callable
+
+from .supabase_client import (
+    get_supabase_client,
+    is_connected as is_supabase_connected,
+    test_connection as test_supabase_connection
+)
+from .direct_sql_client import (
+    execute_query,
+    is_connected as is_sql_connected
+)
+from .json_utils import encode_decimal_datetime
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Import clients
-from app.db.supabase_client import get_supabase_client, is_connected as is_supabase_connected
-import app.db.direct_sql_client as sql_client
+# Cache for table schema information
+_schema_cache = {}
 
-def with_fallback(supabase_func: Callable, sql_func: Callable, *args, **kwargs):
+class DatabaseFacade:
     """
-    Try to execute a function using the Supabase client first, and fall back to SQL if that fails.
+    Unified database interface that automatically chooses the best access method.
     
-    Args:
-        supabase_func: Function to call with the Supabase client
-        sql_func: Function to call with the SQL client as a fallback
-        *args, **kwargs: Arguments to pass to both functions
-        
-    Returns:
-        The result of either function
+    This facade will try Supabase REST API first (faster, more efficient),
+    but fall back to direct SQL queries if the REST API access fails (more reliable).
     """
-    # Try Supabase first
-    if is_supabase_connected():
+    
+    @staticmethod
+    def is_connected() -> bool:
+        """
+        Check if either database connection method is available.
+        
+        Returns:
+            bool: True if at least one connection method is available, False otherwise
+        """
+        return is_supabase_connected() or is_sql_connected()
+    
+    @staticmethod
+    def get_properties(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+        """
+        Get properties from the database using the best available method.
+        
+        Args:
+            limit: Maximum number of records to return
+            offset: Number of records to skip
+            
+        Returns:
+            List[Dict[str, Any]]: List of property records
+        """
+        # First try Supabase REST API (if it's working)
+        if is_supabase_connected() and test_supabase_connection():
+            try:
+                from .supabase_client import fetch_properties
+                properties = fetch_properties(limit=limit, offset=offset)
+                if properties:
+                    logger.info(f"Successfully fetched {len(properties)} properties via Supabase REST API")
+                    return properties
+            except Exception as e:
+                logger.warning(f"Supabase REST API fetch failed: {str(e)}, falling back to direct SQL")
+        
+        # Fall back to direct SQL query
         try:
-            supabase = get_supabase_client()
-            result = supabase_func(supabase, *args, **kwargs)
-            return result
+            query = f"SELECT * FROM properties LIMIT {limit} OFFSET {offset}"
+            results = execute_query(query)
+            logger.info(f"Successfully fetched {len(results)} properties via direct SQL")
+            return encode_decimal_datetime(results)
         except Exception as e:
-            logger.warning(f"Supabase REST API call failed: {str(e)}. Falling back to SQL.")
-    else:
-        logger.warning("Supabase client not connected. Using SQL fallback.")
+            logger.error(f"Direct SQL fetch failed: {str(e)}")
+            return []
     
-    # Fall back to SQL
-    return sql_func(*args, **kwargs)
-
-# Fetch accounts
-def _supabase_fetch_accounts(supabase, limit=100, offset=0):
-    """Fetch accounts using Supabase."""
-    response = supabase.table("accounts").select("*").limit(limit).offset(offset).execute()
-    return response.data if hasattr(response, 'data') else []
-
-def fetch_accounts(limit=100, offset=0):
-    """
-    Fetch accounts from the database.
-    
-    Args:
-        limit: Maximum number of records to return
-        offset: Number of records to skip
+    @staticmethod
+    def get_property_by_id(property_id: Union[str, int]) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific property by ID using the best available method.
         
-    Returns:
-        List of account records
-    """
-    return with_fallback(
-        _supabase_fetch_accounts,
-        sql_client.fetch_accounts,
-        limit=limit,
-        offset=offset
-    )
-
-# Get account by ID
-def _supabase_get_account_by_id(supabase, account_id):
-    """Get account by ID using Supabase."""
-    response = supabase.table("accounts").select("*").eq("account_id", account_id).limit(1).execute()
-    return response.data[0] if hasattr(response, 'data') and response.data else None
-
-def get_account_by_id(account_id):
-    """
-    Get a specific account by ID.
-    
-    Args:
-        account_id: Unique identifier for the account
+        Args:
+            property_id: Unique identifier for the property
+            
+        Returns:
+            Optional[Dict[str, Any]]: Property record if found, None otherwise
+        """
+        # First try Supabase REST API (if it's working)
+        if is_supabase_connected() and test_supabase_connection():
+            try:
+                from .supabase_client import get_property_by_id
+                property_data = get_property_by_id(str(property_id))
+                if property_data:
+                    logger.info(f"Successfully fetched property {property_id} via Supabase REST API")
+                    return property_data
+            except Exception as e:
+                logger.warning(f"Supabase REST API fetch failed: {str(e)}, falling back to direct SQL")
         
-    Returns:
-        Account record if found, None otherwise
-    """
-    return with_fallback(
-        _supabase_get_account_by_id,
-        sql_client.get_account_by_id,
-        account_id=account_id
-    )
-
-# Get accounts by city
-def _supabase_get_accounts_by_city(supabase, city, limit=100):
-    """Get accounts by city using Supabase."""
-    response = supabase.table("accounts").select("*").eq("property_city", city).limit(limit).execute()
-    return response.data if hasattr(response, 'data') else []
-
-def get_accounts_by_city(city, limit=100):
-    """
-    Get accounts by city.
+        # Fall back to direct SQL query
+        try:
+            query = f"SELECT * FROM properties WHERE id = {property_id}"
+            results = execute_query(query)
+            if results:
+                logger.info(f"Successfully fetched property {property_id} via direct SQL")
+                return encode_decimal_datetime(results[0])
+            return None
+        except Exception as e:
+            logger.error(f"Direct SQL fetch failed: {str(e)}")
+            return None
     
-    Args:
-        city: City name to filter by
-        limit: Maximum number of records to return
+    @staticmethod
+    def get_accounts(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+        """
+        Get accounts from the database using the best available method.
         
-    Returns:
-        List of account records in the specified city
-    """
-    return with_fallback(
-        _supabase_get_accounts_by_city,
-        sql_client.get_accounts_by_city,
-        city=city,
-        limit=limit
-    )
+        Args:
+            limit: Maximum number of records to return
+            offset: Number of records to skip
+            
+        Returns:
+            List[Dict[str, Any]]: List of account records
+        """
+        # First try Supabase REST API (if it's working)
+        if is_supabase_connected() and test_supabase_connection():
+            try:
+                from .supabase_client import fetch_accounts
+                accounts = fetch_accounts(limit=limit, offset=offset)
+                if accounts:
+                    logger.info(f"Successfully fetched {len(accounts)} accounts via Supabase REST API")
+                    return accounts
+            except Exception as e:
+                logger.warning(f"Supabase REST API fetch failed: {str(e)}, falling back to direct SQL")
+        
+        # Fall back to direct SQL query
+        try:
+            query = f"SELECT * FROM accounts LIMIT {limit} OFFSET {offset}"
+            results = execute_query(query)
+            logger.info(f"Successfully fetched {len(results)} accounts via direct SQL")
+            return encode_decimal_datetime(results)
+        except Exception as e:
+            logger.error(f"Direct SQL fetch failed: {str(e)}")
+            return []
+    
+    @staticmethod
+    def get_account_by_id(account_id: Union[str, int]) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific account by ID using the best available method.
+        
+        Args:
+            account_id: Unique identifier for the account
+            
+        Returns:
+            Optional[Dict[str, Any]]: Account record if found, None otherwise
+        """
+        # First try Supabase REST API (if it's working)
+        if is_supabase_connected() and test_supabase_connection():
+            try:
+                from .supabase_client import get_account_by_id
+                account_data = get_account_by_id(str(account_id))
+                if account_data:
+                    logger.info(f"Successfully fetched account {account_id} via Supabase REST API")
+                    return account_data
+            except Exception as e:
+                logger.warning(f"Supabase REST API fetch failed: {str(e)}, falling back to direct SQL")
+        
+        # Fall back to direct SQL query
+        try:
+            query = f"SELECT * FROM accounts WHERE id = {account_id}"
+            results = execute_query(query)
+            if results:
+                logger.info(f"Successfully fetched account {account_id} via direct SQL")
+                return encode_decimal_datetime(results[0])
+            return None
+        except Exception as e:
+            logger.error(f"Direct SQL fetch failed: {str(e)}")
+            return None
+    
+    @staticmethod
+    def get_assessments(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+        """
+        Get assessments from the database using the best available method.
+        
+        Args:
+            limit: Maximum number of records to return
+            offset: Number of records to skip
+            
+        Returns:
+            List[Dict[str, Any]]: List of assessment records
+        """
+        # First try Supabase REST API (if it's working)
+        if is_supabase_connected() and test_supabase_connection():
+            try:
+                from .supabase_client import fetch_assessments
+                assessments = fetch_assessments(limit=limit, offset=offset)
+                if assessments:
+                    logger.info(f"Successfully fetched {len(assessments)} assessments via Supabase REST API")
+                    return assessments
+            except Exception as e:
+                logger.warning(f"Supabase REST API fetch failed: {str(e)}, falling back to direct SQL")
+        
+        # Fall back to direct SQL query
+        try:
+            query = f"SELECT * FROM assessments LIMIT {limit} OFFSET {offset}"
+            results = execute_query(query)
+            logger.info(f"Successfully fetched {len(results)} assessments via direct SQL")
+            return encode_decimal_datetime(results)
+        except Exception as e:
+            logger.error(f"Direct SQL fetch failed: {str(e)}")
+            return []
+    
+    @staticmethod
+    def get_assessments_by_property(property_id: Union[str, int]) -> List[Dict[str, Any]]:
+        """
+        Get assessments for a specific property using the best available method.
+        
+        Args:
+            property_id: Unique identifier for the property
+            
+        Returns:
+            List[Dict[str, Any]]: List of assessment records for the property
+        """
+        # First try Supabase REST API (if it's working)
+        if is_supabase_connected() and test_supabase_connection():
+            try:
+                from .supabase_client import get_assessments_by_property
+                assessments = get_assessments_by_property(str(property_id))
+                if assessments:
+                    logger.info(f"Successfully fetched assessments for property {property_id} via Supabase REST API")
+                    return assessments
+            except Exception as e:
+                logger.warning(f"Supabase REST API fetch failed: {str(e)}, falling back to direct SQL")
+        
+        # Fall back to direct SQL query
+        try:
+            query = f"SELECT * FROM assessments WHERE property_id = {property_id}"
+            results = execute_query(query)
+            logger.info(f"Successfully fetched {len(results)} assessments for property {property_id} via direct SQL")
+            return encode_decimal_datetime(results)
+        except Exception as e:
+            logger.error(f"Direct SQL fetch failed: {str(e)}")
+            return []
+    
+    @staticmethod
+    def execute_query(query: str, params: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """
+        Execute a raw SQL query using the best available method.
+        
+        Args:
+            query: SQL query to execute
+            params: Query parameters
+            
+        Returns:
+            List[Dict[str, Any]]: Query result rows
+        """
+        # For raw queries, direct SQL is always more reliable
+        try:
+            results = execute_query(query, params)
+            logger.info(f"Successfully executed query via direct SQL with {len(results)} results")
+            return encode_decimal_datetime(results)
+        except Exception as e:
+            logger.error(f"Direct SQL query failed: {str(e)}")
+            return []
+    
+    @staticmethod
+    def get_table_schema(table_name: str) -> List[Dict[str, Any]]:
+        """
+        Get schema information for a specific table.
+        
+        Args:
+            table_name: Name of the table
+            
+        Returns:
+            List[Dict[str, Any]]: List of column definitions for the table
+        """
+        # Use cache if available
+        if table_name in _schema_cache:
+            return _schema_cache[table_name]
+        
+        # Get schema via direct SQL
+        try:
+            query = f"""
+            SELECT 
+                column_name, 
+                data_type,
+                is_nullable,
+                column_default
+            FROM 
+                information_schema.columns
+            WHERE 
+                table_schema = 'public'
+                AND table_name = '{table_name}'
+            ORDER BY 
+                ordinal_position;
+            """
+            results = execute_query(query)
+            if results:
+                logger.info(f"Successfully fetched schema for table {table_name}")
+                _schema_cache[table_name] = results
+                return results
+            else:
+                logger.warning(f"No schema found for table {table_name}")
+                return []
+        except Exception as e:
+            logger.error(f"Failed to get schema for table {table_name}: {str(e)}")
+            return []
+    
+    @staticmethod
+    def create_record(table_name: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Create a new record in the specified table.
+        
+        Args:
+            table_name: Name of the table
+            data: Record data to insert
+            
+        Returns:
+            Optional[Dict[str, Any]]: Created record if successful, None otherwise
+        """
+        # First try Supabase REST API (if it's working)
+        if is_supabase_connected() and test_supabase_connection():
+            try:
+                client = get_supabase_client()
+                if client:
+                    response = client.from_(table_name).insert(data).execute()
+                    if hasattr(response, 'data') and response.data:
+                        logger.info(f"Successfully created record in {table_name} via Supabase REST API")
+                        return response.data[0]
+            except Exception as e:
+                logger.warning(f"Supabase REST API create failed: {str(e)}, falling back to direct SQL")
+        
+        # Fall back to direct SQL query
+        try:
+            # Build INSERT query dynamically
+            columns = ', '.join(data.keys())
+            placeholders = ', '.join([f"'{v}'" if isinstance(v, str) else str(v) if v is not None else 'NULL' for v in data.values()])
+            query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders}) RETURNING *"
+            results = execute_query(query)
+            if results:
+                logger.info(f"Successfully created record in {table_name} via direct SQL")
+                return encode_decimal_datetime(results[0])
+            return None
+        except Exception as e:
+            logger.error(f"Direct SQL create failed: {str(e)}")
+            return None
+    
+    @staticmethod
+    def update_record(table_name: str, record_id: Union[str, int], data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Update an existing record in the specified table.
+        
+        Args:
+            table_name: Name of the table
+            record_id: ID of the record to update
+            data: Updated record data
+            
+        Returns:
+            Optional[Dict[str, Any]]: Updated record if successful, None otherwise
+        """
+        # First try Supabase REST API (if it's working)
+        if is_supabase_connected() and test_supabase_connection():
+            try:
+                client = get_supabase_client()
+                if client:
+                    response = client.from_(table_name).update(data).eq('id', record_id).execute()
+                    if hasattr(response, 'data') and response.data:
+                        logger.info(f"Successfully updated record {record_id} in {table_name} via Supabase REST API")
+                        return response.data[0]
+            except Exception as e:
+                logger.warning(f"Supabase REST API update failed: {str(e)}, falling back to direct SQL")
+        
+        # Fall back to direct SQL query
+        try:
+            # Build UPDATE query dynamically
+            set_clause = ', '.join([f"{k} = '{v}'" if isinstance(v, str) else f"{k} = {v}" if v is not None else f"{k} = NULL" for k, v in data.items()])
+            query = f"UPDATE {table_name} SET {set_clause} WHERE id = {record_id} RETURNING *"
+            results = execute_query(query)
+            if results:
+                logger.info(f"Successfully updated record {record_id} in {table_name} via direct SQL")
+                return encode_decimal_datetime(results[0])
+            return None
+        except Exception as e:
+            logger.error(f"Direct SQL update failed: {str(e)}")
+            return None
+    
+    @staticmethod
+    def delete_record(table_name: str, record_id: Union[str, int]) -> bool:
+        """
+        Delete a record from the specified table.
+        
+        Args:
+            table_name: Name of the table
+            record_id: ID of the record to delete
+            
+        Returns:
+            bool: True if deletion was successful, False otherwise
+        """
+        # First try Supabase REST API (if it's working)
+        if is_supabase_connected() and test_supabase_connection():
+            try:
+                client = get_supabase_client()
+                if client:
+                    response = client.from_(table_name).delete().eq('id', record_id).execute()
+                    if hasattr(response, 'data'):
+                        logger.info(f"Successfully deleted record {record_id} from {table_name} via Supabase REST API")
+                        return True
+            except Exception as e:
+                logger.warning(f"Supabase REST API delete failed: {str(e)}, falling back to direct SQL")
+        
+        # Fall back to direct SQL query
+        try:
+            query = f"DELETE FROM {table_name} WHERE id = {record_id} RETURNING id"
+            results = execute_query(query)
+            if results:
+                logger.info(f"Successfully deleted record {record_id} from {table_name} via direct SQL")
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Direct SQL delete failed: {str(e)}")
+            return False
 
-# Get property types
-def _supabase_get_property_types(supabase):
-    """Get property types using Supabase (simplified approach)."""
-    # This would typically require a more complex query or server-side function
-    response = supabase.table("accounts").select("property_type, count").execute()
-    if not hasattr(response, 'data') or not response.data:
-        return []
-    
-    # Process the results (simplified)
-    property_types = {}
-    for account in response.data:
-        property_type = account.get('property_type')
-        if property_type:
-            if property_type not in property_types:
-                property_types[property_type] = {'count': 0, 'total_value': 0}
-            property_types[property_type]['count'] += 1
-            property_types[property_type]['total_value'] += account.get('assessed_value', 0) or 0
-    
-    # Calculate averages
-    result = []
-    for property_type, stats in property_types.items():
-        avg_value = stats['total_value'] / stats['count'] if stats['count'] > 0 else 0
-        result.append({
-            'property_type': property_type,
-            'count': stats['count'],
-            'average_value': avg_value
-        })
-    
-    return result
-
-def get_property_types():
-    """
-    Get a list of unique property types and their counts.
-    
-    Returns:
-        List of property types and counts
-    """
-    # Here we'll just use the SQL client directly since the Supabase
-    # implementation would be much more complex for grouped queries
-    return sql_client.get_property_types()
-
-# Get city statistics
-def get_city_statistics():
-    """
-    Get statistics for each city.
-    
-    Returns:
-        List of city statistics
-    """
-    # Again, we'll use SQL directly for these aggregation queries
-    return sql_client.get_city_statistics()
-
-# Get value distribution
-def get_value_distribution():
-    """
-    Get the distribution of property values.
-    
-    Returns:
-        Dictionary with value ranges and counts
-    """
-    return sql_client.get_value_distribution()
-
-# Test connection
-def test_connection():
-    """
-    Test the database connection.
-    
-    Returns:
-        True if either connection method is successful
-    """
-    supabase_connected = is_supabase_connected()
-    if supabase_connected:
-        logger.info("Supabase REST API connection successful")
-    
-    sql_connected = sql_client.test_connection()
-    if sql_connected:
-        logger.info("Direct SQL connection successful")
-    
-    return supabase_connected or sql_connected
-
-if __name__ == "__main__":
-    if test_connection():
-        print("Database connection successful")
-    else:
-        print("Database connection failed")
-    
-    accounts = fetch_accounts(limit=5)
-    print(f"Fetched {len(accounts)} accounts")
-    if accounts:
-        print(f"First account: {json.dumps(accounts[0], indent=2)}")
-    
-    property_types = get_property_types()
-    print(f"Property types: {json.dumps(property_types, indent=2)}")
-    
-    city_stats = get_city_statistics()
-    print(f"City statistics: {json.dumps(city_stats, indent=2)}")
-    
-    value_dist = get_value_distribution()
-    print(f"Value distribution: {json.dumps(value_dist, indent=2)}")
+# Create a singleton instance for easy access
+db = DatabaseFacade()
